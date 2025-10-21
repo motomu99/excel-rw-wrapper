@@ -1,0 +1,152 @@
+plugins {
+    id 'java'
+    id 'java-library'
+    id 'jacoco'
+    id 'com.github.spotbugs' version '6.0.7'
+    id 'checkstyle'
+    id 'pmd'
+}
+
+group = 'com.example'
+version = '1.0.0'
+
+java {
+    sourceCompatibility = '21'
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // OpenCSV
+    api 'com.opencsv:opencsv:5.9'
+    
+    // Test Dependencies
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+// 日本語対応のためのエンコーディング設定
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
+// JARファイル名の設定
+jar {
+    archiveBaseName = 'excel-rw-wrapper'
+    archiveVersion = '1.0.0'
+}
+
+// ソースJARの生成
+java {
+    withSourcesJar()
+    withJavadocJar()
+}
+
+// JaCoCo設定
+jacoco {
+    toolVersion = "0.8.11"
+}
+
+jacocoTestReport {
+    reports {
+        xml.required = true
+        html.required = true
+        csv.required = false
+    }
+    
+    // demoパッケージを除外
+    afterEvaluate {
+        classDirectories.setFrom(classDirectories.files.collect {
+            fileTree(dir: it, exclude: '**/demo/**')
+        })
+    }
+    
+    finalizedBy jacocoTestCoverageVerification
+}
+
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit {
+                minimum = 0.15 // 15%以上のカバレッジを要求（demoパッケージ除外後）
+            }
+        }
+    }
+}
+
+// テスト実行後にカバレッジレポートを生成
+test {
+    finalizedBy jacocoTestReport
+}
+
+// SpotBugs設定
+spotbugs {
+    toolVersion = '4.8.3'
+    ignoreFailures = false
+}
+
+spotbugsMain {
+    reports {
+        html {
+            required = true
+            outputLocation = file("$buildDir/reports/spotbugs/main/spotbugs.html")
+            stylesheet = 'fancy-hist.xsl'
+        }
+        xml {
+            required = true
+            outputLocation = file("$buildDir/reports/spotbugs/main/spotbugs.xml")
+        }
+    }
+}
+
+spotbugsTest {
+    reports {
+        html {
+            required = true
+            outputLocation = file("$buildDir/reports/spotbugs/test/spotbugs.html")
+            stylesheet = 'fancy-hist.xsl'
+        }
+    }
+}
+
+// Checkstyle設定
+checkstyle {
+    toolVersion = '10.12.4'
+    configFile = file('config/checkstyle/checkstyle.xml')
+    ignoreFailures = false
+    maxWarnings = 0
+}
+
+// PMD設定
+pmd {
+    toolVersion = '7.0.0'
+    ruleSetFiles = files('config/pmd/pmd-ruleset.xml')
+    ruleSets = []
+    ignoreFailures = false
+}
+
+pmdMain {
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+pmdTest {
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}

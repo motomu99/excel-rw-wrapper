@@ -1,0 +1,65 @@
+<?xml version="1.0"?>
+<ruleset name="Custom PMD Ruleset"
+        xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+    <description>Custom PMD ruleset for excel-rw-wrapper project</description>
+
+    <!-- 基本ルール -->
+    <rule ref="category/java/bestpractices.xml">
+        <exclude name="JUnitTestContainsTooManyAsserts"/>
+        <exclude name="JUnitAssertionsShouldIncludeMessage"/>
+    </rule>
+
+    <rule ref="category/java/codestyle.xml">
+        <exclude name="CommentDefaultAccessModifier"/>
+        <exclude name="CommentRequired"/>
+        <exclude name="FieldNamingConventions"/>
+        <exclude name="FormalParameterNamingConventions"/>
+        <exclude name="LocalVariableNamingConventions"/>
+        <exclude name="LongVariable"/>
+        <exclude name="ShortVariable"/>
+        <exclude name="VariableNamingConventions"/>
+    </rule>
+
+    <rule ref="category/java/design.xml">
+        <exclude name="LawOfDemeter"/>
+        <exclude name="TooManyMethods"/>
+        <exclude name="TooManyFields"/>
+    </rule>
+
+    <rule ref="category/java/errorprone.xml">
+        <exclude name="BeanMembersShouldSerialize"/>
+        <exclude name="MissingSerialVersionUID"/>
+    </rule>
+
+    <rule ref="category/java/multithreading.xml"/>
+
+    <rule ref="category/java/performance.xml">
+        <exclude name="AvoidInstantiatingObjectsInLoops"/>
+    </rule>
+
+    <rule ref="category/java/security.xml"/>
+
+    <!-- カスタムルール -->
+    <rule name="AvoidReassigningParameters" language="java" message="Avoid reassigning parameters" class="net.sourceforge.pmd.lang.rule.XPathRule">
+        <description>Parameters should not be reassigned</description>
+        <priority>2</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+                    //FormalParameter[@Reassign=true]
+                    ]]>
+                </value>
+            </property>
+        </properties>
+    </rule>
+
+    <!-- テスト用の除外ルール -->
+    <rule ref="category/java/bestpractices.xml/UnusedImports">
+        <exclude-pattern>.*Test\.java</exclude-pattern>
+    </rule>
+
+</ruleset>
