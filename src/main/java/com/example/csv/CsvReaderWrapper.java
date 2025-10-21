@@ -5,6 +5,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.function.BiFunction;
 import com.opencsv.exceptions.CsvException;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * CSV読み込みのラッパークラス
@@ -16,6 +17,7 @@ import com.opencsv.exceptions.CsvException;
  *     Paths.get("sample.csv"), CsvReaderWrapper::read);
  * </pre>
  */
+@Slf4j
 public class CsvReaderWrapper {
 
     /**
@@ -32,9 +34,13 @@ public class CsvReaderWrapper {
     public static <T> List<T> execute(Class<T> beanClass, Path filePath, 
                                      BiFunction<Class<T>, Path, List<T>> readerFunction) 
                                      throws IOException, CsvException {
+        log.info("CSVファイル読み込み開始: ファイルパス={}, Beanクラス={}", filePath, beanClass.getSimpleName());
         try {
-            return readerFunction.apply(beanClass, filePath);
+            List<T> result = readerFunction.apply(beanClass, filePath);
+            log.info("CSVファイル読み込み完了: 読み込み件数={}", result.size());
+            return result;
         } catch (RuntimeException e) {
+            log.error("CSVファイル読み込み中にエラーが発生: ファイルパス={}, エラー={}", filePath, e.getMessage(), e);
             if (e.getCause() instanceof IOException) {
                 throw (IOException) e.getCause();
             } else if (e.getCause() instanceof CsvException) {
@@ -54,11 +60,15 @@ public class CsvReaderWrapper {
      * @return BeanのList
      */
     public static <T> List<T> read(Class<T> beanClass, Path filePath) {
+        log.debug("CsvBeanReaderを使用してCSVファイルを読み込み: ファイルパス={}", filePath);
         try {
             // 標準のCsvBeanReaderを使用してCSVファイルを読み込み
             CsvBeanReader reader = new CsvBeanReader();
-            return reader.readCsvToBeans(filePath.toString(), beanClass);
+            List<T> result = reader.readCsvToBeans(filePath.toString(), beanClass);
+            log.debug("CsvBeanReaderによる読み込み完了: 件数={}", result.size());
+            return result;
         } catch (Exception e) {
+            log.error("CsvBeanReaderでの読み込み中にエラーが発生: ファイルパス={}, エラー={}", filePath, e.getMessage(), e);
             throw new RuntimeException(e);
         }
     }

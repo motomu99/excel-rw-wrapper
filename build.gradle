@@ -34,6 +34,10 @@ dependencies {
     testCompileOnly 'org.projectlombok:lombok:1.18.30'
     testAnnotationProcessor 'org.projectlombok:lombok:1.18.30'
     
+    // SLF4J (ログ出力用)
+    api 'org.slf4j:slf4j-api:2.0.9'
+    runtimeOnly 'ch.qos.logback:logback-classic:1.4.11'
+    
     // 独自アノテーション処理用
     compileOnly 'com.example:excel-rw-wrapper:1.0.0'
     annotationProcessor 'com.example:excel-rw-wrapper:1.0.0'
