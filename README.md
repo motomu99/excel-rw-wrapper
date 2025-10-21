@@ -14,6 +14,7 @@ OpenCSVをラップしたシンプルなCSV読み込みライブラリです。
 
 - Java 21以上
 - OpenCSV 5.9
+- Lombok 1.18.30 (Beanクラスの自動生成用)
 
 ## ビルド
 
@@ -91,7 +92,13 @@ for (Person person : persons) {
 
 ```java
 import com.opencsv.bean.CsvBindByName;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class Person {
     @CsvBindByName(column = "名前")
     private String name;
@@ -105,8 +112,7 @@ public class Person {
     @CsvBindByName(column = "出身地")
     private String birthplace;
     
-    // Getter/Setter
-    // ...
+    // Lombokがgetter/setter/toString/equals/hashCodeを自動生成
 }
 ```
 

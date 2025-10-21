@@ -28,6 +28,12 @@ dependencies {
     // OpenCSV
     api 'com.opencsv:opencsv:5.9'
     
+    // Lombok
+    compileOnly 'org.projectlombok:lombok:1.18.30'
+    annotationProcessor 'org.projectlombok:lombok:1.18.30'
+    testCompileOnly 'org.projectlombok:lombok:1.18.30'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.30'
+    
     // Test Dependencies
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
@@ -35,6 +41,15 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+// Lombok設定
+compileJava {
+    options.compilerArgs += ['-parameters']
+}
+
+compileTestJava {
+    options.compilerArgs += ['-parameters']
 }
 
 // 日本語対応のためのエンコーディング設定
