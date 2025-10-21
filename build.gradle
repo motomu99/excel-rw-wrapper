@@ -34,6 +34,10 @@ dependencies {
     testCompileOnly 'org.projectlombok:lombok:1.18.30'
     testAnnotationProcessor 'org.projectlombok:lombok:1.18.30'
     
+    // 独自アノテーション処理用
+    compileOnly 'com.example:excel-rw-wrapper:1.0.0'
+    annotationProcessor 'com.example:excel-rw-wrapper:1.0.0'
+    
     // Test Dependencies
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'

@@ -1,0 +1,6 @@
+id,name,department,salary,hire_date,position,email,phone,active
+1,John Smith,Engineering,75000,2020-01-15,Senior Developer,john.smith@company.com,555-0101,true
+2,Jane Doe,Marketing,65000,2019-03-22,Marketing Manager,jane.doe@company.com,555-0102,true
+3,Bob Johnson,Sales,60000,2021-06-10,Sales Representative,bob.johnson@company.com,555-0103,true
+4,Alice Brown,HR,55000,2018-09-05,HR Specialist,alice.brown@company.com,555-0104,true
+5,Charlie Wilson,Engineering,80000,2017-11-30,Lead Developer,charlie.wilson@company.com,555-0105,true
