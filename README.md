@@ -184,6 +184,29 @@ List<Person> persons = csvBeanReader.readCsvToBeansFromStream(inputStream, Perso
 - **ブランチカバレッジ**: 66%
 - **メソッドカバレッジ**: 80%
 
+## Javadoc
+
+APIドキュメントを生成できます：
+
+### Javadocの生成
+```bash
+# HTMLドキュメントの生成
+./gradlew generateJavadoc
+
+# JavadocJARの生成
+./gradlew javadocJar
+```
+
+### 生成されるファイル
+- **HTMLドキュメント**: `build/docs/javadoc/index.html`
+- **JavadocJAR**: `build/libs/excel-rw-wrapper-1.0.0-javadoc.jar`
+
+### ビルド時の自動生成
+通常のビルド時にもJavadocが自動生成されます：
+```bash
+./gradlew build
+```
+
 ## ライセンス
 
 MIT License

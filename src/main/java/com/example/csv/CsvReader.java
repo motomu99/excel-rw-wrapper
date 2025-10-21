@@ -11,12 +11,12 @@ import java.util.List;
 
 /**
  * OpenCSVをラップしたCSV読み込みクラス
- * 簡単にCSVファイルを読み込めるようにするよ〜✨
+ * 簡単にCSVファイルを読み込めるようにする
  */
 public class CsvReader {
 
     /**
-     * CSVファイルを読み込んでList<String[]>として返す
+     * CSVファイルを読み込んでList&lt;String[]&gt;として返す
      * 
      * @param filePath CSVファイルのパス
      * @return CSVの各行データ

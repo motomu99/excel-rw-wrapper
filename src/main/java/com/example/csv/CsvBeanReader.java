@@ -13,14 +13,14 @@ import java.util.List;
 
 /**
  * OpenCSVをラップしたBean読み込みクラス
- * アノテーションで項目名を指定してBeanにマッピングできるよ〜✨
+ * アノテーションで項目名を指定してBeanにマッピングできる
  */
 public class CsvBeanReader {
 
     /**
      * CSVファイルを読み込んでBeanのListとして返す
      * 
-     * @param <T> Beanの型
+     * @param &lt;T&gt; Beanの型
      * @param filePath CSVファイルのパス
      * @param beanClass マッピング先のBeanクラス
      * @return BeanのList
@@ -36,7 +36,7 @@ public class CsvBeanReader {
     /**
      * InputStreamからCSVを読み込んでBeanのListとして返す
      * 
-     * @param <T> Beanの型
+     * @param &lt;T&gt; Beanの型
      * @param inputStream CSVデータのInputStream
      * @param beanClass マッピング先のBeanクラス
      * @return BeanのList
@@ -52,7 +52,7 @@ public class CsvBeanReader {
     /**
      * ReaderからCSVを読み込んでBeanのListとして返す
      * 
-     * @param <T> Beanの型
+     * @param &lt;T&gt; Beanの型
      * @param reader CSVデータのReader
      * @param beanClass マッピング先のBeanクラス
      * @return BeanのList

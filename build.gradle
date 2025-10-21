@@ -48,10 +48,40 @@ jar {
     archiveVersion = '1.0.0'
 }
 
-// ソースJARの生成
+// ソースJARとJavadocJARの生成
 java {
     withSourcesJar()
     withJavadocJar()
+}
+
+// Javadoc設定
+javadoc {
+    options.encoding = 'UTF-8'
+    options.charSet = 'UTF-8'
+    options.docEncoding = 'UTF-8'
+    options.windowTitle = 'Excel RW Wrapper API Documentation'
+    options.docTitle = 'Excel RW Wrapper API Documentation'
+    options.header = 'Excel RW Wrapper'
+    options.author = true
+    options.version = true
+    options.use = true
+    options.splitIndex = true
+    options.noDeprecated = false
+    options.noDeprecatedList = false
+    options.noIndex = false
+    options.noNavBar = false
+    options.noTree = false
+    options.noHelp = false
+    options.noTimestamp = false
+    options.noComment = false
+    options.serialWarn = false
+    options.links = [
+        'https://docs.oracle.com/en/java/javase/21/docs/api/',
+        'https://opencsv.sourceforge.net/apidocs/'
+    ]
+    
+    // エラーを無視してJavadocを生成
+    failOnError = false
 }
 
 // JaCoCo設定
@@ -150,3 +180,43 @@ pmdTest {
         html.required = true
     }
 }
+
+// Javadoc生成タスク
+task generateJavadoc(type: Javadoc) {
+    source = sourceSets.main.allJava
+    classpath = configurations.compileClasspath
+    destinationDir = file("$buildDir/docs/javadoc")
+    
+    options.encoding = 'UTF-8'
+    options.charSet = 'UTF-8'
+    options.docEncoding = 'UTF-8'
+    options.windowTitle = 'Excel RW Wrapper API Documentation'
+    options.docTitle = 'Excel RW Wrapper API Documentation'
+    options.header = 'Excel RW Wrapper'
+    options.author = true
+    options.version = true
+    options.use = true
+    options.splitIndex = true
+    options.noDeprecated = false
+    options.noDeprecatedList = false
+    options.noIndex = false
+    options.noNavBar = false
+    options.noTree = false
+    options.noHelp = false
+    options.noTimestamp = false
+    options.noComment = false
+    options.serialWarn = false
+    options.links = [
+        'https://docs.oracle.com/en/java/javase/21/docs/api/',
+        'https://opencsv.sourceforge.net/apidocs/'
+    ]
+    
+    // エラーを無視してJavadocを生成
+    failOnError = false
+}
+
+// ビルド時にJavadocも生成
+build.dependsOn generateJavadoc
+
+// JavadocJARの依存関係を設定
+javadocJar.dependsOn generateJavadoc
