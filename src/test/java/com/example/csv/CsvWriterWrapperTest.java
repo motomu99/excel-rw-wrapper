@@ -222,5 +222,69 @@ public class CsvWriterWrapperTest {
             assertEquals(originalPersons.get(i).getBirthplace(), readPersons.get(i).getBirthplace());
         }
     }
+
+    @Test
+    void testWriteCsvWithBom() throws IOException, CsvException {
+        // BOM付きUTF-8で書き込むテスト
+        Path outputPath = Paths.get("src/test/resources/output_utf8_bom_test.csv");
+        filesToDelete.add(outputPath);
+
+        List<Person> persons = new ArrayList<>();
+        persons.add(new Person("BOMテスト太郎", 25, "エンジニア", "東京"));
+        persons.add(new Person("BOMテスト花子", 30, "デザイナー", "大阪"));
+
+        CsvWriterWrapper.execute(
+            Person.class,
+            outputPath,
+            instance -> instance.setCharset(CharsetType.UTF_8_BOM).write(persons));
+
+        // ファイルが作成されたことを確認
+        assertTrue(Files.exists(outputPath));
+
+        // BOM付きUTF-8で読み込んで検証
+        List<Person> readPersons = CsvReaderWrapper.execute(
+            Person.class,
+            outputPath,
+            instance -> instance.setCharset(CharsetType.UTF_8_BOM).read());
+
+        assertEquals(2, readPersons.size());
+        assertEquals("BOMテスト太郎", readPersons.get(0).getName());
+        assertEquals(25, readPersons.get(0).getAge());
+        assertEquals("エンジニア", readPersons.get(0).getOccupation());
+        assertEquals("東京", readPersons.get(0).getBirthplace());
+    }
+
+    @Test
+    void testWriteAndReadBomRoundtrip() throws IOException, CsvException {
+        // BOM付きUTF-8でラウンドトリップテスト
+        Path outputPath = Paths.get("src/test/resources/output_bom_roundtrip_test.csv");
+        filesToDelete.add(outputPath);
+
+        List<Person> originalPersons = new ArrayList<>();
+        originalPersons.add(new Person("日本語テスト１", 22, "学生", "千葉"));
+        originalPersons.add(new Person("日本語テスト２", 24, "大学院生", "埼玉"));
+        originalPersons.add(new Person("日本語テスト３", 26, "研究者", "茨城"));
+
+        // BOM付きで書き込み
+        CsvWriterWrapper.execute(
+            Person.class,
+            outputPath,
+            instance -> instance.setCharset(CharsetType.UTF_8_BOM).write(originalPersons));
+
+        // BOM付きで読み込み
+        List<Person> readPersons = CsvReaderWrapper.execute(
+            Person.class,
+            outputPath,
+            instance -> instance.setCharset(CharsetType.UTF_8_BOM).read());
+
+        // データが一致することを確認
+        assertEquals(originalPersons.size(), readPersons.size());
+        for (int i = 0; i < originalPersons.size(); i++) {
+            assertEquals(originalPersons.get(i).getName(), readPersons.get(i).getName());
+            assertEquals(originalPersons.get(i).getAge(), readPersons.get(i).getAge());
+            assertEquals(originalPersons.get(i).getOccupation(), readPersons.get(i).getOccupation());
+            assertEquals(originalPersons.get(i).getBirthplace(), readPersons.get(i).getBirthplace());
+        }
+    }
 }
 

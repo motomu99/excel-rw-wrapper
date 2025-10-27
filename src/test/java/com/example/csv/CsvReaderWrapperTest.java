@@ -267,4 +267,31 @@ public class CsvReaderWrapperTest {
         assertEquals("東京", firstPerson.getBirthplace());
     }
 
+    @Test
+    void testReadCsvWithBom() throws IOException, CsvException {
+        // BOM付きUTF-8のCSVファイル読み込みテスト
+
+        List<Person> persons = CsvReaderWrapper.execute(
+            Person.class,
+            Paths.get("src/test/resources/sample_utf8_bom.csv"),
+            instance -> instance.setCharset(CharsetType.UTF_8_BOM).read());
+       
+        assertNotNull(persons);
+        assertEquals(5, persons.size());
+        
+        // 最初のPersonの確認（BOMが正しく処理されていることを確認）
+        Person firstPerson = persons.get(0);
+        assertEquals("田中太郎", firstPerson.getName());
+        assertEquals(25, firstPerson.getAge());
+        assertEquals("エンジニア", firstPerson.getOccupation());
+        assertEquals("東京", firstPerson.getBirthplace());
+        
+        // 2番目のPersonの確認
+        Person secondPerson = persons.get(1);
+        assertEquals("佐藤花子", secondPerson.getName());
+        assertEquals(30, secondPerson.getAge());
+        assertEquals("デザイナー", secondPerson.getOccupation());
+        assertEquals("大阪", secondPerson.getBirthplace());
+    }
+
 }

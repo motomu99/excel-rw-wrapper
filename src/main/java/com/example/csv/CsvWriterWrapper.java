@@ -37,6 +37,7 @@ public class CsvWriterWrapper {
     private Charset charset = Charset.forName("UTF-8");
     private FileType fileType = FileType.CSV;
     private boolean usePositionMapping = false;
+    private boolean withBom = false;
 
     private CsvWriterWrapper(Class<?> beanClass, Path filePath) {
         this.beanClass = beanClass;
@@ -70,28 +71,37 @@ public class CsvWriterWrapper {
      */
     @SuppressWarnings("unchecked")
     public <T> Void write(List<T> beans) {
-        try (FileOutputStream fos = new FileOutputStream(filePath.toFile());
-             OutputStreamWriter osw = new OutputStreamWriter(fos, charset)) {
+        try (FileOutputStream fos = new FileOutputStream(filePath.toFile())) {
             
-            MappingStrategy<T> strategy;
-            if (usePositionMapping) {
-                ColumnPositionMappingStrategy<T> positionStrategy = new ColumnPositionMappingStrategy<>();
-                positionStrategy.setType((Class<? extends T>) this.beanClass);
-                strategy = positionStrategy;
-            } else {
-                HeaderColumnNameMappingStrategy<T> headerStrategy = new HeaderColumnNameMappingStrategy<>();
-                headerStrategy.setType((Class<? extends T>) this.beanClass);
-                strategy = headerStrategy;
+            // BOM付きUTF-8の場合、BOMを書き込む
+            if (withBom) {
+                fos.write(0xEF);
+                fos.write(0xBB);
+                fos.write(0xBF);
+                log.debug("BOMを書き込みました");
             }
             
-            StatefulBeanToCsv<T> beanToCsv = new StatefulBeanToCsvBuilder<T>(osw)
-                    .withMappingStrategy(strategy)
-                    .withSeparator(fileType.getDelimiter().charAt(0))
-                    .build();
-            
-            beanToCsv.write(beans);
-            
-            log.info("CSVファイルへの書き込み完了: ファイルパス={}, 件数={}", filePath, beans.size());
+            try (OutputStreamWriter osw = new OutputStreamWriter(fos, charset)) {
+                MappingStrategy<T> strategy;
+                if (usePositionMapping) {
+                    ColumnPositionMappingStrategy<T> positionStrategy = new ColumnPositionMappingStrategy<>();
+                    positionStrategy.setType((Class<? extends T>) this.beanClass);
+                    strategy = positionStrategy;
+                } else {
+                    HeaderColumnNameMappingStrategy<T> headerStrategy = new HeaderColumnNameMappingStrategy<>();
+                    headerStrategy.setType((Class<? extends T>) this.beanClass);
+                    strategy = headerStrategy;
+                }
+                
+                StatefulBeanToCsv<T> beanToCsv = new StatefulBeanToCsvBuilder<T>(osw)
+                        .withMappingStrategy(strategy)
+                        .withSeparator(fileType.getDelimiter().charAt(0))
+                        .build();
+                
+                beanToCsv.write(beans);
+                
+                log.info("CSVファイルへの書き込み完了: ファイルパス={}, 件数={}", filePath, beans.size());
+            }
             
             return null;
         } catch (IOException e) {
@@ -111,6 +121,7 @@ public class CsvWriterWrapper {
      */
     public CsvWriterWrapper setCharset(CharsetType charsetType) {
         this.charset = Charset.forName(charsetType.getCharsetName());
+        this.withBom = charsetType.isWithBom();
         return this;
     }
 

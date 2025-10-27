@@ -2,7 +2,9 @@ package com.example.csv;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.PushbackInputStream;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -36,6 +38,7 @@ public class CsvReaderWrapper {
     private Charset charset = Charset.forName("UTF-8");
     private FileType fileType = FileType.CSV;
     private boolean usePositionMapping = false;
+    private boolean withBom = false;
 
     private CsvReaderWrapper(Class<?> beanClass, Path filePath) {
         this.beanClass = beanClass;
@@ -72,7 +75,8 @@ public class CsvReaderWrapper {
     @SuppressWarnings("unchecked")
     public <T> List<T> read() {
         try (FileInputStream fis = new FileInputStream(filePath.toFile());
-             InputStreamReader isr = new InputStreamReader(fis, charset)) {
+             InputStream is = withBom ? skipBom(fis) : fis;
+             InputStreamReader isr = new InputStreamReader(is, charset)) {
             
             Object strategy;
             if (usePositionMapping) {
@@ -108,6 +112,30 @@ public class CsvReaderWrapper {
         }
     }
 
+    /**
+     * BOMをスキップするためのInputStream処理
+     * 
+     * @param inputStream 元のInputStream
+     * @return BOMをスキップしたInputStream
+     * @throws IOException 読み込みエラー
+     */
+    private InputStream skipBom(InputStream inputStream) throws IOException {
+        PushbackInputStream pushbackInputStream = new PushbackInputStream(inputStream, 3);
+        byte[] bom = new byte[3];
+        int bytesRead = pushbackInputStream.read(bom);
+        
+        // UTF-8 BOM: EF BB BF
+        if (bytesRead == 3 && bom[0] == (byte) 0xEF && bom[1] == (byte) 0xBB && bom[2] == (byte) 0xBF) {
+            // BOMが見つかった場合はスキップ（何もしない）
+            log.debug("BOMを検出してスキップしました");
+        } else {
+            // BOMがない場合は読み込んだバイトを戻す
+            pushbackInputStream.unread(bom, 0, bytesRead);
+        }
+        
+        return pushbackInputStream;
+    }
+
     public CsvReaderWrapper setSkip(int skipLines) {
         this.skipLines = skipLines;
         return this;
@@ -115,6 +143,7 @@ public class CsvReaderWrapper {
 
     public CsvReaderWrapper setCharset(CharsetType charsetType) {
         this.charset = Charset.forName(charsetType.getCharsetName());
+        this.withBom = charsetType.isWithBom();
         return this;
     }
 
