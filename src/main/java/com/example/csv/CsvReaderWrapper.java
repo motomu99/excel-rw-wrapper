@@ -11,6 +11,7 @@ import com.opencsv.bean.CsvToBean;
 import com.opencsv.bean.CsvToBeanBuilder;
 import com.opencsv.bean.HeaderColumnNameMappingStrategy;
 import com.opencsv.bean.ColumnPositionMappingStrategy;
+import com.opencsv.bean.MappingStrategy;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -81,7 +82,7 @@ public class CsvReaderWrapper {
             
             CsvToBean<T> csvToBean = new CsvToBeanBuilder<T>(new java.io.InputStreamReader(
                     new java.io.FileInputStream(filePath.toFile()), charset))
-                    .withMappingStrategy(strategy)
+                    .withMappingStrategy((MappingStrategy<? extends T>) strategy)
                     .withSeparator(fileType.getDelimiter().charAt(0))
                     .withIgnoreLeadingWhiteSpace(true)
                     .withIgnoreEmptyLine(true)
