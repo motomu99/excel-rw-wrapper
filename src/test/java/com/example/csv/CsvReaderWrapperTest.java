@@ -15,7 +15,10 @@ public class CsvReaderWrapperTest {
     void testReadCsvToBeans() throws IOException, CsvException {
         // 基本的なBean読み込みの使い方
 
-        List<Person> persons = CsvReaderWrapper.execute(Person.class,Paths.get("src/test/resources/sample.csv"),CsvReaderWrapper::read);
+        List<Person> persons = CsvReaderWrapper.execute(
+            Person.class,
+            Paths.get("src/test/resources/sample.csv"),
+            instance -> instance.read());
        
         assertNotNull(persons);
         assertEquals(5, persons.size()); // ヘッダーを除いた5件のデータ
@@ -29,6 +32,26 @@ public class CsvReaderWrapperTest {
         
         // 2番目のPersonの確認
         Person secondPerson = persons.get(1);
+        assertEquals("佐藤花子", secondPerson.getName());
+        assertEquals(30, secondPerson.getAge());
+        assertEquals("デザイナー", secondPerson.getOccupation());
+        assertEquals("大阪", secondPerson.getBirthplace());
+    }
+
+    @Test
+    void testReadCsvToBeans2() throws IOException, CsvException {
+        // 基本的なBean読み込みの使い方
+
+        List<Person> persons = CsvReaderWrapper.execute(
+            Person.class,
+            Paths.get("src/test/resources/sample.csv"),
+            instance -> instance.setSkip(1).read());
+       
+        assertNotNull(persons);
+        assertEquals(4, persons.size()); // ヘッダーを除いた5件のデータ
+        
+        // 2番目のPersonの確認
+        Person secondPerson = persons.get(0);
         assertEquals("佐藤花子", secondPerson.getName());
         assertEquals(30, secondPerson.getAge());
         assertEquals("デザイナー", secondPerson.getOccupation());

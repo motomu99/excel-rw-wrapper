@@ -3,8 +3,12 @@ package com.example.csv;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.function.BiFunction;
+import java.util.function.Function;
+
 import com.opencsv.exceptions.CsvException;
+import com.opencsv.bean.CsvToBean;
+import com.opencsv.bean.CsvToBeanBuilder;
+import com.opencsv.bean.HeaderColumnNameMappingStrategy;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -19,9 +23,18 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 public class CsvReaderWrapper {
+    
+    private int skipLines = 0;
+    private Path filePath;
+    private Class<?> beanClass;
+
+    private CsvReaderWrapper(Class<?> beanClass, Path filePath) {
+        this.beanClass = beanClass;
+        this.filePath = filePath;
+    }
 
     /**
-     * CSVファイルを読み込んでBeanのListとして返す
+     * CSVファイルを読み込んでBeanのListとして返す（CsvReaderWrapperインスタンス用）
      * 
      * @param <T> Beanの型
      * @param beanClass マッピング先のBeanクラス
@@ -32,22 +45,10 @@ public class CsvReaderWrapper {
      * @throws CsvException CSV解析エラー
      */
     public static <T> List<T> execute(Class<T> beanClass, Path filePath, 
-                                     BiFunction<Class<T>, Path, List<T>> readerFunction) 
+                                     Function<CsvReaderWrapper, List<T>> readerFunction) 
                                      throws IOException, CsvException {
-        log.info("CSVファイル読み込み開始: ファイルパス={}, Beanクラス={}", filePath, beanClass.getSimpleName());
-        try {
-            List<T> result = readerFunction.apply(beanClass, filePath);
-            log.info("CSVファイル読み込み完了: 読み込み件数={}", result.size());
-            return result;
-        } catch (RuntimeException e) {
-            log.error("CSVファイル読み込み中にエラーが発生: ファイルパス={}, エラー={}", filePath, e.getMessage(), e);
-            if (e.getCause() instanceof IOException) {
-                throw (IOException) e.getCause();
-            } else if (e.getCause() instanceof CsvException) {
-                throw (CsvException) e.getCause();
-            }
-            throw e;
-        }
+            CsvReaderWrapper wrapper = new CsvReaderWrapper(beanClass, filePath);
+        return readerFunction.apply(wrapper);
     }
 
     /**
@@ -59,17 +60,36 @@ public class CsvReaderWrapper {
      * @param filePath CSVファイルのパス
      * @return BeanのList
      */
-    public static <T> List<T> read(Class<T> beanClass, Path filePath) {
-        log.debug("CsvBeanReaderを使用してCSVファイルを読み込み: ファイルパス={}", filePath);
+    @SuppressWarnings("unchecked")
+    public <T> List<T> read() {
         try {
-            // 標準のCsvBeanReaderを使用してCSVファイルを読み込み
-            CsvBeanReader reader = new CsvBeanReader();
-            List<T> result = reader.readCsvToBeans(filePath.toString(), beanClass);
-            log.debug("CsvBeanReaderによる読み込み完了: 件数={}", result.size());
-            return result;
-        } catch (Exception e) {
-            log.error("CsvBeanReaderでの読み込み中にエラーが発生: ファイルパス={}, エラー={}", filePath, e.getMessage(), e);
+            HeaderColumnNameMappingStrategy<T> strategy = new HeaderColumnNameMappingStrategy<>();
+            strategy.setType((Class<? extends T>) this.beanClass);
+            
+            CsvToBean<T> csvToBean = new CsvToBeanBuilder<T>(new java.io.FileReader(filePath.toFile()))
+                    .withMappingStrategy(strategy)
+                    .withIgnoreLeadingWhiteSpace(true)
+                    .withIgnoreEmptyLine(true)
+                    .build();
+            
+            List<T> result = csvToBean.parse();
+            
+            // データ行をスキップする処理
+            if (this.skipLines > 0 && this.skipLines < result.size()) {
+                return result.subList(this.skipLines, result.size());
+            } else if (this.skipLines >= result.size()) {
+                return new java.util.ArrayList<>();
+            } else {
+                return result;
+            }
+        } catch (IOException e) {
+            log.error("CSVファイル読み込み中にエラーが発生: ファイルパス={}, エラー={}", filePath, e.getMessage(), e);
             throw new RuntimeException(e);
         }
+    }
+
+    public CsvReaderWrapper setSkip(int skipLines) {
+        this.skipLines = skipLines;
+        return this;
     }
 }
