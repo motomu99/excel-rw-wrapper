@@ -228,48 +228,8 @@ public class CsvReaderWrapperTest {
     }
 
     @Test
-    void testUsePositionMappingWithBoolean() throws IOException, CsvException {
-        // usePositionMapping(boolean)メソッドのテスト
-
-        List<Person2> persons = CsvReaderWrapper.execute(
-            Person2.class,
-            Paths.get("src/test/resources/sample_no_header.csv"),
-            instance -> instance.usePositionMapping(true).read());
-       
-        assertNotNull(persons);
-        assertEquals(5, persons.size());
-        
-        // 最初のPersonの確認
-        Person2 firstPerson = persons.get(0);
-        assertEquals("田中太郎", firstPerson.getName());
-        assertEquals(25, firstPerson.getAge());
-        assertEquals("エンジニア", firstPerson.getOccupation());
-        assertEquals("東京", firstPerson.getBirthplace());
-    }
-
-    @Test
-    void testUsePositionMappingWithBooleanFalse() throws IOException, CsvException {
-        // usePositionMapping(false)メソッドのテスト（HeaderMappingを使用）
-
-        List<Person> persons = CsvReaderWrapper.execute(
-            Person.class,
-            Paths.get("src/test/resources/sample.csv"),
-            instance -> instance.usePositionMapping(false).read());
-       
-        assertNotNull(persons);
-        assertEquals(5, persons.size());
-        
-        // 最初のPersonの確認
-        Person firstPerson = persons.get(0);
-        assertEquals("田中太郎", firstPerson.getName());
-        assertEquals(25, firstPerson.getAge());
-        assertEquals("エンジニア", firstPerson.getOccupation());
-        assertEquals("東京", firstPerson.getBirthplace());
-    }
-
-    @Test
-    void testUsePositionMappingNoArgs() throws IOException, CsvException {
-        // usePositionMapping()メソッドのテスト（引数なし）
+    void testUsePositionMapping() throws IOException, CsvException {
+        // usePositionMapping()メソッドのテスト
 
         List<Person2> persons = CsvReaderWrapper.execute(
             Person2.class,
@@ -288,8 +248,8 @@ public class CsvReaderWrapperTest {
     }
 
     @Test
-    void testUseHeaderMappingNoArgs() throws IOException, CsvException {
-        // useHeaderMapping()メソッドのテスト（引数なし）
+    void testUseHeaderMapping() throws IOException, CsvException {
+        // useHeaderMapping()メソッドのテスト
 
         List<Person> persons = CsvReaderWrapper.execute(
             Person.class,
