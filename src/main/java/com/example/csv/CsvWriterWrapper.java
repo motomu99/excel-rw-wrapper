@@ -38,6 +38,7 @@ public class CsvWriterWrapper {
     private FileType fileType = FileType.CSV;
     private boolean usePositionMapping = false;
     private boolean withBom = false;
+    private String lineSeparator = LineSeparatorType.CRLF.getSeparator();
 
     private CsvWriterWrapper(Class<?> beanClass, Path filePath) {
         this.beanClass = beanClass;
@@ -96,6 +97,7 @@ public class CsvWriterWrapper {
                 StatefulBeanToCsv<T> beanToCsv = new StatefulBeanToCsvBuilder<T>(osw)
                         .withMappingStrategy(strategy)
                         .withSeparator(fileType.getDelimiter().charAt(0))
+                        .withLineEnd(lineSeparator)
                         .build();
                 
                 beanToCsv.write(beans);
@@ -153,6 +155,17 @@ public class CsvWriterWrapper {
      */
     public CsvWriterWrapper useHeaderMapping() {
         this.usePositionMapping = false;
+        return this;
+    }
+
+    /**
+     * 改行コードを設定
+     * 
+     * @param lineSeparatorType 改行コードタイプ
+     * @return このインスタンス（メソッドチェーン用）
+     */
+    public CsvWriterWrapper setLineSeparator(LineSeparatorType lineSeparatorType) {
+        this.lineSeparator = lineSeparatorType.getSeparator();
         return this;
     }
 }

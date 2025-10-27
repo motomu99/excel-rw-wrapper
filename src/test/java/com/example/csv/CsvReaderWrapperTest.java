@@ -294,4 +294,34 @@ public class CsvReaderWrapperTest {
         assertEquals("大阪", secondPerson.getBirthplace());
     }
 
+    @Test
+    void testReadCsvWithLf() throws IOException, CsvException {
+        // LF改行コードのCSVファイル読み込みテスト
+
+        List<Person> persons = CsvReaderWrapper.execute(
+            Person.class,
+            Paths.get("src/test/resources/sample_lf.csv"),
+            instance -> instance.read());
+       
+        assertNotNull(persons, "personsリストがnullです");
+        System.out.println("読み込んだ件数: " + persons.size());
+        if (!persons.isEmpty()) {
+            System.out.println("最初のPerson: " + persons.get(0));
+        }
+        assertEquals(3, persons.size(), "期待される件数は3件です");
+        
+        // 最初のPersonの確認（LF改行が正しく処理されていることを確認）
+        Person firstPerson = persons.get(0);
+        assertNotNull(firstPerson, "firstPersonがnullです");
+        assertEquals("田中太郎", firstPerson.getName());
+        assertEquals(25, firstPerson.getAge());
+        assertEquals("エンジニア", firstPerson.getOccupation());
+        assertEquals("東京", firstPerson.getBirthplace());
+        
+        // 2番目のPersonの確認
+        Person secondPerson = persons.get(1);
+        assertEquals("佐藤花子", secondPerson.getName());
+        assertEquals(30, secondPerson.getAge());
+    }
+
 }

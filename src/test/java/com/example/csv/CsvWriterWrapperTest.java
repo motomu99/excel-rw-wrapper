@@ -286,5 +286,97 @@ public class CsvWriterWrapperTest {
             assertEquals(originalPersons.get(i).getBirthplace(), readPersons.get(i).getBirthplace());
         }
     }
+
+    @Test
+    void testWriteCsvWithCrlf() throws IOException, CsvException {
+        // CRLF改行コードで書き込むテスト（デフォルト）
+        Path outputPath = Paths.get("src/test/resources/output_crlf_test.csv");
+        filesToDelete.add(outputPath);
+
+        List<Person> persons = new ArrayList<>();
+        persons.add(new Person("CRLF太郎", 25, "エンジニア", "東京"));
+        persons.add(new Person("CRLF花子", 30, "デザイナー", "大阪"));
+
+        CsvWriterWrapper.execute(
+            Person.class,
+            outputPath,
+            instance -> instance.setLineSeparator(LineSeparatorType.CRLF).write(persons));
+
+        // ファイルが作成されたことを確認
+        assertTrue(Files.exists(outputPath));
+
+        // ファイルの内容にCRLF(\r\n)が含まれていることを確認
+        byte[] fileBytes = Files.readAllBytes(outputPath);
+        String content = new String(fileBytes, java.nio.charset.StandardCharsets.UTF_8);
+        assertTrue(content.contains("\r\n"), "ファイルにCRLFが含まれていません");
+
+        // 読み込んで検証
+        List<Person> readPersons = CsvReaderWrapper.execute(
+            Person.class,
+            outputPath,
+            instance -> instance.read());
+
+        assertEquals(2, readPersons.size());
+        assertEquals("CRLF太郎", readPersons.get(0).getName());
+    }
+
+    @Test
+    void testWriteCsvWithLf() throws IOException, CsvException {
+        // LF改行コードで書き込むテスト
+        Path outputPath = Paths.get("src/test/resources/output_lf_test.csv");
+        filesToDelete.add(outputPath);
+
+        List<Person> persons = new ArrayList<>();
+        persons.add(new Person("LF太郎", 35, "営業", "福岡"));
+        persons.add(new Person("LF花子", 28, "人事", "札幌"));
+
+        CsvWriterWrapper.execute(
+            Person.class,
+            outputPath,
+            instance -> instance.setLineSeparator(LineSeparatorType.LF).write(persons));
+
+        // ファイルが作成されたことを確認
+        assertTrue(Files.exists(outputPath));
+
+        // ファイルの内容にLF(\n)のみが含まれ、CRLF(\r\n)が含まれていないことを確認
+        byte[] fileBytes = Files.readAllBytes(outputPath);
+        String content = new String(fileBytes, java.nio.charset.StandardCharsets.UTF_8);
+        assertFalse(content.contains("\r\n"), "ファイルにCRLFが含まれています");
+        assertTrue(content.contains("\n"), "ファイルにLFが含まれていません");
+
+        // 読み込んで検証
+        List<Person> readPersons = CsvReaderWrapper.execute(
+            Person.class,
+            outputPath,
+            instance -> instance.read());
+
+        assertEquals(2, readPersons.size());
+        assertEquals("LF太郎", readPersons.get(0).getName());
+        assertEquals(35, readPersons.get(0).getAge());
+    }
+
+    @Test
+    void testWriteCsvDefaultLineSeparator() throws IOException, CsvException {
+        // デフォルトがCRLFであることを確認するテスト
+        Path outputPath = Paths.get("src/test/resources/output_default_test.csv");
+        filesToDelete.add(outputPath);
+
+        List<Person> persons = new ArrayList<>();
+        persons.add(new Person("デフォルト太郎", 40, "部長", "名古屋"));
+
+        // 改行コードを指定せずに書き込み（デフォルトはCRLFのはず）
+        CsvWriterWrapper.execute(
+            Person.class,
+            outputPath,
+            instance -> instance.write(persons));
+
+        // ファイルが作成されたことを確認
+        assertTrue(Files.exists(outputPath));
+
+        // ファイルの内容にCRLF(\r\n)が含まれていることを確認（デフォルト動作）
+        byte[] fileBytes = Files.readAllBytes(outputPath);
+        String content = new String(fileBytes, java.nio.charset.StandardCharsets.UTF_8);
+        assertTrue(content.contains("\r\n"), "デフォルトでCRLFになっていません");
+    }
 }
 
