@@ -10,6 +10,7 @@ import com.opencsv.exceptions.CsvException;
 import com.opencsv.bean.CsvToBean;
 import com.opencsv.bean.CsvToBeanBuilder;
 import com.opencsv.bean.HeaderColumnNameMappingStrategy;
+import com.opencsv.bean.ColumnPositionMappingStrategy;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -30,6 +31,7 @@ public class CsvReaderWrapper {
     private Class<?> beanClass;
     private Charset charset = Charset.forName("UTF-8");
     private FileType fileType = FileType.CSV;
+    private boolean usePositionMapping = false;
 
     private CsvReaderWrapper(Class<?> beanClass, Path filePath) {
         this.beanClass = beanClass;
@@ -66,8 +68,16 @@ public class CsvReaderWrapper {
     @SuppressWarnings("unchecked")
     public <T> List<T> read() {
         try {
-            HeaderColumnNameMappingStrategy<T> strategy = new HeaderColumnNameMappingStrategy<>();
-            strategy.setType((Class<? extends T>) this.beanClass);
+            Object strategy;
+            if (usePositionMapping) {
+                ColumnPositionMappingStrategy<T> positionStrategy = new ColumnPositionMappingStrategy<>();
+                positionStrategy.setType((Class<? extends T>) this.beanClass);
+                strategy = positionStrategy;
+            } else {
+                HeaderColumnNameMappingStrategy<T> headerStrategy = new HeaderColumnNameMappingStrategy<>();
+                headerStrategy.setType((Class<? extends T>) this.beanClass);
+                strategy = headerStrategy;
+            }
             
             CsvToBean<T> csvToBean = new CsvToBeanBuilder<T>(new java.io.InputStreamReader(
                     new java.io.FileInputStream(filePath.toFile()), charset))
@@ -105,6 +115,21 @@ public class CsvReaderWrapper {
 
     public CsvReaderWrapper setFileType(FileType fileType) {
         this.fileType = fileType;
+        return this;
+    }
+
+    public CsvReaderWrapper usePositionMapping(boolean usePositionMapping) {
+        this.usePositionMapping = usePositionMapping;
+        return this;
+    }
+
+    public CsvReaderWrapper usePositionMapping() {
+        this.usePositionMapping = true;
+        return this;
+    }
+
+    public CsvReaderWrapper useHeaderMapping() {
+        this.usePositionMapping = false;
         return this;
     }
 }

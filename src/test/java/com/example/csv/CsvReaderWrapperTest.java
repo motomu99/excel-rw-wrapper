@@ -1,6 +1,8 @@
 package com.example.csv;
 
 import com.example.csv.model.Person;
+import com.example.csv.model.Person2;
+
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -170,6 +172,99 @@ public class CsvReaderWrapperTest {
                 Paths.get("invalid/path/file.csv"),
                 instance -> instance.read());
         });
+    }
+    @Test
+    void testReadCsvToBeans6() throws IOException, CsvException {
+        // 基本的なBean読み込みの使い方
+
+        List<Person2> persons = CsvReaderWrapper.execute(
+            Person2.class,
+            Paths.get("src/test/resources/sample_no_header.csv"),
+            instance -> instance.usePositionMapping().read());
+       
+        assertNotNull(persons);
+        assertEquals(5, persons.size());
+        
+        // 最初のPersonの確認
+        Person2 firstPerson = persons.get(0);
+        assertEquals("田中太郎", firstPerson.getName());
+        assertEquals(25, firstPerson.getAge());
+        assertEquals("エンジニア", firstPerson.getOccupation());
+        assertEquals("東京", firstPerson.getBirthplace());
+        
+        // 2番目のPersonの確認
+        Person2 secondPerson = persons.get(1);
+        assertEquals("佐藤花子", secondPerson.getName());
+        assertEquals(30, secondPerson.getAge());
+        assertEquals("デザイナー", secondPerson.getOccupation());
+        assertEquals("大阪", secondPerson.getBirthplace());
+    }
+
+    @Test
+    void testReadCsvToBeans7() throws IOException, CsvException {
+        // 明示的にHeaderMappingを使用するテスト
+
+        List<Person> persons = CsvReaderWrapper.execute(
+            Person.class,
+            Paths.get("src/test/resources/sample.csv"),
+            instance -> instance.useHeaderMapping().read());
+       
+        assertNotNull(persons);
+        assertEquals(5, persons.size());
+        
+        // 最初のPersonの確認
+        Person firstPerson = persons.get(0);
+        assertEquals("田中太郎", firstPerson.getName());
+        assertEquals(25, firstPerson.getAge());
+        assertEquals("エンジニア", firstPerson.getOccupation());
+        assertEquals("東京", firstPerson.getBirthplace());
+        
+        // 2番目のPersonの確認
+        Person secondPerson = persons.get(1);
+        assertEquals("佐藤花子", secondPerson.getName());
+        assertEquals(30, secondPerson.getAge());
+        assertEquals("デザイナー", secondPerson.getOccupation());
+        assertEquals("大阪", secondPerson.getBirthplace());
+    }
+
+    @Test
+    void testUsePositionMappingWithBoolean() throws IOException, CsvException {
+        // usePositionMapping(boolean)メソッドのテスト
+
+        List<Person2> persons = CsvReaderWrapper.execute(
+            Person2.class,
+            Paths.get("src/test/resources/sample_no_header.csv"),
+            instance -> instance.usePositionMapping(true).read());
+       
+        assertNotNull(persons);
+        assertEquals(5, persons.size());
+        
+        // 最初のPersonの確認
+        Person2 firstPerson = persons.get(0);
+        assertEquals("田中太郎", firstPerson.getName());
+        assertEquals(25, firstPerson.getAge());
+        assertEquals("エンジニア", firstPerson.getOccupation());
+        assertEquals("東京", firstPerson.getBirthplace());
+    }
+
+    @Test
+    void testUsePositionMappingWithBooleanFalse() throws IOException, CsvException {
+        // usePositionMapping(false)メソッドのテスト（HeaderMappingを使用）
+
+        List<Person> persons = CsvReaderWrapper.execute(
+            Person.class,
+            Paths.get("src/test/resources/sample.csv"),
+            instance -> instance.usePositionMapping(false).read());
+       
+        assertNotNull(persons);
+        assertEquals(5, persons.size());
+        
+        // 最初のPersonの確認
+        Person firstPerson = persons.get(0);
+        assertEquals("田中太郎", firstPerson.getName());
+        assertEquals(25, firstPerson.getAge());
+        assertEquals("エンジニア", firstPerson.getOccupation());
+        assertEquals("東京", firstPerson.getBirthplace());
     }
 
 }
