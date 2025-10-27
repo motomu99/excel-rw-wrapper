@@ -140,6 +140,79 @@ List<Person> persons = CsvReaderWrapper.execute(
 
 ---
 
+## CSV書き込み機能
+
+### CsvWriterWrapper（推奨）
+
+**新しいBuilderパターンを使用した、最も推奨される方法です。**
+
+#### 基本的な使い方
+
+```java
+import com.example.csv.CsvWriterWrapper;
+import com.example.csv.model.Person;
+import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.List;
+
+// シンプルな書き込み
+List<Person> persons = Arrays.asList(
+    new Person("田中太郎", 25, "エンジニア", "東京"),
+    new Person("佐藤花子", 30, "デザイナー", "大阪")
+);
+
+CsvWriterWrapper.builder(Person.class, Paths.get("output.csv"))
+    .write(persons);
+```
+
+#### 詳細設定
+
+```java
+import com.example.csv.CharsetType;
+import com.example.csv.FileType;
+import com.example.csv.LineSeparatorType;
+
+// 複数の設定を組み合わせ
+CsvWriterWrapper.builder(Person.class, Paths.get("output.tsv"))
+    .charset(CharsetType.S_JIS)       // 文字セット指定
+    .fileType(FileType.TSV)            // TSVファイル
+    .lineSeparator(LineSeparatorType.LF) // 改行コード
+    .write(persons);
+```
+
+#### 対応する改行コード
+
+```java
+LineSeparatorType.CRLF   // Windows標準（\r\n）（デフォルト）
+LineSeparatorType.LF     // Unix/Linux/Mac標準（\n）
+LineSeparatorType.CR     // 旧Mac標準（\r）
+```
+
+#### ヘッダーなしCSVの書き込み
+
+```java
+// 位置ベースのマッピングを使用
+CsvWriterWrapper.builder(Person.class, Paths.get("no_header.csv"))
+    .usePositionMapping()  // 位置ベースマッピング
+    .write(persons);
+```
+
+#### 従来のAPI（互換性維持）
+
+既存コードとの互換性のため、従来の`execute()`メソッドも引き続き使用できます。
+
+```java
+CsvWriterWrapper.execute(
+    Person.class,
+    Paths.get("output.csv"),
+    instance -> instance.setCharset(CharsetType.UTF_8).write(persons)
+);
+```
+
+**詳細は [MIGRATION.md](MIGRATION.md) を参照してください。**
+
+---
+
 ### CsvBeanReader（レガシー）
 
 ```java

@@ -1,4 +1,4 @@
-# CsvReaderWrapper リファクタリング移行ガイド
+# CSV Wrapper リファクタリング移行ガイド
 
 ## 📋 目次
 - [概要](#概要)
@@ -13,7 +13,7 @@
 
 ## 📌 概要
 
-`CsvReaderWrapper` が新しいBuilderパターンを導入してリファクタリングされました。
+`CsvReaderWrapper` と `CsvWriterWrapper` が新しいBuilderパターンを導入してリファクタリングされました。
 **既存のコードは完全に互換性を維持しており、すぐに動作しなくなることはありません。**
 
 しかし、新しいBuilderパターンはより直感的で読みやすいため、今後の開発では新しいAPIの使用を推奨します。
@@ -31,9 +31,11 @@
 
 ### 1. 新しいBuilderパターンの追加
 
-従来の `execute()` メソッドに加え、新しい `builder()` メソッドが追加されました。
+従来の `execute()` メソッドに加え、新しい `builder()` メソッドが両クラスに追加されました。
 
-#### Before (従来のAPI - 引き続き使用可能)
+#### CsvReaderWrapper
+
+**Before (従来のAPI - 引き続き使用可能)**
 ```java
 List<Person> persons = CsvReaderWrapper.execute(
     Person.class,
@@ -42,7 +44,7 @@ List<Person> persons = CsvReaderWrapper.execute(
 );
 ```
 
-#### After (新しいAPI - 推奨)
+**After (新しいAPI - 推奨)**
 ```java
 List<Person> persons = CsvReaderWrapper.builder(Person.class, Paths.get("sample.csv"))
     .charset(CharsetType.UTF_8_BOM)
@@ -50,34 +52,71 @@ List<Person> persons = CsvReaderWrapper.builder(Person.class, Paths.get("sample.
     .read();
 ```
 
+#### CsvWriterWrapper
+
+**Before (従来のAPI - 引き続き使用可能)**
+```java
+List<Person> persons = Arrays.asList(new Person("田中", 25));
+CsvWriterWrapper.execute(
+    Person.class,
+    Paths.get("output.csv"),
+    instance -> instance.setCharset(CharsetType.UTF_8).write(persons)
+);
+```
+
+**After (新しいAPI - 推奨)**
+```java
+List<Person> persons = Arrays.asList(new Person("田中", 25));
+CsvWriterWrapper.builder(Person.class, Paths.get("output.csv"))
+    .charset(CharsetType.UTF_8)
+    .write(persons);
+```
+
 ### 2. 新しいクラスの追加
 
-#### `CsvReadException`
-CSV読み込み時の専用例外クラスが追加されました。
+#### `CsvReadException` / `CsvWriteException`
+CSV読み込み/書き込み時の専用例外クラスが追加されました。
 従来の `RuntimeException` よりも明確なエラーハンドリングが可能になります。
 
 ```java
+// 読み込み
 try {
     List<Person> persons = CsvReaderWrapper.builder(Person.class, path).read();
 } catch (CsvReadException e) {
-    // CSV読み込みエラーの処理
     log.error("CSV読み込みエラー: {}", e.getMessage());
+}
+
+// 書き込み
+try {
+    CsvWriterWrapper.builder(Person.class, path).write(persons);
+} catch (CsvWriteException e) {
+    log.error("CSV書き込みエラー: {}", e.getMessage());
 }
 ```
 
-#### `BomSkipper`
-BOM (Byte Order Mark) スキップ処理が独立したユーティリティクラスになりました。
+#### `BomSkipper` / `BomWriter`
+BOM (Byte Order Mark) 処理が独立したユーティリティクラスになりました。
 他のクラスでも再利用可能です。
 
 ```java
+// 読み込み時のBOMスキップ
 InputStream is = BomSkipper.skip(fileInputStream);
+
+// 書き込み時のBOM書き込み
+BomWriter.write(fileOutputStream);
 ```
 
 ### 3. 内部リファクタリング
 
+#### CsvReaderWrapper
 - `createMappingStrategy()`: マッピング戦略の生成を独立したメソッドに分離
 - `applySkipLines()`: スキップ行処理を独立したメソッドに分離
 - `StandardCharsets.UTF_8` の使用: 型安全な文字セット定義に変更
+
+#### CsvWriterWrapper
+- `createMappingStrategy()`: マッピング戦略の生成を独立したメソッドに分離
+- `StandardCharsets.UTF_8` の使用: 型安全な文字セット定義に変更
+- BOM書き込み処理のユーティリティ化
 
 ---
 
@@ -280,6 +319,111 @@ List<Person> persons = CsvReaderWrapper.builder(Person.class, Paths.get("sample.
     .read();
 ```
 
+### 例8: CSV書き込み（基本）
+
+#### Before
+```java
+List<Person> persons = Arrays.asList(new Person("田中", 25));
+CsvWriterWrapper.execute(
+    Person.class,
+    Paths.get("output.csv"),
+    instance -> instance.write(persons)
+);
+```
+
+#### After
+```java
+List<Person> persons = Arrays.asList(new Person("田中", 25));
+CsvWriterWrapper.builder(Person.class, Paths.get("output.csv"))
+    .write(persons);
+```
+
+### 例9: CSV書き込み（文字セット指定）
+
+#### Before
+```java
+List<Person> persons = Arrays.asList(new Person("田中", 25));
+CsvWriterWrapper.execute(
+    Person.class,
+    Paths.get("output_sjis.csv"),
+    instance -> instance.setCharset(CharsetType.S_JIS).write(persons)
+);
+```
+
+#### After
+```java
+List<Person> persons = Arrays.asList(new Person("田中", 25));
+CsvWriterWrapper.builder(Person.class, Paths.get("output_sjis.csv"))
+    .charset(CharsetType.S_JIS)
+    .write(persons);
+```
+
+### 例10: TSV書き込み
+
+#### Before
+```java
+List<Person> persons = Arrays.asList(new Person("田中", 25));
+CsvWriterWrapper.execute(
+    Person.class,
+    Paths.get("output.tsv"),
+    instance -> instance.setFileType(FileType.TSV).write(persons)
+);
+```
+
+#### After
+```java
+List<Person> persons = Arrays.asList(new Person("田中", 25));
+CsvWriterWrapper.builder(Person.class, Paths.get("output.tsv"))
+    .fileType(FileType.TSV)
+    .write(persons);
+```
+
+### 例11: 改行コード指定
+
+#### Before
+```java
+List<Person> persons = Arrays.asList(new Person("田中", 25));
+CsvWriterWrapper.execute(
+    Person.class,
+    Paths.get("output.csv"),
+    instance -> instance.setLineSeparator(LineSeparatorType.LF).write(persons)
+);
+```
+
+#### After
+```java
+List<Person> persons = Arrays.asList(new Person("田中", 25));
+CsvWriterWrapper.builder(Person.class, Paths.get("output.csv"))
+    .lineSeparator(LineSeparatorType.LF)
+    .write(persons);
+```
+
+### 例12: 複数設定（書き込み）
+
+#### Before
+```java
+List<Person> persons = Arrays.asList(new Person("田中", 25));
+CsvWriterWrapper.execute(
+    Person.class,
+    Paths.get("output.tsv"),
+    instance -> instance
+        .setCharset(CharsetType.UTF_8_BOM)
+        .setFileType(FileType.TSV)
+        .setLineSeparator(LineSeparatorType.LF)
+        .write(persons)
+);
+```
+
+#### After
+```java
+List<Person> persons = Arrays.asList(new Person("田中", 25));
+CsvWriterWrapper.builder(Person.class, Paths.get("output.tsv"))
+    .charset(CharsetType.UTF_8_BOM)
+    .fileType(FileType.TSV)
+    .lineSeparator(LineSeparatorType.LF)
+    .write(persons);
+```
+
 ---
 
 ## ❓ FAQ
@@ -306,11 +450,15 @@ List<Person> persons = CsvReaderWrapper.builder(Person.class, Paths.get("sample.
 
 ### Q6: エラーハンドリングはどう変わりますか？
 
-**A:** 新しいAPIでは `CsvReadException` がスローされます。これにより、より明確なエラーハンドリングが可能になります。ただし、`CsvReadException` は `RuntimeException` を継承しているため、キャッチしなくても動作します。
+**A:** 新しいAPIでは `CsvReadException` / `CsvWriteException` がスローされます。これにより、より明確なエラーハンドリングが可能になります。ただし、これらは `RuntimeException` を継承しているため、キャッチしなくても動作します。
 
-### Q7: BomSkipperを直接使用できますか？
+### Q7: BomSkipper/BomWriterを直接使用できますか？
 
-**A:** はい、`BomSkipper.skip(InputStream)` を直接使用できます。CSV読み込み以外の場面でもBOMスキップが必要な場合に便利です。
+**A:** はい、`BomSkipper.skip(InputStream)` や `BomWriter.write(OutputStream)` を直接使用できます。CSV処理以外の場面でもBOM処理が必要な場合に便利です。
+
+### Q8: CsvWriterWrapperも同じように移行できますか？
+
+**A:** はい、CsvWriterWrapperも同じBuilderパターンを採用しています。設定メソッド名も統一されているため、同じ感覚で移行できます。
 
 ---
 
