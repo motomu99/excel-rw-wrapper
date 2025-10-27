@@ -52,10 +52,8 @@ public class CsvStreamWriterTest {
         assertTrue(Files.exists(outputPath));
 
         // 書き込んだファイルを読み込んで検証
-        List<Person> readPersons = CsvReaderWrapper.execute(
-            Person.class,
-            outputPath,
-            instance -> instance.read());
+        List<Person> readPersons = CsvReaderWrapper.builder(Person.class, outputPath)
+            .read();
 
         assertEquals(3, readPersons.size());
         assertEquals("山田太郎", readPersons.get(0).getName());
@@ -82,10 +80,8 @@ public class CsvStreamWriterTest {
         assertTrue(Files.exists(outputPath));
 
         // 書き込んだファイルを読み込んで検証
-        List<Person> readPersons = CsvReaderWrapper.execute(
-            Person.class,
-            outputPath,
-            instance -> instance.read());
+        List<Person> readPersons = CsvReaderWrapper.builder(Person.class, outputPath)
+            .read();
 
         assertEquals(2, readPersons.size()); // 30歳以上の2人のみ
         assertTrue(readPersons.stream().allMatch(person -> person.getAge() >= 30));
@@ -110,10 +106,9 @@ public class CsvStreamWriterTest {
         assertTrue(Files.exists(outputPath));
 
         // Shift_JISで読み込んで検証
-        List<Person> readPersons = CsvReaderWrapper.execute(
-            Person.class,
-            outputPath,
-            instance -> instance.setCharset(CharsetType.S_JIS).read());
+        List<Person> readPersons = CsvReaderWrapper.builder(Person.class, outputPath)
+            .charset(CharsetType.S_JIS)
+            .read();
 
         assertEquals(2, readPersons.size());
         assertEquals("テスト太郎", readPersons.get(0).getName());
@@ -138,10 +133,9 @@ public class CsvStreamWriterTest {
         assertTrue(Files.exists(outputPath));
 
         // TSVで読み込んで検証
-        List<Person> readPersons = CsvReaderWrapper.execute(
-            Person.class,
-            outputPath,
-            instance -> instance.setFileType(FileType.TSV).read());
+        List<Person> readPersons = CsvReaderWrapper.builder(Person.class, outputPath)
+            .fileType(FileType.TSV)
+            .read();
 
         assertEquals(2, readPersons.size());
         assertEquals("山田太郎", readPersons.get(0).getName());
@@ -245,10 +239,8 @@ public class CsvStreamWriterTest {
         assertTrue(Files.exists(outputPath));
 
         // 書き込んだファイルを読み込んで検証
-        List<Person> readPersons = CsvReaderWrapper.execute(
-            Person.class,
-            outputPath,
-            instance -> instance.read());
+        List<Person> readPersons = CsvReaderWrapper.builder(Person.class, outputPath)
+            .read();
 
         assertEquals(3, readPersons.size()); // 25歳以上かつ学生でない3人
         assertTrue(readPersons.stream().allMatch(person -> person.getAge() >= 25));
