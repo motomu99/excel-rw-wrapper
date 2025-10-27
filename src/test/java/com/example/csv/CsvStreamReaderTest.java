@@ -4,6 +4,7 @@ import com.example.csv.model.Person;
 import com.example.csv.model.PersonWithoutHeader;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
@@ -13,9 +14,11 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import com.opencsv.exceptions.CsvException;
 
+@DisplayName("CsvStreamReader: Stream APIを使用したCSV読み込み")
 public class CsvStreamReaderTest {
 
     @Test
+    @DisplayName("基本的なStream処理 - CSVファイルをStreamとして読み込み、Listに変換できること")
     void testBasicStreamProcessing() throws IOException, CsvException {
         // 基本的なStream処理のテスト
         
@@ -34,6 +37,7 @@ public class CsvStreamReaderTest {
     }
 
     @Test
+    @DisplayName("フィルタリング - Stream.filter()を使用してデータを絞り込めること")
     void testStreamWithFiltering() throws IOException, CsvException {
         // フィルタリング付きのStream処理のテスト
         
@@ -50,6 +54,7 @@ public class CsvStreamReaderTest {
     }
 
     @Test
+    @DisplayName("マッピング - Stream.map()を使用してデータを変換できること")
     void testStreamWithMapping() throws IOException, CsvException {
         // マッピング付きのStream処理のテスト
         
@@ -65,6 +70,7 @@ public class CsvStreamReaderTest {
     }
 
     @Test
+    @DisplayName("行スキップ - skip()メソッドで指定行数をスキップできること")
     void testStreamWithSkip() throws IOException, CsvException {
         // スキップ行数指定のテスト
         
@@ -81,6 +87,7 @@ public class CsvStreamReaderTest {
     }
 
     @Test
+    @DisplayName("文字セット指定 - charset()メソッドでShift_JISファイルを読み込めること")
     void testStreamWithCharset() throws IOException, CsvException {
         // 文字エンコーディング指定のテスト（Shift_JIS）
         
@@ -97,6 +104,7 @@ public class CsvStreamReaderTest {
     }
 
     @Test
+    @DisplayName("ファイル形式指定 - fileType()メソッドでTSVファイルを読み込めること")
     void testStreamWithFileType() throws IOException, CsvException {
         // ファイルタイプ指定のテスト（TSV）
         
@@ -113,6 +121,7 @@ public class CsvStreamReaderTest {
     }
 
     @Test
+    @DisplayName("位置ベースマッピング - usePositionMapping()でヘッダーなしCSVを読み込めること")
     void testStreamWithPositionMapping() throws IOException, CsvException {
         // 位置ベースマッピングのテスト
         
@@ -130,6 +139,7 @@ public class CsvStreamReaderTest {
     }
 
     @Test
+    @DisplayName("ヘッダーマッピング - useHeaderMapping()でヘッダー付きCSVを読み込めること")
     void testStreamWithHeaderMapping() throws IOException, CsvException {
         // ヘッダーベースマッピングのテスト（デフォルト）
         
@@ -146,6 +156,7 @@ public class CsvStreamReaderTest {
     }
 
     @Test
+    @DisplayName("メソッドチェーン - 複数の設定とStream操作を組み合わせて使用できること")
     void testStreamWithChainedOperations() throws IOException, CsvException {
         // チェーン操作のテスト
         
@@ -168,6 +179,7 @@ public class CsvStreamReaderTest {
     }
 
     @Test
+    @DisplayName("カウント操作 - Stream.count()でレコード数を取得できること")
     void testStreamCount() throws IOException, CsvException {
         // カウント操作のテスト
         
@@ -179,6 +191,7 @@ public class CsvStreamReaderTest {
     }
 
     @Test
+    @DisplayName("forEach操作 - Stream.forEach()で各レコードを処理できること")
     void testStreamForEach() throws IOException, CsvException {
         // forEach操作のテスト
         
