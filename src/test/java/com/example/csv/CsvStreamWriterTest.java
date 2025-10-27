@@ -1,7 +1,7 @@
 package com.example.csv;
 
 import com.example.csv.model.Person;
-import com.example.csv.model.Person2;
+import com.example.csv.model.PersonWithoutHeader;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterEach;
@@ -170,11 +170,11 @@ public class CsvStreamWriterTest {
         Path outputPath = Paths.get("src/test/resources/output_stream_no_header_test.csv");
         filesToDelete.add(outputPath);
 
-        List<Person2> persons = new ArrayList<>();
-        persons.add(new Person2("山田太郎", 28, "プログラマー", "神奈川"));
-        persons.add(new Person2("鈴木花子", 32, "デザイナー", "京都"));
+        List<PersonWithoutHeader> persons = new ArrayList<>();
+        persons.add(new PersonWithoutHeader("山田太郎", 28, "プログラマー", "神奈川"));
+        persons.add(new PersonWithoutHeader("鈴木花子", 32, "デザイナー", "京都"));
 
-        CsvStreamWriter.of(Person2.class, outputPath)
+        CsvStreamWriter.of(PersonWithoutHeader.class, outputPath)
             .usePositionMapping()
             .write(persons.stream());
 

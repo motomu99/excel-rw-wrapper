@@ -1,7 +1,7 @@
 package com.example.csv;
 
 import com.example.csv.model.Person;
-import com.example.csv.model.Person2;
+import com.example.csv.model.PersonWithoutHeader;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterEach;
@@ -117,11 +117,11 @@ public class CsvWriterWrapperLegacyTest {
         Path outputPath = Paths.get("src/test/resources/legacy_output_no_header_test.csv");
         filesToDelete.add(outputPath);
 
-        List<Person2> persons = new ArrayList<>();
-        persons.add(new Person2("ノーヘッダー太郎", 40, "役員", "広島"));
+        List<PersonWithoutHeader> persons = new ArrayList<>();
+        persons.add(new PersonWithoutHeader("ノーヘッダー太郎", 40, "役員", "広島"));
 
         CsvWriterWrapper.execute(
-            Person2.class,
+            PersonWithoutHeader.class,
             outputPath,
             instance -> instance.usePositionMapping().write(persons));
 

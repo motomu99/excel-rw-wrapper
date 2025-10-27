@@ -6,14 +6,17 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * 日本語サンプル用のPerson Beanクラス
- * アノテーションで項目名を指定してBeanにマッピングできる
- * Lombokでgetter/setter/toString/equals/hashCodeを自動生成
+ * ヘッダーなしCSV用のPerson Beanクラス
+ * 
+ * <p>位置ベースマッピング（@CsvBindByPosition）を使用してCSVデータをマッピングします。
+ * ヘッダー行がないCSVファイルを読み込む際に使用します。</p>
+ * 
+ * <p>Lombokでgetter/setter/toString/equals/hashCodeを自動生成します。</p>
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Person2 {
+public class PersonWithoutHeader {
 
     @CsvBindByPosition(position = 0)
     private String name;
@@ -27,3 +30,4 @@ public class Person2 {
     @CsvBindByPosition(position = 3)
     private String birthplace;
 }
+

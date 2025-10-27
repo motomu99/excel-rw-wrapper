@@ -1,10 +1,11 @@
 package com.example.csv;
 
 import com.example.csv.model.Person;
-import com.example.csv.model.Person2;
+import com.example.csv.model.PersonWithoutHeader;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
@@ -21,6 +22,7 @@ import com.opencsv.exceptions.CsvException;
  * <p>このクラスは推奨される新しいBuilderパターンのテストです。</p>
  * <p>レガシーAPIのテストは {@link CsvWriterWrapperLegacyTest} を参照してください。</p>
  */
+@DisplayName("CsvWriterWrapper: 新しいBuilderパターンAPI")
 public class CsvWriterWrapperTest {
 
     private List<Path> filesToDelete = new ArrayList<>();
@@ -36,6 +38,7 @@ public class CsvWriterWrapperTest {
     }
 
     @Test
+    @DisplayName("基本的な書き込み - デフォルト設定でCSVファイルに書き込めること")
     void testBuilderBasicWrite() throws IOException, CsvException {
         // Builderパターンの基本的な書き込み
         Path outputPath = Paths.get("src/test/resources/builder_output_test.csv");
@@ -60,6 +63,7 @@ public class CsvWriterWrapperTest {
     }
 
     @Test
+    @DisplayName("文字セット指定 - Shift_JISで書き込み、読み込みできること")
     void testBuilderWithCharset() throws IOException, CsvException {
         // Builderパターンでcharset設定
         Path outputPath = Paths.get("src/test/resources/builder_sjis_test.csv");
@@ -84,6 +88,7 @@ public class CsvWriterWrapperTest {
     }
 
     @Test
+    @DisplayName("ファイル形式指定 - TSV形式で書き込み、読み込みできること")
     void testBuilderWithFileType() throws IOException, CsvException {
         // BuilderパターンでTSV設定
         Path outputPath = Paths.get("src/test/resources/builder_test.tsv");
@@ -108,6 +113,7 @@ public class CsvWriterWrapperTest {
     }
 
     @Test
+    @DisplayName("改行コード指定 - LF改行で書き込み、CRLF混入がないこと")
     void testBuilderWithLineSeparator() throws IOException {
         // Builderパターンで改行コード設定
         Path outputPath = Paths.get("src/test/resources/builder_lf_test.csv");
@@ -130,22 +136,23 @@ public class CsvWriterWrapperTest {
     }
 
     @Test
+    @DisplayName("位置ベースマッピング - ヘッダーなしで書き込み、読み込みできること")
     void testBuilderWithPositionMapping() throws IOException, CsvException {
         // Builderパターンで位置ベースマッピング
         Path outputPath = Paths.get("src/test/resources/builder_position_test.csv");
         filesToDelete.add(outputPath);
 
-        List<Person2> persons = new ArrayList<>();
-        persons.add(new Person2("テスト太郎", 25, "エンジニア", "東京"));
+        List<PersonWithoutHeader> persons = new ArrayList<>();
+        persons.add(new PersonWithoutHeader("テスト太郎", 25, "エンジニア", "東京"));
 
-        CsvWriterWrapper.builder(Person2.class, outputPath)
+        CsvWriterWrapper.builder(PersonWithoutHeader.class, outputPath)
             .usePositionMapping()
             .write(persons);
 
         assertTrue(Files.exists(outputPath));
 
         // 位置ベースマッピングで読み込んで検証
-        List<Person2> readPersons = CsvReaderWrapper.builder(Person2.class, outputPath)
+        List<PersonWithoutHeader> readPersons = CsvReaderWrapper.builder(PersonWithoutHeader.class, outputPath)
             .usePositionMapping()
             .read();
 
@@ -154,6 +161,7 @@ public class CsvWriterWrapperTest {
     }
 
     @Test
+    @DisplayName("BOM処理 - BOM付きUTF-8で書き込み、BOMが正しく出力されること")
     void testBuilderWithBom() throws IOException, CsvException {
         // BuilderパターンでBOM付き
         Path outputPath = Paths.get("src/test/resources/builder_bom_test.csv");
@@ -184,6 +192,7 @@ public class CsvWriterWrapperTest {
     }
 
     @Test
+    @DisplayName("複数設定の組み合わせ - charset/fileType/lineSeparator/headerMappingを同時指定できること")
     void testBuilderWithMultipleSettings() throws IOException, CsvException {
         // Builderパターンで複数設定の組み合わせ
         Path outputPath = Paths.get("src/test/resources/builder_multi_test.tsv");
@@ -213,6 +222,7 @@ public class CsvWriterWrapperTest {
     }
 
     @Test
+    @DisplayName("空リスト - 空のリストを書き込んでもエラーが発生しないこと")
     void testBuilderWithEmptyList() throws IOException {
         // Builderパターンで空リスト
         Path outputPath = Paths.get("src/test/resources/builder_empty_test.csv");
@@ -227,6 +237,7 @@ public class CsvWriterWrapperTest {
     }
 
     @Test
+    @DisplayName("ラウンドトリップ - 書き込んだデータを読み込み、元のデータと一致すること")
     void testBuilderRoundtrip() throws IOException, CsvException {
         // Builderパターンでラウンドトリップ
         Path outputPath = Paths.get("src/test/resources/builder_roundtrip_test.csv");
@@ -253,6 +264,7 @@ public class CsvWriterWrapperTest {
     }
 
     @Test
+    @DisplayName("複雑なシナリオ - TSV/Shift_JIS/CRLFを組み合わせて書き込み、読み込みできること")
     void testBuilderComplexScenario() throws IOException, CsvException {
         // Builderパターンで複雑なシナリオ
         Path outputPath = Paths.get("src/test/resources/builder_complex_test.tsv");

@@ -1,7 +1,7 @@
 package com.example.csv;
 
 import com.example.csv.model.Person;
-import com.example.csv.model.Person2;
+import com.example.csv.model.PersonWithoutHeader;
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
@@ -116,15 +116,15 @@ public class CsvStreamReaderTest {
     void testStreamWithPositionMapping() throws IOException, CsvException {
         // 位置ベースマッピングのテスト
         
-        List<Person2> result = CsvStreamReader.of(Person2.class, Paths.get("src/test/resources/sample_no_header.csv"))
+        List<PersonWithoutHeader> result = CsvStreamReader.of(PersonWithoutHeader.class, Paths.get("src/test/resources/sample_no_header.csv"))
             .usePositionMapping()
             .process(stream -> stream.collect(Collectors.toList()));
         
         assertNotNull(result);
         assertEquals(5, result.size());
         
-        // 最初のPerson2の確認
-        Person2 firstPerson = result.get(0);
+        // 最初のPersonWithoutHeaderの確認
+        PersonWithoutHeader firstPerson = result.get(0);
         assertEquals("田中太郎", firstPerson.getName());
         assertEquals(25, firstPerson.getAge());
     }
