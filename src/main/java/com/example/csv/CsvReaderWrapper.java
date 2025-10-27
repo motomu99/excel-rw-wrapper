@@ -1,10 +1,13 @@
 package com.example.csv;
 
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.Charset;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
-import java.nio.charset.Charset;
 
 import com.opencsv.exceptions.CsvException;
 import com.opencsv.bean.CsvToBean;
@@ -68,7 +71,9 @@ public class CsvReaderWrapper {
      */
     @SuppressWarnings("unchecked")
     public <T> List<T> read() {
-        try {
+        try (FileInputStream fis = new FileInputStream(filePath.toFile());
+             InputStreamReader isr = new InputStreamReader(fis, charset)) {
+            
             Object strategy;
             if (usePositionMapping) {
                 ColumnPositionMappingStrategy<T> positionStrategy = new ColumnPositionMappingStrategy<>();
@@ -80,8 +85,7 @@ public class CsvReaderWrapper {
                 strategy = headerStrategy;
             }
             
-            CsvToBean<T> csvToBean = new CsvToBeanBuilder<T>(new java.io.InputStreamReader(
-                    new java.io.FileInputStream(filePath.toFile()), charset))
+            CsvToBean<T> csvToBean = new CsvToBeanBuilder<T>(isr)
                     .withMappingStrategy((MappingStrategy<? extends T>) strategy)
                     .withSeparator(fileType.getDelimiter().charAt(0))
                     .withIgnoreLeadingWhiteSpace(true)
@@ -94,7 +98,7 @@ public class CsvReaderWrapper {
             if (this.skipLines > 0 && this.skipLines < result.size()) {
                 return result.subList(this.skipLines, result.size());
             } else if (this.skipLines >= result.size()) {
-                return new java.util.ArrayList<>();
+                return new ArrayList<>();
             } else {
                 return result;
             }
