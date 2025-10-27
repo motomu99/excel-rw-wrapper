@@ -68,7 +68,79 @@ List<String[]> data = csvReader.readCsvFromStream(inputStream);
 
 ## Bean読み込み機能
 
-### 基本的なBean読み込み
+### CsvReaderWrapper（推奨）
+
+**新しいBuilderパターンを使用した、最も推奨される方法です。**
+
+#### 基本的な使い方
+
+```java
+import com.example.csv.CsvReaderWrapper;
+import com.example.csv.model.Person;
+import java.nio.file.Paths;
+import java.util.List;
+
+// シンプルな読み込み
+List<Person> persons = CsvReaderWrapper.builder(Person.class, Paths.get("path/to/your/file.csv"))
+    .read();
+
+// Beanのプロパティにアクセス
+for (Person person : persons) {
+    System.out.println("名前: " + person.getName());
+    System.out.println("年齢: " + person.getAge());
+}
+```
+
+#### 詳細設定
+
+```java
+import com.example.csv.CharsetType;
+import com.example.csv.FileType;
+
+// 複数の設定を組み合わせ
+List<Person> persons = CsvReaderWrapper.builder(Person.class, Paths.get("data.tsv"))
+    .charset(CharsetType.S_JIS)       // 文字セット指定
+    .fileType(FileType.TSV)            // TSVファイル
+    .skipLines(1)                      // 最初の1行をスキップ
+    .read();
+```
+
+#### 対応する文字セット
+
+```java
+CharsetType.UTF_8        // UTF-8（デフォルト）
+CharsetType.UTF_8_BOM    // UTF-8 with BOM
+CharsetType.S_JIS        // Shift_JIS
+CharsetType.EUC_JP       // EUC-JP
+CharsetType.WINDOWS_31J  // Windows-31J
+```
+
+#### ヘッダーなしCSVの読み込み
+
+```java
+// 位置ベースのマッピングを使用
+List<Person> persons = CsvReaderWrapper.builder(Person.class, Paths.get("no_header.csv"))
+    .usePositionMapping()  // 位置ベースマッピング
+    .read();
+```
+
+#### 従来のAPI（互換性維持）
+
+既存コードとの互換性のため、従来の`execute()`メソッドも引き続き使用できます。
+
+```java
+List<Person> persons = CsvReaderWrapper.execute(
+    Person.class,
+    Paths.get("sample.csv"),
+    instance -> instance.setCharset(CharsetType.UTF_8).read()
+);
+```
+
+**詳細は [MIGRATION.md](MIGRATION.md) を参照してください。**
+
+---
+
+### CsvBeanReader（レガシー）
 
 ```java
 import com.example.csv.CsvBeanReader;
