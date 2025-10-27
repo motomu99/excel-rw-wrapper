@@ -24,50 +24,6 @@ OpenCSVをラップしたシンプルなCSV読み込みライブラリです。
 
 ## 使用方法
 
-### 基本的な使い方
-
-```java
-import com.example.csv.CsvReader;
-import java.util.List;
-
-// CsvReaderのインスタンスを作成
-CsvReader csvReader = new CsvReader();
-
-// CSVファイルを読み込み
-List<String[]> data = csvReader.readCsvFile("path/to/your/file.csv");
-
-// データを処理
-for (String[] row : data) {
-    for (String cell : row) {
-        System.out.print(cell + " ");
-    }
-    System.out.println();
-}
-```
-
-### ヘッダーを除いたデータのみを取得
-
-```java
-// ヘッダー行を除いたデータのみを取得
-List<String[]> dataOnly = csvReader.readCsvDataOnly("path/to/your/file.csv", true);
-```
-
-### ヘッダー情報のみを取得
-
-```java
-// ヘッダー行のみを取得
-String[] header = csvReader.readCsvHeader("path/to/your/file.csv");
-```
-
-### InputStreamから読み込み
-
-```java
-// InputStreamからCSVを読み込み
-List<String[]> data = csvReader.readCsvFromStream(inputStream);
-```
-
-## Bean読み込み機能
-
 ### CsvReaderWrapper（推奨）
 
 **新しいBuilderパターンを使用した、最も推奨される方法です。**
@@ -213,27 +169,7 @@ CsvWriterWrapper.execute(
 
 ---
 
-### CsvBeanReader（レガシー）
-
-```java
-import com.example.csv.CsvBeanReader;
-import com.example.csv.model.Person;
-import java.util.List;
-
-// CsvBeanReaderのインスタンスを作成
-CsvBeanReader csvBeanReader = new CsvBeanReader();
-
-// CSVファイルをBeanのListとして読み込み
-List<Person> persons = csvBeanReader.readCsvToBeans("path/to/your/file.csv", Person.class);
-
-// Beanのプロパティにアクセス
-for (Person person : persons) {
-    System.out.println("名前: " + person.getName());
-    System.out.println("年齢: " + person.getAge());
-}
-```
-
-### アノテーションでの項目名指定
+## アノテーションでの項目名指定
 
 ```java
 import com.opencsv.bean.CsvBindByName;
@@ -297,17 +233,10 @@ public class Employee {
     @CsvBindByName(column = "hire_date")
     @CsvDate("yyyy-MM-dd")
     private LocalDate hireDate;
-    
+
     // Getter/Setter
     // ...
 }
-```
-
-### InputStreamからBean読み込み
-
-```java
-// InputStreamからBeanを読み込み
-List<Person> persons = csvBeanReader.readCsvToBeansFromStream(inputStream, Person.class);
 ```
 
 ## サンプルファイル
@@ -330,10 +259,6 @@ List<Person> persons = csvBeanReader.readCsvToBeansFromStream(inputStream, Perso
 ```
 
 カバレッジレポートは `build/reports/jacoco/test/html/index.html` で確認できます。
-
-- **CsvReaderクラス**: 73%のカバレッジ
-- **ブランチカバレッジ**: 66%
-- **メソッドカバレッジ**: 80%
 
 ## Javadoc
 
