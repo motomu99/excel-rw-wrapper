@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.function.Function;
+import java.nio.charset.Charset;
 
 import com.opencsv.exceptions.CsvException;
 import com.opencsv.bean.CsvToBean;
@@ -27,6 +28,8 @@ public class CsvReaderWrapper {
     private int skipLines = 0;
     private Path filePath;
     private Class<?> beanClass;
+    private Charset charset = Charset.forName("UTF-8");
+    private FileType fileType = FileType.CSV;
 
     private CsvReaderWrapper(Class<?> beanClass, Path filePath) {
         this.beanClass = beanClass;
@@ -66,8 +69,10 @@ public class CsvReaderWrapper {
             HeaderColumnNameMappingStrategy<T> strategy = new HeaderColumnNameMappingStrategy<>();
             strategy.setType((Class<? extends T>) this.beanClass);
             
-            CsvToBean<T> csvToBean = new CsvToBeanBuilder<T>(new java.io.FileReader(filePath.toFile()))
+            CsvToBean<T> csvToBean = new CsvToBeanBuilder<T>(new java.io.InputStreamReader(
+                    new java.io.FileInputStream(filePath.toFile()), charset))
                     .withMappingStrategy(strategy)
+                    .withSeparator(fileType.getDelimiter().charAt(0))
                     .withIgnoreLeadingWhiteSpace(true)
                     .withIgnoreEmptyLine(true)
                     .build();
@@ -90,6 +95,16 @@ public class CsvReaderWrapper {
 
     public CsvReaderWrapper setSkip(int skipLines) {
         this.skipLines = skipLines;
+        return this;
+    }
+
+    public CsvReaderWrapper setCharset(CharsetType charsetType) {
+        this.charset = Charset.forName(charsetType.getCharsetName());
+        return this;
+    }
+
+    public CsvReaderWrapper setFileType(FileType fileType) {
+        this.fileType = fileType;
         return this;
     }
 }
