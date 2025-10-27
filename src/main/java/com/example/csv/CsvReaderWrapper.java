@@ -118,11 +118,6 @@ public class CsvReaderWrapper {
         return this;
     }
 
-    public CsvReaderWrapper usePositionMapping(boolean usePositionMapping) {
-        this.usePositionMapping = usePositionMapping;
-        return this;
-    }
-
     public CsvReaderWrapper usePositionMapping() {
         this.usePositionMapping = true;
         return this;
