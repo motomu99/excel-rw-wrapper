@@ -138,4 +138,38 @@ public class CsvReaderWrapperTest {
         assertEquals("大阪", secondPerson.getBirthplace());
     }
 
+    @Test
+    void testReadCsvWithSkipLinesGreaterThanDataSize() throws IOException, CsvException {
+        // スキップ行数がデータ数以上のテスト
+        List<Person> persons = CsvReaderWrapper.execute(
+            Person.class,
+            Paths.get("src/test/resources/sample.csv"),
+            instance -> instance.setSkip(10).read()); // データより多いスキップ数
+        
+        assertNotNull(persons);
+        assertTrue(persons.isEmpty()); // 空のリストが返されることを確認
+    }
+
+    @Test
+    void testReadCsvWithFileNotFound() {
+        // 存在しないファイルのテスト
+        assertThrows(RuntimeException.class, () -> {
+            CsvReaderWrapper.execute(
+                Person.class,
+                Paths.get("src/test/resources/nonexistent.csv"),
+                instance -> instance.read());
+        });
+    }
+
+    @Test
+    void testReadCsvWithInvalidPath() {
+        // 無効なファイルパスのテスト
+        assertThrows(RuntimeException.class, () -> {
+            CsvReaderWrapper.execute(
+                Person.class,
+                Paths.get("invalid/path/file.csv"),
+                instance -> instance.read());
+        });
+    }
+
 }
