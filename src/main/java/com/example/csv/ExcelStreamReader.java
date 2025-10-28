@@ -136,6 +136,9 @@ public class ExcelStreamReader<T> {
      * 指定された列名を持つ行を、上から指定行数の範囲内で探してヘッダー行とする
      * また、この列の値が空になったらデータ読み込みを終了する
      *
+     * <p>注意: キー列を持つヘッダー行が見つからない場合、またはヘッダー行にキー列が存在しない場合、
+     * process()メソッド実行時にIOExceptionが投げられます。
+     *
      * @param keyColumnName キーとなる列名
      * @return このインスタンス
      */
@@ -217,8 +220,11 @@ public class ExcelStreamReader<T> {
         // ヘッダー行を検出
         int headerRowIndex = findHeaderRow(sheet);
         if (headerRowIndex == -1) {
-            log.warn("ヘッダー行が見つかりませんでした");
-            return result;
+            String errorMsg = headerKeyColumn != null
+                ? String.format("キー列 '%s' を持つヘッダー行が %d行以内に見つかりませんでした", headerKeyColumn, headerSearchRows)
+                : "ヘッダー行が見つかりませんでした";
+            log.error(errorMsg);
+            throw new Exception(errorMsg);
         }
 
         Row headerRow = sheet.getRow(headerRowIndex);
@@ -244,7 +250,9 @@ public class ExcelStreamReader<T> {
         if (headerKeyColumn != null) {
             keyColumnIndex = columnMap.get(headerKeyColumn);
             if (keyColumnIndex == null) {
-                log.warn("キー列 '{}' がヘッダーに見つかりませんでした", headerKeyColumn);
+                String errorMsg = String.format("キー列 '%s' がヘッダー行に見つかりませんでした", headerKeyColumn);
+                log.error(errorMsg);
+                throw new Exception(errorMsg);
             }
         }
 
@@ -309,7 +317,6 @@ public class ExcelStreamReader<T> {
             }
         }
 
-        log.warn("キー列 '{}' を持つヘッダー行が {}行以内に見つかりませんでした", headerKeyColumn, headerSearchRows);
         return -1;
     }
 

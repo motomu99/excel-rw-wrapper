@@ -428,14 +428,16 @@ public class ExcelStreamReaderTest {
     }
 
     @Test
-    @DisplayName("ヘッダー未検出 - ヘッダーが見つからない場合は空のリストを返すこと")
-    void testHeaderNotFound() throws IOException {
-        List<Person> result = ExcelStreamReader.of(Person.class, SAMPLE_EXCEL_WITH_TITLE)
-            .headerKey("存在しない列名")
-            .process(stream -> stream.collect(Collectors.toList()));
+    @DisplayName("ヘッダー未検出 - ヘッダーが見つからない場合は例外を投げること")
+    void testHeaderNotFound() {
+        IOException exception = assertThrows(IOException.class, () -> {
+            ExcelStreamReader.of(Person.class, SAMPLE_EXCEL_WITH_TITLE)
+                .headerKey("存在しない列名")
+                .process(stream -> stream.collect(Collectors.toList()));
+        });
 
-        assertNotNull(result);
-        assertEquals(0, result.size());
+        assertTrue(exception.getMessage().contains("存在しない列名"));
+        assertTrue(exception.getMessage().contains("見つかりませんでした"));
     }
 
     @Test
@@ -452,5 +454,18 @@ public class ExcelStreamReaderTest {
         assertEquals(2, names.size());
         assertTrue(names.contains("佐藤花子"));
         assertTrue(names.contains("山田次郎"));
+    }
+
+    @Test
+    @DisplayName("キー列がヘッダーに存在しない - ヘッダー行は見つかったがキー列が存在しない場合は例外を投げること")
+    void testKeyColumnNotInHeader() {
+        IOException exception = assertThrows(IOException.class, () -> {
+            ExcelStreamReader.of(Person.class, SAMPLE_EXCEL)
+                .headerKey("存在しない列")
+                .process(stream -> stream.collect(Collectors.toList()));
+        });
+
+        assertTrue(exception.getMessage().contains("存在しない列"));
+        assertTrue(exception.getMessage().contains("ヘッダー行に見つかりませんでした"));
     }
 }
