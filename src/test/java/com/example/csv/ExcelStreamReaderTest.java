@@ -2,6 +2,8 @@ package com.example.csv;
 
 import com.example.csv.model.Person;
 import com.example.csv.model.PersonWithoutHeader;
+import com.example.csv.exception.HeaderNotFoundException;
+import com.example.csv.exception.KeyColumnNotFoundException;
 
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -428,9 +430,9 @@ public class ExcelStreamReaderTest {
     }
 
     @Test
-    @DisplayName("ヘッダー未検出 - ヘッダーが見つからない場合は例外を投げること")
+    @DisplayName("ヘッダー未検出 - ヘッダーが見つからない場合はHeaderNotFoundExceptionを投げること")
     void testHeaderNotFound() {
-        IOException exception = assertThrows(IOException.class, () -> {
+        HeaderNotFoundException exception = assertThrows(HeaderNotFoundException.class, () -> {
             ExcelStreamReader.of(Person.class, SAMPLE_EXCEL_WITH_TITLE)
                 .headerKey("存在しない列名")
                 .process(stream -> stream.collect(Collectors.toList()));
@@ -457,9 +459,9 @@ public class ExcelStreamReaderTest {
     }
 
     @Test
-    @DisplayName("キー列がヘッダーに存在しない - ヘッダー行は見つかったがキー列が存在しない場合は例外を投げること")
+    @DisplayName("キー列がヘッダーに存在しない - ヘッダー行は見つかったがキー列が存在しない場合はKeyColumnNotFoundExceptionを投げること")
     void testKeyColumnNotInHeader() {
-        IOException exception = assertThrows(IOException.class, () -> {
+        KeyColumnNotFoundException exception = assertThrows(KeyColumnNotFoundException.class, () -> {
             ExcelStreamReader.of(Person.class, SAMPLE_EXCEL)
                 .headerKey("存在しない列")
                 .process(stream -> stream.collect(Collectors.toList()));

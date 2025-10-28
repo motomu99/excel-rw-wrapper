@@ -22,6 +22,10 @@ import org.apache.poi.ss.usermodel.WorkbookFactory;
 import com.opencsv.bean.CsvBindByName;
 import com.opencsv.bean.CsvBindByPosition;
 
+import com.example.csv.exception.HeaderNotFoundException;
+import com.example.csv.exception.KeyColumnNotFoundException;
+import com.example.csv.exception.SheetNotFoundException;
+
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -136,8 +140,11 @@ public class ExcelStreamReader<T> {
      * 指定された列名を持つ行を、上から指定行数の範囲内で探してヘッダー行とする
      * また、この列の値が空になったらデータ読み込みを終了する
      *
-     * <p>注意: キー列を持つヘッダー行が見つからない場合、またはヘッダー行にキー列が存在しない場合、
-     * process()メソッド実行時にIOExceptionが投げられます。
+     * <p>注意: process()メソッド実行時に以下の例外が投げられる可能性があります：
+     * <ul>
+     *   <li>{@link HeaderNotFoundException} - キー列を持つヘッダー行が見つからない場合</li>
+     *   <li>{@link KeyColumnNotFoundException} - ヘッダー行にキー列が存在しない場合</li>
+     * </ul>
      *
      * @param keyColumnName キーとなる列名
      * @return このインスタンス
@@ -173,7 +180,11 @@ public class ExcelStreamReader<T> {
 
             Sheet sheet = getSheet(workbook);
             if (sheet == null) {
-                throw new IOException("指定されたシートが見つかりません");
+                if (sheetName != null) {
+                    throw new SheetNotFoundException(sheetName);
+                } else {
+                    throw new SheetNotFoundException(sheetIndex);
+                }
             }
 
             List<T> data = readSheet(sheet);
@@ -220,11 +231,13 @@ public class ExcelStreamReader<T> {
         // ヘッダー行を検出
         int headerRowIndex = findHeaderRow(sheet);
         if (headerRowIndex == -1) {
-            String errorMsg = headerKeyColumn != null
-                ? String.format("キー列 '%s' を持つヘッダー行が %d行以内に見つかりませんでした", headerKeyColumn, headerSearchRows)
-                : "ヘッダー行が見つかりませんでした";
-            log.error(errorMsg);
-            throw new Exception(errorMsg);
+            if (headerKeyColumn != null) {
+                log.error("キー列 '{}' を持つヘッダー行が {}行以内に見つかりませんでした", headerKeyColumn, headerSearchRows);
+                throw new HeaderNotFoundException(headerKeyColumn, headerSearchRows);
+            } else {
+                log.error("ヘッダー行が見つかりませんでした");
+                throw new HeaderNotFoundException("ヘッダー行が見つかりませんでした");
+            }
         }
 
         Row headerRow = sheet.getRow(headerRowIndex);
@@ -250,9 +263,8 @@ public class ExcelStreamReader<T> {
         if (headerKeyColumn != null) {
             keyColumnIndex = columnMap.get(headerKeyColumn);
             if (keyColumnIndex == null) {
-                String errorMsg = String.format("キー列 '%s' がヘッダー行に見つかりませんでした", headerKeyColumn);
-                log.error(errorMsg);
-                throw new Exception(errorMsg);
+                log.error("キー列 '{}' がヘッダー行に見つかりませんでした", headerKeyColumn);
+                throw new KeyColumnNotFoundException(headerKeyColumn);
             }
         }
 
