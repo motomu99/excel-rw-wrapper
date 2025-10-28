@@ -4,6 +4,7 @@ import com.example.csv.model.Person;
 import com.example.csv.model.PersonWithoutHeader;
 import com.example.csv.exception.HeaderNotFoundException;
 import com.example.csv.exception.KeyColumnNotFoundException;
+import com.example.csv.exception.CellValueConversionException;
 
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -32,6 +33,7 @@ public class ExcelStreamReaderTest {
     private static final Path SAMPLE_EXCEL_MULTI_SHEET = TEST_RESOURCES_DIR.resolve("sample_multi_sheet.xlsx");
     private static final Path SAMPLE_EXCEL_WITH_TITLE = TEST_RESOURCES_DIR.resolve("sample_with_title.xlsx");
     private static final Path SAMPLE_EXCEL_WITH_EMPTY_KEY = TEST_RESOURCES_DIR.resolve("sample_with_empty_key.xlsx");
+    private static final Path SAMPLE_EXCEL_INVALID_TYPE = TEST_RESOURCES_DIR.resolve("sample_invalid_type.xlsx");
 
     @BeforeAll
     static void setUp() throws IOException {
@@ -52,6 +54,9 @@ public class ExcelStreamReaderTest {
 
         // キー列が途中で空になるサンプルExcelファイルを作成
         createSampleExcelWithEmptyKey();
+
+        // 型変換エラー用のサンプルExcelファイルを作成
+        createSampleExcelInvalidType();
     }
 
     private static void createSampleExcel() throws IOException {
@@ -201,6 +206,33 @@ public class ExcelStreamReaderTest {
             // その後のデータ（読み込まれないはず）
             createDataRow(sheet, 5, "高橋健太", 35, "マネージャー", "名古屋");
             createDataRow(sheet, 6, "伊藤美咲", 27, "エンジニア", "札幌");
+
+            workbook.write(fos);
+        }
+    }
+
+    private static void createSampleExcelInvalidType() throws IOException {
+        try (Workbook workbook = new XSSFWorkbook();
+             FileOutputStream fos = new FileOutputStream(SAMPLE_EXCEL_INVALID_TYPE.toFile())) {
+
+            Sheet sheet = workbook.createSheet("Sheet1");
+
+            // ヘッダー行
+            Row headerRow = sheet.createRow(0);
+            headerRow.createCell(0).setCellValue("名前");
+            headerRow.createCell(1).setCellValue("年齢");
+            headerRow.createCell(2).setCellValue("職業");
+            headerRow.createCell(3).setCellValue("出身地");
+
+            // データ行（1件目は正常）
+            createDataRow(sheet, 1, "田中太郎", 25, "エンジニア", "東京");
+
+            // データ行（2件目は年齢が文字列）
+            Row invalidRow = sheet.createRow(2);
+            invalidRow.createCell(0).setCellValue("佐藤花子");
+            invalidRow.createCell(1).setCellValue("abc"); // 年齢に文字列
+            invalidRow.createCell(2).setCellValue("デザイナー");
+            invalidRow.createCell(3).setCellValue("大阪");
 
             workbook.write(fos);
         }
@@ -469,5 +501,26 @@ public class ExcelStreamReaderTest {
 
         assertTrue(exception.getMessage().contains("存在しない列"));
         assertTrue(exception.getMessage().contains("ヘッダー行に見つかりませんでした"));
+    }
+
+    @Test
+    @DisplayName("型変換エラー - 数字項目に文字列が来た場合はCellValueConversionExceptionを投げること")
+    void testCellValueConversionError() {
+        CellValueConversionException exception = assertThrows(CellValueConversionException.class, () -> {
+            ExcelStreamReader.of(Person.class, SAMPLE_EXCEL_INVALID_TYPE)
+                .process(stream -> stream.collect(Collectors.toList()));
+        });
+
+        // エラーメッセージの確認
+        assertTrue(exception.getMessage().contains("セル値の変換に失敗しました"));
+        assertTrue(exception.getMessage().contains("abc"));
+        assertTrue(exception.getMessage().contains("年齢"));
+        assertTrue(exception.getMessage().contains("Integer") || exception.getMessage().contains("int"));
+
+        // エラー詳細の確認
+        assertEquals(2, exception.getRowIndex()); // 0から始まるので2（3行目）
+        assertEquals("年齢", exception.getColumnName());
+        assertEquals("abc", exception.getCellValue());
+        assertTrue(exception.getTargetType().contains("Integer") || exception.getTargetType().contains("int"));
     }
 }
