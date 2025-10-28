@@ -4,16 +4,19 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.Path;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
-
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.DateUtil;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -397,7 +400,21 @@ public class ExcelStreamReader<T> {
 
         return switch (cell.getCellType()) {
             case STRING -> cell.getStringCellValue();
-            case NUMERIC -> String.valueOf((int) cell.getNumericCellValue());
+            case NUMERIC -> {
+                if (DateUtil.isCellDateFormatted(cell)) {
+                    // 日付セルの場合は日付文字列として返す
+                    Date date = cell.getDateCellValue();
+                    LocalDateTime dateTime = date.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
+                    // 時刻が00:00:00の場合はLocalDateとして扱う
+                    if (dateTime.toLocalTime().equals(java.time.LocalTime.MIDNIGHT)) {
+                        yield dateTime.toLocalDate().toString();
+                    } else {
+                        yield dateTime.toString();
+                    }
+                } else {
+                    yield String.valueOf((int) cell.getNumericCellValue());
+                }
+            }
             case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
             case FORMULA -> cell.getCellFormula();
             default -> "";
@@ -447,8 +464,22 @@ public class ExcelStreamReader<T> {
                 } else {
                     return Boolean.parseBoolean(getCellValue(cell));
                 }
+            } else if (targetType == LocalDate.class) {
+                if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
+                    Date date = cell.getDateCellValue();
+                    return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+                } else {
+                    return LocalDate.parse(getCellValue(cell));
+                }
+            } else if (targetType == LocalDateTime.class) {
+                if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
+                    Date date = cell.getDateCellValue();
+                    return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
+                } else {
+                    return LocalDateTime.parse(getCellValue(cell));
+                }
             }
-        } catch (NumberFormatException | IllegalArgumentException e) {
+        } catch (IllegalArgumentException e) {
             String cellValue = getCellValue(cell);
             log.error("セル値の変換に失敗しました: 行={}, 列='{}', 値='{}', 型={}",
                     rowIndex + 1, columnName, cellValue, targetType.getSimpleName());

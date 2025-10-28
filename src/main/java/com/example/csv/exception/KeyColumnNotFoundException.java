@@ -6,15 +6,6 @@ package com.example.csv.exception;
 public class KeyColumnNotFoundException extends ExcelReaderException {
 
     /**
-     * 指定されたメッセージで例外を構築
-     *
-     * @param message エラーメッセージ
-     */
-    public KeyColumnNotFoundException(String message) {
-        super(message);
-    }
-
-    /**
      * キー列名を指定して例外を構築
      *
      * @param keyColumnName キー列名

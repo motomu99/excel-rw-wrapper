@@ -6,15 +6,6 @@ package com.example.csv.exception;
 public class SheetNotFoundException extends ExcelReaderException {
 
     /**
-     * 指定されたメッセージで例外を構築
-     *
-     * @param message エラーメッセージ
-     */
-    public SheetNotFoundException(String message) {
-        super(message);
-    }
-
-    /**
      * シート名を指定して例外を構築
      *
      * @param sheetName シート名
