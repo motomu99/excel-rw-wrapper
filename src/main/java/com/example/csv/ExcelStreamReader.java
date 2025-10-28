@@ -448,7 +448,7 @@ public class ExcelStreamReader<T> {
                     return Boolean.parseBoolean(getCellValue(cell));
                 }
             }
-        } catch (NumberFormatException | IllegalArgumentException e) {
+        } catch (IllegalArgumentException e) {
             String cellValue = getCellValue(cell);
             log.error("セル値の変換に失敗しました: 行={}, 列='{}', 値='{}', 型={}",
                     rowIndex + 1, columnName, cellValue, targetType.getSimpleName());

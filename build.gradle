@@ -42,9 +42,7 @@ dependencies {
     api 'org.slf4j:slf4j-api:2.0.9'
     runtimeOnly 'ch.qos.logback:logback-classic:1.4.11'
 
-    // 独自アノテーション処理用
-    compileOnly 'com.example:excel-rw-wrapper:1.0.0'
-    annotationProcessor 'com.example:excel-rw-wrapper:1.0.0'
+    // 独自アノテーション処理は未使用（自己参照を削除）
 
     // Test Dependencies
     testImplementation 'junit:junit:4.13.2'
