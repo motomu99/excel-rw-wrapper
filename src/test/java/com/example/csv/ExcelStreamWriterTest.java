@@ -10,12 +10,14 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -515,6 +517,173 @@ public class ExcelStreamWriterTest {
         assertEquals(2, readPersons.size());
         assertEquals("田中\"太郎\"", readPersons.get(0).getName());
         assertEquals("佐藤,花子", readPersons.get(1).getName());
+    }
+    
+    @Test
+    @DisplayName("書き込み位置指定 - startCell()で開始セルを指定できること")
+    void testWriteWithStartCell() throws IOException {
+        Path outputPath = TEST_OUTPUT_DIR.resolve("start_cell.xlsx");
+        
+        List<Person> persons = List.of(
+            new Person("田中太郎", 25, "エンジニア", "東京"),
+            new Person("佐藤花子", 30, "デザイナー", "大阪")
+        );
+        
+        // B3セル（行2、列1）から書き込み開始
+        ExcelStreamWriter.of(Person.class, outputPath)
+            .startCell(2, 1)
+            .write(persons.stream());
+        
+        assertTrue(Files.exists(outputPath));
+        
+        try (FileInputStream fis = new FileInputStream(outputPath.toFile());
+             Workbook workbook = WorkbookFactory.create(fis)) {
+            
+            Sheet sheet = workbook.getSheetAt(0);
+            
+            // B3セル（行2、列1）にヘッダーがあることを確認
+            Row headerRow = sheet.getRow(2);
+            assertNotNull(headerRow);
+            assertEquals("名前", getCellValueAsString(headerRow.getCell(1)));
+            assertEquals("年齢", getCellValueAsString(headerRow.getCell(2)));
+            
+            // B4セル（行3、列1）にデータがあることを確認
+            Row dataRow1 = sheet.getRow(3);
+            assertNotNull(dataRow1);
+            assertEquals("田中太郎", getCellValueAsString(dataRow1.getCell(1)));
+            assertEquals(25, getCellValueAsNumber(dataRow1.getCell(2)));
+        }
+    }
+    
+    @Test
+    @DisplayName("既存ファイルへの書き込み - テンプレートファイルにデータを書き込めること")
+    void testWriteToExistingFile() throws IOException {
+        // テンプレートファイルを作成
+        Path templatePath = TEST_OUTPUT_DIR.resolve("template.xlsx");
+        try (Workbook workbook = new XSSFWorkbook();
+             FileOutputStream fos = new FileOutputStream(templatePath.toFile())) {
+            
+            Sheet sheet = workbook.createSheet("テンプレート");
+            
+            // タイトル行（A1セル）
+            Row titleRow = sheet.createRow(0);
+            titleRow.createCell(0).setCellValue("社員マスタ");
+            
+            // 説明行（A2セル）
+            Row descRow = sheet.createRow(1);
+            descRow.createCell(0).setCellValue("2024年度版");
+            
+            workbook.write(fos);
+        }
+        
+        // テンプレートファイルにデータを追記
+        List<Person> persons = List.of(
+            new Person("田中太郎", 25, "エンジニア", "東京"),
+            new Person("佐藤花子", 30, "デザイナー", "大阪")
+        );
+        
+        ExcelStreamWriter.of(Person.class, templatePath)
+            .sheetName("テンプレート")
+            .startCell(2, 0)  // A3セルから書き込み
+            .loadExisting()
+            .write(persons.stream());
+        
+        // 結果確認
+        try (FileInputStream fis = new FileInputStream(templatePath.toFile());
+             Workbook workbook = WorkbookFactory.create(fis)) {
+            
+            Sheet sheet = workbook.getSheet("テンプレート");
+            assertNotNull(sheet);
+            
+            // タイトルが残っていることを確認
+            Row titleRow = sheet.getRow(0);
+            assertEquals("社員マスタ", getCellValueAsString(titleRow.getCell(0)));
+            
+            // 説明が残っていることを確認
+            Row descRow = sheet.getRow(1);
+            assertEquals("2024年度版", getCellValueAsString(descRow.getCell(0)));
+            
+            // A3セルにヘッダーがあることを確認
+            Row headerRow = sheet.getRow(2);
+            assertNotNull(headerRow);
+            assertEquals("名前", getCellValueAsString(headerRow.getCell(0)));
+            
+            // A4セルにデータがあることを確認
+            Row dataRow1 = sheet.getRow(3);
+            assertNotNull(dataRow1);
+            assertEquals("田中太郎", getCellValueAsString(dataRow1.getCell(0)));
+            assertEquals(25, getCellValueAsNumber(dataRow1.getCell(1)));
+        }
+    }
+    
+    @Test
+    @DisplayName("既存ファイル・新規シート - 既存ファイルに新しいシートを追加できること")
+    void testWriteToExistingFileNewSheet() throws IOException {
+        // 既存ファイルを作成
+        Path existingPath = TEST_OUTPUT_DIR.resolve("existing_with_sheets.xlsx");
+        try (Workbook workbook = new XSSFWorkbook();
+             FileOutputStream fos = new FileOutputStream(existingPath.toFile())) {
+            
+            Sheet sheet1 = workbook.createSheet("既存シート");
+            Row row = sheet1.createRow(0);
+            row.createCell(0).setCellValue("既存データ");
+            
+            workbook.write(fos);
+        }
+        
+        // 新しいシートを追加
+        List<Person> persons = List.of(
+            new Person("田中太郎", 25, "エンジニア", "東京")
+        );
+        
+        ExcelStreamWriter.of(Person.class, existingPath)
+            .sheetName("新規シート")
+            .loadExisting()
+            .write(persons.stream());
+        
+        // 結果確認
+        try (FileInputStream fis = new FileInputStream(existingPath.toFile());
+             Workbook workbook = WorkbookFactory.create(fis)) {
+            
+            // 既存シートが残っていることを確認
+            Sheet existingSheet = workbook.getSheet("既存シート");
+            assertNotNull(existingSheet);
+            assertEquals("既存データ", getCellValueAsString(existingSheet.getRow(0).getCell(0)));
+            
+            // 新しいシートが追加されていることを確認
+            Sheet newSheet = workbook.getSheet("新規シート");
+            assertNotNull(newSheet);
+            Row headerRow = newSheet.getRow(0);
+            assertEquals("名前", getCellValueAsString(headerRow.getCell(0)));
+        }
+    }
+    
+    @Test
+    @DisplayName("startCell単独使用 - loadExisting()なしでもstartCell()は動作すること")
+    void testStartCellWithoutLoadExisting() throws IOException {
+        Path outputPath = TEST_OUTPUT_DIR.resolve("start_cell_only.xlsx");
+        
+        List<Person> persons = List.of(
+            new Person("田中太郎", 25, "エンジニア", "東京")
+        );
+        
+        // 新規ファイルでもstartCell()を使用可能
+        ExcelStreamWriter.of(Person.class, outputPath)
+            .startCell(5, 3)  // D6セルから開始
+            .write(persons.stream());
+        
+        assertTrue(Files.exists(outputPath));
+        
+        try (FileInputStream fis = new FileInputStream(outputPath.toFile());
+             Workbook workbook = WorkbookFactory.create(fis)) {
+            
+            Sheet sheet = workbook.getSheetAt(0);
+            
+            // D6セル（行5、列3）にヘッダーがあることを確認
+            Row headerRow = sheet.getRow(5);
+            assertNotNull(headerRow);
+            assertEquals("名前", getCellValueAsString(headerRow.getCell(3)));
+        }
     }
 }
 

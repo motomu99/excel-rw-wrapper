@@ -1,8 +1,10 @@
 package com.example.csv;
 
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -19,6 +21,7 @@ import org.apache.poi.ss.usermodel.CreationHelper;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import com.opencsv.bean.CsvBindByName;
@@ -50,6 +53,13 @@ import lombok.extern.slf4j.Slf4j;
  * ExcelStreamWriter.of(PersonWithoutHeader.class, Paths.get("output.xlsx"))
  *     .usePositionMapping()
  *     .write(persons.stream());
+ *
+ * // 既存ファイル（テンプレート）にデータを書き込む
+ * ExcelStreamWriter.of(Person.class, Paths.get("template.xlsx"))
+ *     .loadExisting()
+ *     .sheetName("データ")
+ *     .startCell(2, 0)  // A3セルから書き込み開始
+ *     .write(persons.stream());
  * </pre>
  *
  * @param <T> マッピング先のBeanクラスの型
@@ -66,6 +76,9 @@ public class ExcelStreamWriter<T> {
     private int sheetIndex = 0;
     
     private boolean usePositionMapping = false;
+    private boolean loadExisting = false;
+    private int startRow = 0;
+    private int startColumn = 0;
     
     /** フィールド情報キャッシュ（パフォーマンス最適化用） */
     private Map<Field, FieldMappingInfo> fieldCache = null;
@@ -134,6 +147,31 @@ public class ExcelStreamWriter<T> {
     }
 
     /**
+     * 既存ファイルを読み込んで書き込む
+     * テンプレートファイルにデータを追記する際に使用
+     *
+     * @return このインスタンス
+     */
+    public ExcelStreamWriter<T> loadExisting() {
+        this.loadExisting = true;
+        return this;
+    }
+
+    /**
+     * 書き込み開始セルを設定
+     * 指定した行・列から書き込みを開始する（0始まり）
+     *
+     * @param row 開始行（0始まり）
+     * @param column 開始列（0始まり）
+     * @return このインスタンス
+     */
+    public ExcelStreamWriter<T> startCell(int row, int column) {
+        this.startRow = row;
+        this.startColumn = column;
+        return this;
+    }
+
+    /**
      * Streamを書き込む
      *
      * <p>Streamの要素をExcelファイルに書き込みます。
@@ -144,14 +182,26 @@ public class ExcelStreamWriter<T> {
      * @throws IOException ファイル書き込みエラーが発生した場合
      */
     public void write(Stream<T> stream) throws IOException {
-        try (Workbook workbook = new XSSFWorkbook();
-             FileOutputStream fos = new FileOutputStream(filePath.toFile())) {
+        Workbook workbook = null;
+        FileOutputStream fos = null;
+        
+        try {
+            // 既存ファイルを開くか新規作成
+            if (loadExisting && Files.exists(filePath)) {
+                try (FileInputStream fis = new FileInputStream(filePath.toFile())) {
+                    workbook = WorkbookFactory.create(fis);
+                    log.info("既存のExcelファイルを開きました: {}", filePath);
+                }
+            } else {
+                workbook = new XSSFWorkbook();
+                log.info("新規Excelファイルを作成します: {}", filePath);
+            }
             
             // スタイルの初期化
             initializeStyles(workbook);
             
-            // シートを作成
-            Sheet sheet = workbook.createSheet(sheetName);
+            // シートを取得または作成
+            Sheet sheet = getOrCreateSheet(workbook);
             
             // フィールドキャッシュを構築
             buildFieldCache();
@@ -161,14 +211,20 @@ public class ExcelStreamWriter<T> {
             
             // データ行を作成
             List<T> dataList = stream.toList();
-            int rowIndex = 1;
+            int rowIndex = startRow + 1;
             for (T bean : dataList) {
-                Row row = sheet.createRow(rowIndex++);
+                Row row = sheet.getRow(rowIndex);
+                if (row == null) {
+                    row = sheet.createRow(rowIndex);
+                }
                 writeDataRow(row, bean);
+                rowIndex++;
             }
             
+            // ファイルに書き込み
+            fos = new FileOutputStream(filePath.toFile());
             workbook.write(fos);
-            log.info("Excelファイルを作成しました: {}", filePath);
+            log.info("Excelファイルを保存しました: {}", filePath);
             
         } catch (IOException e) {
             log.error("Excelファイル書き込み中にエラーが発生: ファイルパス={}, エラー={}", filePath, e.getMessage(), e);
@@ -176,7 +232,36 @@ public class ExcelStreamWriter<T> {
         } catch (Exception e) {
             log.error("Excel処理中にエラーが発生: ファイルパス={}, エラー={}", filePath, e.getMessage(), e);
             throw new IOException("Excel処理中にエラーが発生しました", e);
+        } finally {
+            if (fos != null) {
+                try {
+                    fos.close();
+                } catch (IOException e) {
+                    log.warn("FileOutputStreamのクローズに失敗: {}", e.getMessage());
+                }
+            }
+            if (workbook != null) {
+                try {
+                    workbook.close();
+                } catch (IOException e) {
+                    log.warn("Workbookのクローズに失敗: {}", e.getMessage());
+                }
+            }
         }
+    }
+
+    /**
+     * シートを取得または作成
+     */
+    private Sheet getOrCreateSheet(Workbook workbook) {
+        Sheet sheet = workbook.getSheet(sheetName);
+        if (sheet == null) {
+            sheet = workbook.createSheet(sheetName);
+            log.debug("新しいシートを作成: {}", sheetName);
+        } else {
+            log.debug("既存のシートを使用: {}", sheetName);
+        }
+        return sheet;
     }
 
     /**
@@ -227,19 +312,22 @@ public class ExcelStreamWriter<T> {
      * ヘッダー行を作成
      */
     private void createHeaderRow(Sheet sheet) {
-        Row headerRow = sheet.createRow(0);
+        Row headerRow = sheet.getRow(startRow);
+        if (headerRow == null) {
+            headerRow = sheet.createRow(startRow);
+        }
         
         if (usePositionMapping) {
             // 位置ベースマッピングの場合は、position順にヘッダーを作成
             for (FieldMappingInfo mappingInfo : fieldCache.values()) {
                 if (mappingInfo.position != null) {
-                    Cell cell = headerRow.createCell(mappingInfo.position);
+                    Cell cell = headerRow.createCell(startColumn + mappingInfo.position);
                     cell.setCellValue(mappingInfo.columnName != null ? mappingInfo.columnName : mappingInfo.field.getName());
                 }
             }
         } else {
             // ヘッダーベースマッピングの場合は、フィールド定義順にヘッダーを作成
-            int columnIndex = 0;
+            int columnIndex = startColumn;
             for (FieldMappingInfo mappingInfo : fieldCache.values()) {
                 if (mappingInfo.columnName != null) {
                     Cell cell = headerRow.createCell(columnIndex++);
@@ -258,13 +346,13 @@ public class ExcelStreamWriter<T> {
             for (FieldMappingInfo mappingInfo : fieldCache.values()) {
                 if (mappingInfo.position != null) {
                     Object value = mappingInfo.field.get(bean);
-                    Cell cell = row.createCell(mappingInfo.position);
+                    Cell cell = row.createCell(startColumn + mappingInfo.position);
                     setCellValue(cell, value);
                 }
             }
         } else {
             // ヘッダーベースマッピング
-            int columnIndex = 0;
+            int columnIndex = startColumn;
             for (FieldMappingInfo mappingInfo : fieldCache.values()) {
                 if (mappingInfo.columnName != null) {
                     Object value = mappingInfo.field.get(bean);
