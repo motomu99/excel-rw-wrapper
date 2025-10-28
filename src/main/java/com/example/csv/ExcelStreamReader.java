@@ -25,6 +25,7 @@ import com.opencsv.bean.CsvBindByPosition;
 import com.example.csv.exception.HeaderNotFoundException;
 import com.example.csv.exception.KeyColumnNotFoundException;
 import com.example.csv.exception.SheetNotFoundException;
+import com.example.csv.exception.CellValueConversionException;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -373,7 +374,11 @@ public class ExcelStreamReader<T> {
             if (columnIndex != null && columnIndex < row.getLastCellNum()) {
                 Cell cell = row.getCell(columnIndex);
                 if (cell != null) {
-                    Object value = convertCellValue(cell, field.getType());
+                    String columnName = headerMap.get(columnIndex);
+                    if (columnName == null) {
+                        columnName = "列" + columnIndex;
+                    }
+                    Object value = convertCellValue(cell, field.getType(), row.getRowNum(), columnName);
                     field.set(bean, value);
                 }
             }
@@ -401,8 +406,16 @@ public class ExcelStreamReader<T> {
 
     /**
      * セルの値を指定された型に変換
+     *
+     * @param cell セル
+     * @param targetType 変換先の型
+     * @param rowIndex 行番号（エラーメッセージ用）
+     * @param columnName 列名（エラーメッセージ用）
+     * @return 変換された値
+     * @throws CellValueConversionException 型変換に失敗した場合
      */
-    private Object convertCellValue(Cell cell, Class<?> targetType) {
+    private Object convertCellValue(Cell cell, Class<?> targetType, int rowIndex, String columnName)
+            throws CellValueConversionException {
         if (cell == null || cell.getCellType() == CellType.BLANK) {
             return null;
         }
@@ -435,8 +448,11 @@ public class ExcelStreamReader<T> {
                     return Boolean.parseBoolean(getCellValue(cell));
                 }
             }
-        } catch (Exception e) {
-            log.warn("セル値の変換に失敗しました: セル={}, 型={}, エラー={}", cell, targetType, e.getMessage());
+        } catch (NumberFormatException | IllegalArgumentException e) {
+            String cellValue = getCellValue(cell);
+            log.error("セル値の変換に失敗しました: 行={}, 列='{}', 値='{}', 型={}",
+                    rowIndex + 1, columnName, cellValue, targetType.getSimpleName());
+            throw new CellValueConversionException(rowIndex, columnName, cellValue, targetType, e);
         }
 
         return null;

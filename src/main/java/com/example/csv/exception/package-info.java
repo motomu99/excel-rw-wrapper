@@ -10,6 +10,7 @@
  *   <li>{@link com.example.csv.exception.HeaderNotFoundException} - ヘッダー行が見つからない場合</li>
  *   <li>{@link com.example.csv.exception.KeyColumnNotFoundException} - キー列が見つからない場合</li>
  *   <li>{@link com.example.csv.exception.SheetNotFoundException} - シートが見つからない場合</li>
+ *   <li>{@link com.example.csv.exception.CellValueConversionException} - セルの値を型変換できない場合</li>
  * </ul>
  *
  * <h2>使用例</h2>
@@ -27,6 +28,11 @@
  * } catch (SheetNotFoundException e) {
  *     // シートが見つからない場合の処理
  *     System.err.println("シートエラー: " + e.getMessage());
+ * } catch (CellValueConversionException e) {
+ *     // セルの値を型変換できない場合の処理
+ *     System.err.println("型変換エラー: " + e.getMessage());
+ *     System.err.println("問題の行: " + (e.getRowIndex() + 1));
+ *     System.err.println("問題の列: " + e.getColumnName());
  * } catch (ExcelReaderException e) {
  *     // その他のExcel読み込みエラー
  *     System.err.println("Excel読み込みエラー: " + e.getMessage());
