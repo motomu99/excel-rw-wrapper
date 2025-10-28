@@ -30,9 +30,21 @@ import lombok.extern.slf4j.Slf4j;
  *
  * 使用例:
  * <pre>
+ * // 基本的な使用方法
  * List&lt;Person&gt; persons = ExcelStreamReader.of(Person.class, Paths.get("sample.xlsx"))
  *     .sheetIndex(0)
  *     .skip(1)
+ *     .process(stream -&gt; stream.collect(Collectors.toList()));
+ *
+ * // ヘッダー行を自動検出（上から10行以内で「名前」列を探す）
+ * List&lt;Person&gt; persons = ExcelStreamReader.of(Person.class, Paths.get("sample.xlsx"))
+ *     .headerKey("名前")
+ *     .process(stream -&gt; stream.collect(Collectors.toList()));
+ *
+ * // ヘッダー行の探索範囲を20行に拡張
+ * List&lt;Person&gt; persons = ExcelStreamReader.of(Person.class, Paths.get("sample.xlsx"))
+ *     .headerKey("名前")
+ *     .headerSearchRows(20)
  *     .process(stream -&gt; stream.collect(Collectors.toList()));
  * </pre>
  */
@@ -45,6 +57,8 @@ public class ExcelStreamReader<T> {
     private String sheetName = null;
     private int skipLines = 0;
     private boolean usePositionMapping = false;
+    private String headerKeyColumn = null;
+    private int headerSearchRows = 10;
 
     private ExcelStreamReader(Class<T> beanClass, Path filePath) {
         this.beanClass = beanClass;
@@ -118,6 +132,31 @@ public class ExcelStreamReader<T> {
     }
 
     /**
+     * ヘッダー行を自動検出するためのキー列名を設定
+     * 指定された列名を持つ行を、上から指定行数の範囲内で探してヘッダー行とする
+     * また、この列の値が空になったらデータ読み込みを終了する
+     *
+     * @param keyColumnName キーとなる列名
+     * @return このインスタンス
+     */
+    public ExcelStreamReader<T> headerKey(String keyColumnName) {
+        this.headerKeyColumn = keyColumnName;
+        return this;
+    }
+
+    /**
+     * ヘッダー行を探索する最大行数を設定（デフォルト: 10行）
+     * headerKey()と組み合わせて使用する
+     *
+     * @param rows 探索する最大行数
+     * @return このインスタンス
+     */
+    public ExcelStreamReader<T> headerSearchRows(int rows) {
+        this.headerSearchRows = rows;
+        return this;
+    }
+
+    /**
      * Streamを処理する
      *
      * @param <R> 戻り値の型
@@ -175,8 +214,14 @@ public class ExcelStreamReader<T> {
             return result;
         }
 
-        // ヘッダー行を取得（最初の行）
-        Row headerRow = sheet.getRow(sheet.getFirstRowNum());
+        // ヘッダー行を検出
+        int headerRowIndex = findHeaderRow(sheet);
+        if (headerRowIndex == -1) {
+            log.warn("ヘッダー行が見つかりませんでした");
+            return result;
+        }
+
+        Row headerRow = sheet.getRow(headerRowIndex);
         if (headerRow == null) {
             return result;
         }
@@ -194,11 +239,29 @@ public class ExcelStreamReader<T> {
             }
         }
 
+        // キー列のインデックスを取得（終了判定用）
+        Integer keyColumnIndex = null;
+        if (headerKeyColumn != null) {
+            keyColumnIndex = columnMap.get(headerKeyColumn);
+            if (keyColumnIndex == null) {
+                log.warn("キー列 '{}' がヘッダーに見つかりませんでした", headerKeyColumn);
+            }
+        }
+
         // データ行を読み込む（ヘッダー行の次から）
-        for (int rowIndex = sheet.getFirstRowNum() + 1; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
+        for (int rowIndex = headerRowIndex + 1; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
             Row row = sheet.getRow(rowIndex);
             if (row == null || isEmptyRow(row)) {
                 continue;
+            }
+
+            // キー列が指定されている場合、その列が空なら読み込みを終了
+            if (keyColumnIndex != null) {
+                Cell keyCell = row.getCell(keyColumnIndex);
+                if (isEmptyCell(keyCell)) {
+                    log.debug("キー列が空のため読み込みを終了: 行={}", rowIndex);
+                    break;
+                }
             }
 
             T bean = createBean(row, headerMap, columnMap);
@@ -208,6 +271,57 @@ public class ExcelStreamReader<T> {
         }
 
         return result;
+    }
+
+    /**
+     * ヘッダー行を検出する
+     * headerKeyColumnが指定されている場合は、その列名を持つ行を探す
+     * 指定されていない場合は、最初の行をヘッダーとする
+     *
+     * @return ヘッダー行のインデックス（見つからない場合は-1）
+     */
+    private int findHeaderRow(Sheet sheet) {
+        if (headerKeyColumn == null) {
+            // キー列が指定されていない場合は最初の行をヘッダーとする
+            return sheet.getFirstRowNum();
+        }
+
+        // 指定された行数の範囲内でキー列を探す
+        int firstRow = sheet.getFirstRowNum();
+        int searchLimit = Math.min(firstRow + headerSearchRows, sheet.getLastRowNum() + 1);
+
+        for (int rowIndex = firstRow; rowIndex < searchLimit; rowIndex++) {
+            Row row = sheet.getRow(rowIndex);
+            if (row == null) {
+                continue;
+            }
+
+            // 行内のすべてのセルをチェックして、キー列名があるか確認
+            for (int cellIndex = 0; cellIndex < row.getLastCellNum(); cellIndex++) {
+                Cell cell = row.getCell(cellIndex);
+                if (cell != null) {
+                    String cellValue = getCellValue(cell);
+                    if (headerKeyColumn.equals(cellValue)) {
+                        log.debug("ヘッダー行を検出: 行={}, キー列={}", rowIndex, headerKeyColumn);
+                        return rowIndex;
+                    }
+                }
+            }
+        }
+
+        log.warn("キー列 '{}' を持つヘッダー行が {}行以内に見つかりませんでした", headerKeyColumn, headerSearchRows);
+        return -1;
+    }
+
+    /**
+     * セルが空かどうかを判定
+     */
+    private boolean isEmptyCell(Cell cell) {
+        if (cell == null || cell.getCellType() == CellType.BLANK) {
+            return true;
+        }
+        String value = getCellValue(cell);
+        return value == null || value.trim().isEmpty();
     }
 
     /**
