@@ -138,7 +138,7 @@ public class ExternalSortExample {
             Paths.get("data_sjis.csv"),
             Paths.get("data_sorted_sjis.csv")
         )
-        .charset(CharsetType.SHIFT_JIS)
+        .charset(CharsetType.S_JIS)
         .comparator((line1, line2) -> {
             String name1 = line1.split(",")[0];
             String name2 = line2.split(",")[0];
