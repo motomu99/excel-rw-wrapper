@@ -31,6 +31,9 @@ dependencies {
     // Apache POI for Excel
     api 'org.apache.poi:poi:5.2.5'
     api 'org.apache.poi:poi-ooxml:5.2.5'
+    
+    // Excel Streaming Reader (メモリ効率の良い大量データ読み込み用)
+    api 'com.github.pjfanning:excel-streaming-reader:4.3.0'
 
     // Lombok
     compileOnly 'org.projectlombok:lombok:1.18.30'
