@@ -18,6 +18,7 @@ import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
+import java.util.Base64;
 
 /**
  * 大容量CSV/Excel用のグルーピング＆ソート処理ユーティリティ
@@ -168,12 +169,8 @@ public class LargeDataGroupingSorter<T> {
             processEachGroup(sortedGroupFiles, processor);
             log.info("グループ処理完了");
             
-        } catch (Exception e) {
-            log.error("処理中にエラーが発生しました: {}", e.getMessage(), e);
-            throw e;
         } finally {
-            // cleanup();  // デバッグ用に一時的に無効化
-            log.info("一時ディレクトリ: {}", tempDirectory);
+            cleanup();
         }
     }
     
@@ -213,7 +210,7 @@ public class LargeDataGroupingSorter<T> {
     private Map<String, Path> splitByGroup() throws IOException {
         Map<String, CSVWriter> writerMap = new HashMap<>();
         Map<String, Path> groupFileMap = new HashMap<>();
-        String[] headers = null;
+        String[] headers = buildHeaderArray();  // ヘッダー配列を取得
         
         try (Reader reader = new InputStreamReader(
                 new FileInputStream(inputPath.toFile()), charset)) {
@@ -243,6 +240,10 @@ public class LargeDataGroupingSorter<T> {
                     
                     Writer fileWriter = Files.newBufferedWriter(groupFile, charset);
                     writer = new CSVWriter(fileWriter);
+                    
+                    // ヘッダー行を書き込み
+                    writer.writeNext(headers);
+                    
                     writerMap.put(groupKey, writer);
                 }
                 
@@ -269,6 +270,24 @@ public class LargeDataGroupingSorter<T> {
         }
         
         return groupFileMap;
+    }
+    
+    /**
+     * ヘッダー配列を構築
+     */
+    private String[] buildHeaderArray() {
+        List<String> headers = new ArrayList<>();
+        java.lang.reflect.Field[] fields = beanClass.getDeclaredFields();
+        
+        for (java.lang.reflect.Field field : fields) {
+            com.opencsv.bean.CsvBindByName annotation = 
+                field.getAnnotation(com.opencsv.bean.CsvBindByName.class);
+            if (annotation != null) {
+                headers.add(annotation.column());
+            }
+        }
+        
+        return headers.toArray(new String[0]);
     }
     
     /**
@@ -613,10 +632,22 @@ public class LargeDataGroupingSorter<T> {
     }
     
     /**
-     * ファイル名として使える文字列にサニタイズ
+     * ファイル名として使える文字列にサニタイズ（Base64エンコード）
      */
     private String sanitizeFileName(String fileName) {
-        return fileName.replaceAll("[^a-zA-Z0-9._-]", "_");
+        // 日本語などの非ASCII文字を含む場合でも一意なファイル名にするため、Base64エンコードを使用
+        try {
+            byte[] bytes = fileName.getBytes(StandardCharsets.UTF_8);
+            String encoded = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+            // ファイル名が長すぎる場合は切り詰める
+            if (encoded.length() > 100) {
+                encoded = encoded.substring(0, 100);
+            }
+            return encoded;
+        } catch (Exception e) {
+            // フォールバック：単純な置換
+            return fileName.replaceAll("[^a-zA-Z0-9._-]", "_");
+        }
     }
     
     /**
