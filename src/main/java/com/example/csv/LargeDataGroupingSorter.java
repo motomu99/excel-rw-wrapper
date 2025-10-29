@@ -1,5 +1,6 @@
 package com.example.csv;
 
+import com.opencsv.CSVReader;
 import com.opencsv.CSVWriter;
 import com.opencsv.bean.CsvToBean;
 import com.opencsv.bean.CsvToBeanBuilder;
@@ -332,7 +333,7 @@ public class LargeDataGroupingSorter<T> {
                 List<Pair<String, T>> pairs = new ArrayList<>();
                 
                 for (String line : lines) {
-                    T bean = parseCsvLine(line);
+                    T bean = parseCsvLineWithOpenCSV(line);
                     if (bean != null) {
                         pairs.add(new Pair<>(line, bean));
                     }
@@ -346,12 +347,14 @@ public class LargeDataGroupingSorter<T> {
                 for (Pair<String, T> pair : pairs) {
                     lines.add(pair.first);
                 }
+                
+                log.debug("ソート完了: グループ={}, ソート前={}, ソート後={}", groupKey, pairs.size(), lines.size());
             } else if (useComparable) {
                 // Comparableインターフェース使用
                 List<Pair<String, T>> pairs = new ArrayList<>();
                 
                 for (String line : lines) {
-                    T bean = parseCsvLine(line);
+                    T bean = parseCsvLineWithOpenCSV(line);
                     if (bean != null) {
                         pairs.add(new Pair<>(line, bean));
                     }
@@ -532,8 +535,8 @@ public class LargeDataGroupingSorter<T> {
         
         return (line1, line2) -> {
             try {
-                T bean1 = parseCsvLine(line1);
-                T bean2 = parseCsvLine(line2);
+                T bean1 = parseCsvLineWithOpenCSV(line1);
+                T bean2 = parseCsvLineWithOpenCSV(line2);
                 
                 if (bean1 == null || bean2 == null) {
                     // パースに失敗した場合は文字列比較
@@ -558,70 +561,55 @@ public class LargeDataGroupingSorter<T> {
     }
     
     /**
-     * CSV行をBeanにパース（ソート用）
+     * CSV行をBeanにパース（OpenCSV使用）
      */
-    private T parseCsvLine(String line) {
+    private T parseCsvLineWithOpenCSV(String line) {
         try {
             if (line == null || line.trim().isEmpty()) {
                 return null;
             }
             
-            T bean = beanClass.getDeclaredConstructor().newInstance();
-            String[] values = parseCsvValues(line);
-            
-            // csvFieldsの順序に従ってフィールドに値を設定
-            for (int i = 0; i < csvFields.size() && i < values.length; i++) {
-                java.lang.reflect.Field field = csvFields.get(i);
-                if (field != null) {
-                    String value = values[i];
+            // OpenCSVでパース
+            try (CSVReader csvReader = new CSVReader(new StringReader(line))) {
+                String[] values = csvReader.readNext();
+                if (values == null || values.length == 0) {
+                    return null;
+                }
+                
+                T bean = beanClass.getDeclaredConstructor().newInstance();
+                java.lang.reflect.Field[] fields = beanClass.getDeclaredFields();
+                int index = 0;
+                
+                for (java.lang.reflect.Field field : fields) {
+                    com.opencsv.bean.CsvBindByName annotation = 
+                        field.getAnnotation(com.opencsv.bean.CsvBindByName.class);
                     
-                    if (value != null && !value.trim().isEmpty()) {
-                        // 型に応じて変換
-                        if (field.getType() == String.class) {
-                            field.set(bean, value);
-                        } else if (field.getType() == Integer.class || field.getType() == int.class) {
-                            field.set(bean, Integer.parseInt(value.trim()));
-                        } else if (field.getType() == Long.class || field.getType() == long.class) {
-                            field.set(bean, Long.parseLong(value.trim()));
-                        } else if (field.getType() == Double.class || field.getType() == double.class) {
-                            field.set(bean, Double.parseDouble(value.trim()));
+                    if (annotation != null && index < values.length) {
+                        field.setAccessible(true);
+                        String value = values[index++];
+                        
+                        if (value != null && !value.trim().isEmpty()) {
+                            // 型に応じて変換
+                            if (field.getType() == String.class) {
+                                field.set(bean, value);
+                            } else if (field.getType() == Integer.class || field.getType() == int.class) {
+                                field.set(bean, Integer.parseInt(value.trim()));
+                            } else if (field.getType() == Long.class || field.getType() == long.class) {
+                                field.set(bean, Long.parseLong(value.trim()));
+                            } else if (field.getType() == Double.class || field.getType() == double.class) {
+                                field.set(bean, Double.parseDouble(value.trim()));
+                            }
                         }
                     }
                 }
+                
+                return bean;
             }
-            
-            return bean;
             
         } catch (Exception e) {
             log.debug("CSV行のパースエラー（ソート用）: line={}, error={}", line, e.getMessage());
             return null;  // エラー時はnullを返す
         }
-    }
-    
-    /**
-     * CSV行を値の配列にパース（簡易実装）
-     */
-    private String[] parseCsvValues(String line) {
-        // 簡易的なCSVパース（クォート対応）
-        List<String> values = new ArrayList<>();
-        StringBuilder current = new StringBuilder();
-        boolean inQuotes = false;
-        
-        for (int i = 0; i < line.length(); i++) {
-            char c = line.charAt(i);
-            
-            if (c == '"') {
-                inQuotes = !inQuotes;
-            } else if (c == ',' && !inQuotes) {
-                values.add(current.toString());
-                current = new StringBuilder();
-            } else {
-                current.append(c);
-            }
-        }
-        values.add(current.toString());
-        
-        return values.toArray(new String[0]);
     }
     
     /**
