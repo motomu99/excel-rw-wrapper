@@ -344,4 +344,3 @@ class CsvExternalSorterTest {
         return lines;
     }
 }
-
