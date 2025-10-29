@@ -4,7 +4,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.PushbackInputStream;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.function.Function;
@@ -13,8 +12,6 @@ import java.util.stream.Stream;
 import com.opencsv.exceptions.CsvException;
 import com.opencsv.bean.CsvToBean;
 import com.opencsv.bean.CsvToBeanBuilder;
-import com.opencsv.bean.HeaderColumnNameMappingStrategy;
-import com.opencsv.bean.ColumnPositionMappingStrategy;
 import com.opencsv.bean.MappingStrategy;
 import lombok.extern.slf4j.Slf4j;
 
@@ -120,25 +117,15 @@ public class CsvStreamReader<T> {
      * @throws IOException ファイル読み込みエラー
      * @throws CsvException CSV解析エラー
      */
-    @SuppressWarnings("unchecked")
     public <R> R process(Function<Stream<T>, R> processor) throws IOException, CsvException {
         try (FileInputStream fis = new FileInputStream(filePath.toFile());
-             InputStream is = charsetType.isWithBom() ? skipBom(fis) : fis;
+             InputStream is = charsetType.isWithBom() ? BomHandler.skipBom(fis) : fis;
              InputStreamReader isr = new InputStreamReader(is, Charset.forName(charsetType.getCharsetName()))) {
             
-            Object strategy;
-            if (usePositionMapping) {
-                ColumnPositionMappingStrategy<T> positionStrategy = new ColumnPositionMappingStrategy<>();
-                positionStrategy.setType((Class<? extends T>) beanClass);
-                strategy = positionStrategy;
-            } else {
-                HeaderColumnNameMappingStrategy<T> headerStrategy = new HeaderColumnNameMappingStrategy<>();
-                headerStrategy.setType((Class<? extends T>) beanClass);
-                strategy = headerStrategy;
-            }
+            MappingStrategy<T> strategy = MappingStrategyFactory.createStrategy(beanClass, usePositionMapping);
             
             CsvToBean<T> csvToBean = new CsvToBeanBuilder<T>(isr)
-                    .withMappingStrategy((MappingStrategy<? extends T>) strategy)
+                    .withMappingStrategy(strategy)
                     .withSeparator(fileType.getDelimiter().charAt(0))
                     .withIgnoreLeadingWhiteSpace(true)
                     .withIgnoreEmptyLine(true)
@@ -155,32 +142,8 @@ public class CsvStreamReader<T> {
             return processor.apply(stream);
         } catch (IOException e) {
             log.error("CSVファイル読み込み中にエラーが発生: ファイルパス={}, エラー={}", filePath, e.getMessage(), e);
-            throw new RuntimeException(e);
+            throw new CsvReadException("CSVファイルの読み込みに失敗しました: " + filePath, e);
         }
-    }
-    
-    /**
-     * BOMをスキップするためのInputStream処理
-     * 
-     * @param inputStream 元のInputStream
-     * @return BOMをスキップしたInputStream
-     * @throws IOException 読み込みエラー
-     */
-    private InputStream skipBom(InputStream inputStream) throws IOException {
-        PushbackInputStream pushbackInputStream = new PushbackInputStream(inputStream, 3);
-        byte[] bom = new byte[3];
-        int bytesRead = pushbackInputStream.read(bom);
-        
-        // UTF-8 BOM: EF BB BF
-        if (bytesRead == 3 && bom[0] == (byte) 0xEF && bom[1] == (byte) 0xBB && bom[2] == (byte) 0xBF) {
-            // BOMが見つかった場合はスキップ（何もしない）
-            log.debug("BOMを検出してスキップしました");
-        } else {
-            // BOMがない場合は読み込んだバイトを戻す
-            pushbackInputStream.unread(bom, 0, bytesRead);
-        }
-        
-        return pushbackInputStream;
     }
 }
 

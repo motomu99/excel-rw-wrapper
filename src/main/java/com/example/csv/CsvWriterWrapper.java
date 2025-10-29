@@ -11,8 +11,6 @@ import java.util.function.Function;
 
 import com.opencsv.bean.StatefulBeanToCsv;
 import com.opencsv.bean.StatefulBeanToCsvBuilder;
-import com.opencsv.bean.HeaderColumnNameMappingStrategy;
-import com.opencsv.bean.ColumnPositionMappingStrategy;
 import com.opencsv.bean.MappingStrategy;
 import com.opencsv.exceptions.CsvDataTypeMismatchException;
 import com.opencsv.exceptions.CsvRequiredFieldEmptyException;
@@ -111,7 +109,7 @@ public class CsvWriterWrapper {
             
             // BOM付きUTF-8の場合、BOMを書き込む
             if (withBom) {
-                BomWriter.write(fos);
+                BomHandler.writeBom(fos);
             }
             
             try (OutputStreamWriter osw = new OutputStreamWriter(fos, charset)) {
@@ -146,15 +144,7 @@ public class CsvWriterWrapper {
      */
     @SuppressWarnings("unchecked")
     private <T> MappingStrategy<T> createMappingStrategy() {
-        if (usePositionMapping) {
-            ColumnPositionMappingStrategy<T> strategy = new ColumnPositionMappingStrategy<>();
-            strategy.setType((Class<? extends T>) this.beanClass);
-            return strategy;
-        } else {
-            HeaderColumnNameMappingStrategy<T> strategy = new HeaderColumnNameMappingStrategy<>();
-            strategy.setType((Class<? extends T>) this.beanClass);
-            return strategy;
-        }
+        return MappingStrategyFactory.createStrategy((Class<T>) this.beanClass, usePositionMapping);
     }
 
     /**

@@ -11,8 +11,6 @@ import java.util.stream.Stream;
 
 import com.opencsv.bean.StatefulBeanToCsv;
 import com.opencsv.bean.StatefulBeanToCsvBuilder;
-import com.opencsv.bean.HeaderColumnNameMappingStrategy;
-import com.opencsv.bean.ColumnPositionMappingStrategy;
 import com.opencsv.bean.MappingStrategy;
 import com.opencsv.exceptions.CsvDataTypeMismatchException;
 import com.opencsv.exceptions.CsvRequiredFieldEmptyException;
@@ -125,23 +123,11 @@ public class CsvStreamWriter<T> {
             
             // BOM付きUTF-8の場合、BOMを書き込む
             if (charsetType.isWithBom()) {
-                fos.write(0xEF);
-                fos.write(0xBB);
-                fos.write(0xBF);
-                log.debug("BOMを書き込みました");
+                BomHandler.writeBom(fos);
             }
             
             try (OutputStreamWriter osw = new OutputStreamWriter(fos, Charset.forName(charsetType.getCharsetName()))) {
-                MappingStrategy<T> strategy;
-                if (usePositionMapping) {
-                    ColumnPositionMappingStrategy<T> positionStrategy = new ColumnPositionMappingStrategy<>();
-                    positionStrategy.setType((Class<? extends T>) beanClass);
-                    strategy = positionStrategy;
-                } else {
-                    HeaderColumnNameMappingStrategy<T> headerStrategy = new HeaderColumnNameMappingStrategy<>();
-                    headerStrategy.setType((Class<? extends T>) beanClass);
-                    strategy = headerStrategy;
-                }
+                MappingStrategy<T> strategy = MappingStrategyFactory.createStrategy(beanClass, usePositionMapping);
                 
                 StatefulBeanToCsv<T> beanToCsv = new StatefulBeanToCsvBuilder<T>(osw)
                         .withMappingStrategy(strategy)
@@ -155,10 +141,10 @@ public class CsvStreamWriter<T> {
             }
         } catch (IOException e) {
             log.error("CSVファイル書き込み中にエラーが発生: ファイルパス={}, エラー={}", filePath, e.getMessage(), e);
-            throw new RuntimeException(e);
+            throw new CsvWriteException("CSVファイルの書き込みに失敗しました: " + filePath, e);
         } catch (CsvDataTypeMismatchException | CsvRequiredFieldEmptyException e) {
             log.error("CSV書き込み中にデータ型エラーが発生: ファイルパス={}, エラー={}", filePath, e.getMessage(), e);
-            throw new RuntimeException(e);
+            throw new CsvWriteException("CSVデータの変換に失敗しました: " + filePath, e);
         }
     }
 }

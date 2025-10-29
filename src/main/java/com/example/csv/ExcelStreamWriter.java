@@ -3,16 +3,13 @@ package com.example.csv;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Stream;
 
 import org.apache.poi.ss.usermodel.Cell;
@@ -23,9 +20,6 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-
-import com.opencsv.bean.CsvBindByName;
-import com.opencsv.bean.CsvBindByPosition;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -81,7 +75,7 @@ public class ExcelStreamWriter<T> {
     private int startColumn = 0;
     
     /** フィールド情報キャッシュ（パフォーマンス最適化用） */
-    private Map<Field, FieldMappingInfo> fieldCache = null;
+    private FieldMappingCache fieldMappingCache = null;
     
     /** 日付スタイルのキャッシュ */
     private CellStyle dateStyle = null;
@@ -204,7 +198,7 @@ public class ExcelStreamWriter<T> {
             Sheet sheet = getOrCreateSheet(workbook);
             
             // フィールドキャッシュを構築
-            buildFieldCache();
+            fieldMappingCache = new FieldMappingCache(beanClass);
             
             // ヘッダー行を作成
             createHeaderRow(sheet);
@@ -279,34 +273,6 @@ public class ExcelStreamWriter<T> {
         dateTimeStyle.setDataFormat(createHelper.createDataFormat().getFormat("yyyy-MM-dd HH:mm:ss"));
     }
 
-    /**
-     * フィールドキャッシュを構築
-     */
-    private void buildFieldCache() {
-        fieldCache = new LinkedHashMap<>();
-        Field[] fields = beanClass.getDeclaredFields();
-        
-        for (Field field : fields) {
-            String columnName = null;
-            Integer position = null;
-
-            // 位置ベースマッピング
-            CsvBindByPosition positionAnnotation = field.getAnnotation(CsvBindByPosition.class);
-            if (positionAnnotation != null) {
-                position = positionAnnotation.position();
-            }
-
-            // ヘッダーベースマッピング
-            CsvBindByName nameAnnotation = field.getAnnotation(CsvBindByName.class);
-            if (nameAnnotation != null) {
-                columnName = nameAnnotation.column();
-            }
-
-            if (columnName != null || position != null) {
-                fieldCache.put(field, new FieldMappingInfo(field, columnName, position));
-            }
-        }
-    }
 
     /**
      * ヘッダー行を作成
@@ -319,7 +285,7 @@ public class ExcelStreamWriter<T> {
         
         if (usePositionMapping) {
             // 位置ベースマッピングの場合は、position順にヘッダーを作成
-            for (FieldMappingInfo mappingInfo : fieldCache.values()) {
+            for (FieldMappingCache.FieldMappingInfo mappingInfo : fieldMappingCache.getCache().values()) {
                 if (mappingInfo.position != null) {
                     Cell cell = headerRow.createCell(startColumn + mappingInfo.position);
                     cell.setCellValue(mappingInfo.columnName != null ? mappingInfo.columnName : mappingInfo.field.getName());
@@ -328,7 +294,7 @@ public class ExcelStreamWriter<T> {
         } else {
             // ヘッダーベースマッピングの場合は、フィールド定義順にヘッダーを作成
             int columnIndex = startColumn;
-            for (FieldMappingInfo mappingInfo : fieldCache.values()) {
+            for (FieldMappingCache.FieldMappingInfo mappingInfo : fieldMappingCache.getCache().values()) {
                 if (mappingInfo.columnName != null) {
                     Cell cell = headerRow.createCell(columnIndex++);
                     cell.setCellValue(mappingInfo.columnName);
@@ -343,7 +309,7 @@ public class ExcelStreamWriter<T> {
     private void writeDataRow(Row row, T bean) throws Exception {
         if (usePositionMapping) {
             // 位置ベースマッピング
-            for (FieldMappingInfo mappingInfo : fieldCache.values()) {
+            for (FieldMappingCache.FieldMappingInfo mappingInfo : fieldMappingCache.getCache().values()) {
                 if (mappingInfo.position != null) {
                     Object value = mappingInfo.field.get(bean);
                     Cell cell = row.createCell(startColumn + mappingInfo.position);
@@ -353,7 +319,7 @@ public class ExcelStreamWriter<T> {
         } else {
             // ヘッダーベースマッピング
             int columnIndex = startColumn;
-            for (FieldMappingInfo mappingInfo : fieldCache.values()) {
+            for (FieldMappingCache.FieldMappingInfo mappingInfo : fieldMappingCache.getCache().values()) {
                 if (mappingInfo.columnName != null) {
                     Object value = mappingInfo.field.get(bean);
                     Cell cell = row.createCell(columnIndex++);
@@ -394,22 +360,6 @@ public class ExcelStreamWriter<T> {
             cell.setCellStyle(dateTimeStyle);
         } else {
             cell.setCellValue(value.toString());
-        }
-    }
-
-    /**
-     * フィールドマッピング情報を保持する内部クラス
-     */
-    private static class FieldMappingInfo {
-        final Field field;
-        final String columnName;
-        final Integer position;
-
-        FieldMappingInfo(Field field, String columnName, Integer position) {
-            this.field = field;
-            this.field.setAccessible(true);
-            this.columnName = columnName;
-            this.position = position;
         }
     }
 }

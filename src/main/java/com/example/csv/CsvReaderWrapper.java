@@ -14,8 +14,6 @@ import java.util.function.Function;
 import com.opencsv.exceptions.CsvException;
 import com.opencsv.bean.CsvToBean;
 import com.opencsv.bean.CsvToBeanBuilder;
-import com.opencsv.bean.HeaderColumnNameMappingStrategy;
-import com.opencsv.bean.ColumnPositionMappingStrategy;
 import com.opencsv.bean.MappingStrategy;
 import lombok.extern.slf4j.Slf4j;
 
@@ -107,7 +105,7 @@ public class CsvReaderWrapper {
      */
     public <T> List<T> read() {
         try (FileInputStream fis = new FileInputStream(filePath.toFile());
-             InputStream is = withBom ? BomSkipper.skip(fis) : fis;
+             InputStream is = withBom ? BomHandler.skipBom(fis) : fis;
              InputStreamReader isr = new InputStreamReader(is, charset)) {
             
             MappingStrategy<T> strategy = createMappingStrategy();
@@ -136,15 +134,7 @@ public class CsvReaderWrapper {
      */
     @SuppressWarnings("unchecked")
     private <T> MappingStrategy<T> createMappingStrategy() {
-        if (usePositionMapping) {
-            ColumnPositionMappingStrategy<T> strategy = new ColumnPositionMappingStrategy<>();
-            strategy.setType((Class<? extends T>) this.beanClass);
-            return strategy;
-        } else {
-            HeaderColumnNameMappingStrategy<T> strategy = new HeaderColumnNameMappingStrategy<>();
-            strategy.setType((Class<? extends T>) this.beanClass);
-            return strategy;
-        }
+        return MappingStrategyFactory.createStrategy((Class<T>) this.beanClass, usePositionMapping);
     }
 
     /**

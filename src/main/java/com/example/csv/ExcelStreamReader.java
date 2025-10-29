@@ -2,39 +2,27 @@ package com.example.csv;
 
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.Set;
 import java.util.Spliterators;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
-import org.apache.poi.ss.usermodel.DateUtil;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 
 import com.github.pjfanning.xlsx.StreamingReader;
-import com.opencsv.bean.CsvBindByName;
-import com.opencsv.bean.CsvBindByPosition;
 
 import com.example.csv.exception.HeaderNotFoundException;
 import com.example.csv.exception.KeyColumnNotFoundException;
 import com.example.csv.exception.SheetNotFoundException;
-import com.example.csv.exception.CellValueConversionException;
 import com.example.csv.exception.UncheckedExcelException;
 
 import lombok.extern.slf4j.Slf4j;
@@ -69,12 +57,6 @@ public class ExcelStreamReader<T> {
     /** デフォルトのヘッダー探索行数 */
     private static final int DEFAULT_HEADER_SEARCH_ROWS = 10;
 
-    /** サポートする数値型のセット */
-    private static final Set<Class<?>> NUMERIC_TYPES = Set.of(
-        Integer.class, int.class,
-        Long.class, long.class,
-        Double.class, double.class
-    );
 
     private final Class<T> beanClass;
     private final Path filePath;
@@ -86,7 +68,7 @@ public class ExcelStreamReader<T> {
     private int headerSearchRows = DEFAULT_HEADER_SEARCH_ROWS;
 
     /** フィールド情報キャッシュ（パフォーマンス最適化用） */
-    private Map<Field, FieldMappingInfo> fieldCache = null;
+    private FieldMappingCache fieldMappingCache = null;
 
     private ExcelStreamReader(Class<T> beanClass, Path filePath) {
         this.beanClass = beanClass;
@@ -391,7 +373,7 @@ public class ExcelStreamReader<T> {
                 for (int i = 0; i < headerRow.getLastCellNum(); i++) {
                     Cell cell = headerRow.getCell(i);
                     if (cell != null) {
-                        String headerValue = getCellValue(cell);
+                        String headerValue = CellValueConverter.getCellValueAsString(cell);
                         headerMap.put(i, headerValue);
                         columnMap.put(headerValue, i);
                     }
@@ -407,8 +389,8 @@ public class ExcelStreamReader<T> {
                 }
 
                 // フィールドキャッシュを構築
-                if (fieldCache == null) {
-                    buildFieldCache(columnMap);
+                if (fieldMappingCache == null) {
+                    fieldMappingCache = new FieldMappingCache(beanClass);
                 }
             }
 
@@ -439,7 +421,7 @@ public class ExcelStreamReader<T> {
                     for (int cellIndex = 0; cellIndex < row.getLastCellNum(); cellIndex++) {
                         Cell cell = row.getCell(cellIndex);
                         if (cell != null) {
-                            String cellValue = getCellValue(cell);
+                            String cellValue = CellValueConverter.getCellValueAsString(cell);
                             if (headerKeyColumn.equals(cellValue)) {
                                 log.debug("ヘッダー行を検出: 行={}, キー列={}", row.getRowNum(), headerKeyColumn);
                                 headerRow = row;
@@ -472,7 +454,7 @@ public class ExcelStreamReader<T> {
         if (cell == null || cell.getCellType() == CellType.BLANK) {
             return true;
         }
-        String value = getCellValue(cell);
+        String value = CellValueConverter.getCellValueAsString(cell);
         return value == null || value.trim().isEmpty();
     }
 
@@ -481,13 +463,13 @@ public class ExcelStreamReader<T> {
      */
     private T createBean(Row row, Map<Integer, String> headerMap, Map<String, Integer> columnMap) throws Exception {
         // フィールドキャッシュの初期化（初回のみ）
-        if (fieldCache == null) {
-            buildFieldCache(columnMap);
+        if (fieldMappingCache == null) {
+            fieldMappingCache = new FieldMappingCache(beanClass);
         }
 
         T bean = beanClass.getDeclaredConstructor().newInstance();
 
-        for (FieldMappingInfo mappingInfo : fieldCache.values()) {
+        for (FieldMappingCache.FieldMappingInfo mappingInfo : fieldMappingCache.getCache().values()) {
             Integer columnIndex = null;
 
             if (usePositionMapping) {
@@ -503,7 +485,7 @@ public class ExcelStreamReader<T> {
                     if (columnName == null) {
                         columnName = "列" + columnIndex;
                     }
-                    Object value = convertCellValue(cell, mappingInfo.field.getType(), row.getRowNum(), columnName);
+                    Object value = CellValueConverter.convertCellValue(cell, mappingInfo.field.getType(), row.getRowNum(), columnName);
                     mappingInfo.field.set(bean, value);
                 }
             }
@@ -512,101 +494,7 @@ public class ExcelStreamReader<T> {
         return bean;
     }
 
-    /**
-     * フィールドキャッシュを構築（初回のみ実行）
-     */
-    private void buildFieldCache(Map<String, Integer> columnMap) {
-        fieldCache = new HashMap<>();
-        Field[] fields = beanClass.getDeclaredFields();
-        
-        for (Field field : fields) {
-            String columnName = null;
-            Integer position = null;
 
-            // 位置ベースマッピング
-            CsvBindByPosition positionAnnotation = field.getAnnotation(CsvBindByPosition.class);
-            if (positionAnnotation != null) {
-                position = positionAnnotation.position();
-            }
-
-            // ヘッダーベースマッピング
-            CsvBindByName nameAnnotation = field.getAnnotation(CsvBindByName.class);
-            if (nameAnnotation != null) {
-                columnName = nameAnnotation.column();
-            }
-
-            if (columnName != null || position != null) {
-                fieldCache.put(field, new FieldMappingInfo(field, columnName, position));
-            }
-        }
-    }
-
-    /**
-     * セルの値を文字列として取得
-     */
-    private String getCellValue(Cell cell) {
-        if (cell == null) {
-            return "";
-        }
-
-        return switch (cell.getCellType()) {
-            case STRING -> cell.getStringCellValue();
-            case NUMERIC -> {
-                if (DateUtil.isCellDateFormatted(cell)) {
-                    yield formatDateCell(cell);
-                } else {
-                    double value = cell.getNumericCellValue();
-                    // 整数値かどうかをチェック（小数点以下が0の場合）
-                    if (value == (long) value) {
-                        yield String.valueOf((long) value);
-                    } else {
-                        yield String.valueOf(value);
-                    }
-                }
-            }
-            case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
-            case FORMULA -> cell.getCellFormula();
-            default -> "";
-        };
-    }
-
-    /**
-     * セルの値を指定された型に変換
-     *
-     * @param cell セル
-     * @param targetType 変換先の型
-     * @param rowIndex 行番号（エラーメッセージ用）
-     * @param columnName 列名（エラーメッセージ用）
-     * @return 変換された値
-     * @throws CellValueConversionException 型変換に失敗した場合
-     */
-    private Object convertCellValue(Cell cell, Class<?> targetType, int rowIndex, String columnName)
-            throws CellValueConversionException {
-        if (cell == null || cell.getCellType() == CellType.BLANK) {
-            return null;
-        }
-
-        try {
-            if (targetType == String.class) {
-                return getCellValue(cell);
-            } else if (isNumericType(targetType)) {
-                return convertToNumericType(cell, targetType);
-            } else if (targetType == Boolean.class || targetType == boolean.class) {
-                return convertToBooleanType(cell);
-            } else if (targetType == LocalDate.class) {
-                return convertToLocalDate(cell);
-            } else if (targetType == LocalDateTime.class) {
-                return convertToLocalDateTime(cell);
-            }
-        } catch (IllegalArgumentException e) {
-            String cellValue = getCellValue(cell);
-            log.error("セル値の変換に失敗しました: 行={}, 列='{}', 値='{}', 型={}",
-                    rowIndex + 1, columnName, cellValue, targetType.getSimpleName());
-            throw new CellValueConversionException(rowIndex, columnName, cellValue, targetType, e);
-        }
-
-        return null;
-    }
 
     /**
      * 行が空かどうかを判定
@@ -615,135 +503,12 @@ public class ExcelStreamReader<T> {
         for (int i = 0; i < row.getLastCellNum(); i++) {
             Cell cell = row.getCell(i);
             if (cell != null && cell.getCellType() != CellType.BLANK) {
-                String value = getCellValue(cell);
+                String value = CellValueConverter.getCellValueAsString(cell);
                 if (value != null && !value.trim().isEmpty()) {
                     return false;
                 }
             }
         }
         return true;
-    }
-
-    /**
-     * Date型をLocalDateTimeに変換
-     */
-    private LocalDateTime convertDateToLocalDateTime(Date date) {
-        return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
-    }
-
-    /**
-     * Date型をLocalDateに変換
-     */
-    private LocalDate convertDateToLocalDate(Date date) {
-        return convertDateToLocalDateTime(date).toLocalDate();
-    }
-
-    /**
-     * 日付セルかどうかを判定し、適切な文字列に変換
-     */
-    private String formatDateCell(Cell cell) {
-        Date date = cell.getDateCellValue();
-        LocalDateTime dateTime = convertDateToLocalDateTime(date);
-        // 時刻が00:00:00の場合はLocalDateとして扱う
-        if (dateTime.toLocalTime().equals(java.time.LocalTime.MIDNIGHT)) {
-            return dateTime.toLocalDate().toString();
-        } else {
-            return dateTime.toString();
-        }
-    }
-
-    /**
-     * 数値型かどうかを判定
-     */
-    private boolean isNumericType(Class<?> type) {
-        return NUMERIC_TYPES.contains(type);
-    }
-
-    /**
-     * セルを数値型に変換
-     */
-    private Number convertToNumericType(Cell cell, Class<?> targetType) {
-        Number result = parseNumericCell(cell, targetType);
-        if (result != null) {
-            return result;
-        }
-        return parseNumericString(getCellValue(cell), targetType);
-    }
-
-    /**
-     * セルをBoolean型に変換
-     */
-    private Boolean convertToBooleanType(Cell cell) {
-        if (cell.getCellType() == CellType.BOOLEAN) {
-            return cell.getBooleanCellValue();
-        }
-        return Boolean.parseBoolean(getCellValue(cell));
-    }
-
-    /**
-     * セルをLocalDate型に変換
-     */
-    private LocalDate convertToLocalDate(Cell cell) {
-        if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
-            return convertDateToLocalDate(cell.getDateCellValue());
-        }
-        return LocalDate.parse(getCellValue(cell));
-    }
-
-    /**
-     * セルをLocalDateTime型に変換
-     */
-    private LocalDateTime convertToLocalDateTime(Cell cell) {
-        if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
-            return convertDateToLocalDateTime(cell.getDateCellValue());
-        }
-        return LocalDateTime.parse(getCellValue(cell));
-    }
-
-    /**
-     * 数値セルから値を取得し、指定された型にキャスト
-     */
-    private Number parseNumericCell(Cell cell, Class<?> targetType) {
-        if (cell.getCellType() == CellType.NUMERIC) {
-            double numericValue = cell.getNumericCellValue();
-            if (targetType == Integer.class || targetType == int.class) {
-                return (int) numericValue;
-            } else if (targetType == Long.class || targetType == long.class) {
-                return (long) numericValue;
-            } else if (targetType == Double.class || targetType == double.class) {
-                return numericValue;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * 文字列から数値型に変換
-     */
-    private Number parseNumericString(String value, Class<?> targetType) {
-        if (targetType == Integer.class || targetType == int.class) {
-            return Integer.parseInt(value);
-        } else if (targetType == Long.class || targetType == long.class) {
-            return Long.parseLong(value);
-        } else if (targetType == Double.class || targetType == double.class) {
-            return Double.parseDouble(value);
-        }
-        return null;
-    }
-
-    /**
-     * フィールドマッピング情報を保持する内部クラス
-     */
-    private static class FieldMappingInfo {
-        final Field field;
-        final String columnName;
-        final Integer position;
-
-        FieldMappingInfo(Field field, String columnName, Integer position) {
-            this.field = field;
-            this.field.setAccessible(true);
-            this.columnName = columnName;
-            this.position = position;
-        }
     }
 }
