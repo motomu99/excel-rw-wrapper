@@ -4,16 +4,11 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Spliterators;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -66,9 +61,6 @@ public class ExcelStreamReader<T> {
     private boolean usePositionMapping = false;
     private String headerKeyColumn = null;
     private int headerSearchRows = DEFAULT_HEADER_SEARCH_ROWS;
-
-    /** フィールド情報キャッシュ（パフォーマンス最適化用） */
-    private FieldMappingCache fieldMappingCache = null;
 
     private ExcelStreamReader(Class<T> beanClass, Path filePath) {
         this.beanClass = beanClass;
@@ -260,180 +252,13 @@ public class ExcelStreamReader<T> {
      * 行ごとにBeanを生成することでメモリ効率を向上
      */
     private Iterator<T> createStreamingIterator(Sheet sheet) {
-        return new Iterator<T>() {
-            private final Iterator<Row> rowIterator = sheet.iterator();
-            private Row headerRow = null;
-            private Map<Integer, String> headerMap = null;
-            private Map<String, Integer> columnMap = null;
-            private Integer keyColumnIndex = null;
-            private boolean initialized = false;
-            private T nextBean = null;
-            private boolean hasNext = false;
-            private boolean hasNextComputed = false;
-
-            @Override
-            public boolean hasNext() {
-                if (hasNextComputed) {
-                    return hasNext;
-                }
-
-                // 初期化（ヘッダー行の検出）
-                if (!initialized) {
-                    try {
-                        initializeHeader();
-                    } catch (Exception e) {
-                        throw new UncheckedExcelException("ヘッダー初期化エラー", e);
-                    }
-                    initialized = true;
-                }
-
-                // 空のシートの場合（headerMapがnull）
-                if (headerMap == null || columnMap == null) {
-                    hasNext = false;
-                    hasNextComputed = true;
-                    return false;
-                }
-
-                // 次のBeanを取得
-                try {
-                    while (rowIterator.hasNext()) {
-                        Row row = rowIterator.next();
-                        
-                        // 空行をスキップ
-                        if (row == null || isEmptyRow(row)) {
-                            continue;
-                        }
-
-                        // キー列が指定されている場合、その列が空なら終了
-                        if (keyColumnIndex != null) {
-                            Cell keyCell = row.getCell(keyColumnIndex);
-                            if (isEmptyCell(keyCell)) {
-                                log.debug("キー列が空のため読み込みを終了: 行={}", row.getRowNum());
-                                hasNext = false;
-                                hasNextComputed = true;
-                                return false;
-                            }
-                        }
-
-                        // Beanを作成
-                        nextBean = createBean(row, headerMap, columnMap);
-                        if (nextBean != null) {
-                            hasNext = true;
-                            hasNextComputed = true;
-                            return true;
-                        }
-                    }
-                } catch (Exception e) {
-                    throw new UncheckedExcelException("Bean作成エラー", e);
-                }
-
-                hasNext = false;
-                hasNextComputed = true;
-                return false;
-            }
-
-            @Override
-            public T next() {
-                if (!hasNextComputed) {
-                    hasNext();
-                }
-                if (!hasNext) {
-                    throw new NoSuchElementException();
-                }
-                hasNextComputed = false;
-                return nextBean;
-            }
-
-            /**
-             * ヘッダー行を初期化
-             */
-            private void initializeHeader() throws Exception {
-                int headerRowIndex = findHeaderRowInStream();
-                if (headerRowIndex == -1) {
-                    if (headerKeyColumn != null) {
-                        log.error("キー列 '{}' を持つヘッダー行が {}行以内に見つかりませんでした", headerKeyColumn, headerSearchRows);
-                        throw new HeaderNotFoundException(headerKeyColumn, headerSearchRows);
-                    } else {
-                        // キー列が指定されていない場合、ヘッダーが見つからなければ空のシートとして扱う
-                        log.debug("ヘッダー行が見つかりませんでした（空のシート）");
-                        return;  // 空のIteratorとして動作
-                    }
-                }
-
-                if (headerRow == null) {
-                    // 空のシートとして扱う
-                    log.debug("ヘッダー行がnullです（空のシート）");
-                    return;
-                }
-
-                headerMap = new HashMap<>();
-                columnMap = new HashMap<>();
-
-                // ヘッダー情報を構築
-                for (int i = 0; i < headerRow.getLastCellNum(); i++) {
-                    Cell cell = headerRow.getCell(i);
-                    if (cell != null) {
-                        String headerValue = CellValueConverter.getCellValueAsString(cell);
-                        headerMap.put(i, headerValue);
-                        columnMap.put(headerValue, i);
-                    }
-                }
-
-                // キー列のインデックスを取得（終了判定用）
-                if (headerKeyColumn != null) {
-                    keyColumnIndex = columnMap.get(headerKeyColumn);
-                    if (keyColumnIndex == null) {
-                        log.error("キー列 '{}' がヘッダー行に見つかりませんでした", headerKeyColumn);
-                        throw new KeyColumnNotFoundException(headerKeyColumn);
-                    }
-                }
-
-                // フィールドキャッシュを構築
-                if (fieldMappingCache == null) {
-                    fieldMappingCache = new FieldMappingCache(beanClass);
-                }
-            }
-
-            /**
-             * ストリーミング処理でヘッダー行を検出
-             */
-            private int findHeaderRowInStream() {
-                if (headerKeyColumn == null) {
-                    // キー列が指定されていない場合は最初の行をヘッダーとする
-                    if (rowIterator.hasNext()) {
-                        headerRow = rowIterator.next();
-                        return headerRow.getRowNum();
-                    }
-                    return -1;
-                }
-
-                // 指定された行数の範囲内でキー列を探す
-                int rowCount = 0;
-                while (rowIterator.hasNext() && rowCount < headerSearchRows) {
-                    Row row = rowIterator.next();
-                    rowCount++;
-                    
-                    if (row == null) {
-                        continue;
-                    }
-
-                    // 行内のすべてのセルをチェックして、キー列名があるか確認
-                    for (int cellIndex = 0; cellIndex < row.getLastCellNum(); cellIndex++) {
-                        Cell cell = row.getCell(cellIndex);
-                        if (cell != null) {
-                            String cellValue = CellValueConverter.getCellValueAsString(cell);
-                            if (headerKeyColumn.equals(cellValue)) {
-                                log.debug("ヘッダー行を検出: 行={}, キー列={}", row.getRowNum(), headerKeyColumn);
-                                headerRow = row;
-                                return row.getRowNum();
-                            }
-                        }
-                    }
-                }
-
-                return -1;
-            }
-        };
+        return new ExcelRowIterator<>(
+            sheet.iterator(), 
+            beanClass, 
+            headerKeyColumn, 
+            headerSearchRows, 
+            usePositionMapping
+        );
     }
 
     /**
@@ -447,68 +272,4 @@ public class ExcelStreamReader<T> {
         }
     }
 
-    /**
-     * セルが空かどうかを判定
-     */
-    private boolean isEmptyCell(Cell cell) {
-        if (cell == null || cell.getCellType() == CellType.BLANK) {
-            return true;
-        }
-        String value = CellValueConverter.getCellValueAsString(cell);
-        return value == null || value.trim().isEmpty();
-    }
-
-    /**
-     * 行からBeanを作成
-     */
-    private T createBean(Row row, Map<Integer, String> headerMap, Map<String, Integer> columnMap) throws Exception {
-        // フィールドキャッシュの初期化（初回のみ）
-        if (fieldMappingCache == null) {
-            fieldMappingCache = new FieldMappingCache(beanClass);
-        }
-
-        T bean = beanClass.getDeclaredConstructor().newInstance();
-
-        for (FieldMappingCache.FieldMappingInfo mappingInfo : fieldMappingCache.getCache().values()) {
-            Integer columnIndex = null;
-
-            if (usePositionMapping) {
-                columnIndex = mappingInfo.position;
-            } else {
-                columnIndex = columnMap.get(mappingInfo.columnName);
-            }
-
-            if (columnIndex != null && columnIndex < row.getLastCellNum()) {
-                Cell cell = row.getCell(columnIndex);
-                if (cell != null) {
-                    String columnName = headerMap.get(columnIndex);
-                    if (columnName == null) {
-                        columnName = "列" + columnIndex;
-                    }
-                    Object value = CellValueConverter.convertCellValue(cell, mappingInfo.field.getType(), row.getRowNum(), columnName);
-                    mappingInfo.field.set(bean, value);
-                }
-            }
-        }
-
-        return bean;
-    }
-
-
-
-    /**
-     * 行が空かどうかを判定
-     */
-    private boolean isEmptyRow(Row row) {
-        for (int i = 0; i < row.getLastCellNum(); i++) {
-            Cell cell = row.getCell(i);
-            if (cell != null && cell.getCellType() != CellType.BLANK) {
-                String value = CellValueConverter.getCellValueAsString(cell);
-                if (value != null && !value.trim().isEmpty()) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
 }
