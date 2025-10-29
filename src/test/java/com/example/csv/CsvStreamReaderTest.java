@@ -207,4 +207,28 @@ public class CsvStreamReaderTest {
         assertTrue(result.contains("田中太郎"));
         assertTrue(result.contains("佐藤花子"));
     }
+
+    @Test
+    @DisplayName("エラー: 存在しないファイルを指定した場合にRuntimeExceptionがスローされること")
+    void testFileNotFound() {
+        assertThrows(RuntimeException.class, () -> {
+            CsvStreamReader.of(Person.class, Paths.get("src/test/resources/nonexistent.csv"))
+                .process(stream -> stream.collect(java.util.stream.Collectors.toList()));
+        });
+    }
+
+    @Test
+    @DisplayName("BOM付きUTF-8ファイルを正しく読み込めること")
+    void testUtf8BomFile() throws IOException, CsvException {
+        List<Person> result = CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample_utf8_bom.csv"))
+            .charset(CharsetType.UTF_8_BOM)
+            .process(stream -> stream.collect(java.util.stream.Collectors.toList()));
+        
+        assertNotNull(result);
+        assertTrue(result.size() > 0);
+        
+        // 最初のPersonの確認（BOMが正しくスキップされている）
+        Person firstPerson = result.get(0);
+        assertEquals("田中太郎", firstPerson.getName());
+    }
 }
