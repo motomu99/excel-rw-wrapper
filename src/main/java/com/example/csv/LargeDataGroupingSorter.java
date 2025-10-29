@@ -74,6 +74,10 @@ public class LargeDataGroupingSorter<T> {
     private Comparator<T> comparator;
     private boolean useComparable = false;
     
+    // CSVヘッダーとフィールドマッピング（キャッシュ）
+    private List<String> csvHeaders = null;
+    private List<java.lang.reflect.Field> csvFields = null;
+    
     private LargeDataGroupingSorter(Class<T> beanClass, Path inputPath) {
         this.beanClass = beanClass;
         this.inputPath = inputPath;
@@ -197,8 +201,33 @@ public class LargeDataGroupingSorter<T> {
     private Map<String, Path> splitByGroup() throws IOException {
         Map<String, BufferedWriter> writerMap = new HashMap<>();
         Map<String, Path> groupFileMap = new HashMap<>();
-        String headerLine = buildHeaderLine();
+        String headerLine = null;
+        List<String> dataLines = new ArrayList<>();
         
+        // ① まず全行を文字列として読み込む（メモリに載せるが、Beanよりは軽い）
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                new FileInputStream(inputPath.toFile()),
+                java.nio.charset.Charset.forName(charsetType.getCharsetName())))) {
+            
+            // ヘッダー行
+            headerLine = reader.readLine();
+            if (headerLine == null) {
+                throw new IOException("CSVファイルが空です");
+            }
+            
+            //ヘッダーをパースしてフィールドマッピングを構築
+            initializeFieldMapping(headerLine);
+            
+            // データ行
+            String line;
+            while ((line = reader.readLine()) != null) {
+                dataLines.add(line);
+            }
+        }
+        
+        final String finalHeaderLine = headerLine;
+        
+        // ② OpenCSVで再度読み込んでBean変換
         try (Reader reader = new InputStreamReader(
                 new FileInputStream(inputPath.toFile()),
                 java.nio.charset.Charset.forName(charsetType.getCharsetName()))) {
@@ -207,12 +236,24 @@ public class LargeDataGroupingSorter<T> {
                     .withType(beanClass)
                     .build();
             
+            Iterator<T> beanIterator = csvToBean.iterator();
+            int lineIndex = 0;
             int totalLines = 0;
-            for (T bean : csvToBean) {
+            
+            while (beanIterator.hasNext() && lineIndex < dataLines.size()) {
+                T bean = beanIterator.next();
+                String originalLine = dataLines.get(lineIndex);
+                lineIndex++;
                 totalLines++;
                 
                 // グループキー取得
                 String groupKey = extractGroupKey(bean);
+                
+                // グループキーがnullの場合はスキップ
+                if (groupKey == null || groupKey.trim().isEmpty()) {
+                    log.warn("グループキーがnullまたは空です。スキップします: bean={}", bean);
+                    continue;
+                }
                 
                 // グループキーごとにファイルに書き込み
                 BufferedWriter writer = writerMap.computeIfAbsent(groupKey, key -> {
@@ -222,7 +263,7 @@ public class LargeDataGroupingSorter<T> {
                         BufferedWriter w = Files.newBufferedWriter(groupFile,
                                 java.nio.charset.Charset.forName(charsetType.getCharsetName()));
                         // ヘッダー行を書き込み
-                        w.write(headerLine);
+                        w.write(finalHeaderLine);
                         w.newLine();
                         return w;
                     } catch (IOException e) {
@@ -230,7 +271,8 @@ public class LargeDataGroupingSorter<T> {
                     }
                 });
                 
-                writer.write(beanToCsvLine(bean));
+                // 元のCSV行をそのまま書き出す
+                writer.write(originalLine);
                 writer.newLine();
                 
                 // 進捗ログ
@@ -253,25 +295,6 @@ public class LargeDataGroupingSorter<T> {
         }
         
         return groupFileMap;
-    }
-    
-    /**
-     * ヘッダー行を構築
-     */
-    private String buildHeaderLine() {
-        List<String> headers = new ArrayList<>();
-        java.lang.reflect.Field[] fields = beanClass.getDeclaredFields();
-        
-        for (java.lang.reflect.Field field : fields) {
-            com.opencsv.bean.CsvBindByName annotation = 
-                field.getAnnotation(com.opencsv.bean.CsvBindByName.class);
-            
-            if (annotation != null) {
-                headers.add(annotation.column());
-            }
-        }
-        
-        return String.join(",", headers);
     }
     
     /**
@@ -348,19 +371,50 @@ public class LargeDataGroupingSorter<T> {
     }
     
     /**
-     * BeanをCSV行文字列に変換（OpenCSVのアノテーション使用）
+     * ヘッダーをパースしてフィールドマッピングを構築
+     */
+    private void initializeFieldMapping(String headerLine) {
+        csvHeaders = new ArrayList<>();
+        csvFields = new ArrayList<>();
+        
+        log.debug("ヘッダー行: {}", headerLine);
+        
+        // ヘッダー行をパース
+        String[] headers = headerLine.split(",");
+        Map<String, java.lang.reflect.Field> fieldMap = new HashMap<>();
+        
+        // Beanのフィールドをマップ化
+        for (java.lang.reflect.Field field : beanClass.getDeclaredFields()) {
+            com.opencsv.bean.CsvBindByName annotation = 
+                field.getAnnotation(com.opencsv.bean.CsvBindByName.class);
+            if (annotation != null) {
+                field.setAccessible(true);
+                fieldMap.put(annotation.column(), field);
+                log.debug("フィールドマップ追加: column='{}', field={}", annotation.column(), field.getName());
+            }
+        }
+        
+        // ヘッダーの順序に従ってフィールドを並べる
+        for (String header : headers) {
+            String trimmedHeader = header.trim();
+            csvHeaders.add(trimmedHeader);
+            java.lang.reflect.Field field = fieldMap.get(trimmedHeader);
+            csvFields.add(field);
+            log.debug("ヘッダーマッピング: header='{}', field={}", trimmedHeader, field != null ? field.getName() : "null");
+        }
+        
+        log.debug("フィールドマッピング完了: headers={}, fields={}", csvHeaders.size(), csvFields.size());
+    }
+    
+    /**
+     * BeanをCSV行文字列に変換（ヘッダーの順序に従う）
      */
     private String beanToCsvLine(T bean) {
         try {
             List<String> values = new ArrayList<>();
-            java.lang.reflect.Field[] fields = beanClass.getDeclaredFields();
             
-            for (java.lang.reflect.Field field : fields) {
-                com.opencsv.bean.CsvBindByName annotation = 
-                    field.getAnnotation(com.opencsv.bean.CsvBindByName.class);
-                
-                if (annotation != null) {
-                    field.setAccessible(true);
+            for (java.lang.reflect.Field field : csvFields) {
+                if (field != null) {
                     Object value = field.get(bean);
                     
                     if (value != null) {
@@ -371,8 +425,10 @@ public class LargeDataGroupingSorter<T> {
                         }
                         values.add(strValue);
                     } else {
-                        values.add("");  // 空の値
+                        values.add("");
                     }
+                } else {
+                    values.add("");
                 }
             }
             
@@ -398,6 +454,11 @@ public class LargeDataGroupingSorter<T> {
                 T bean1 = parseCsvLine(line1);
                 T bean2 = parseCsvLine(line2);
                 
+                if (bean1 == null || bean2 == null) {
+                    // パースに失敗した場合は文字列比較
+                    return line1.compareTo(line2);
+                }
+                
                 if (comparator != null) {
                     return comparator.compare(bean1, bean2);
                 } else if (useComparable) {
@@ -408,41 +469,41 @@ public class LargeDataGroupingSorter<T> {
                     return 0;
                 }
             } catch (Exception e) {
-                log.warn("ソート比較エラー: {}", e.getMessage());
+                // エラー時は常に一貫した結果を返す（文字列比較）
+                log.debug("ソート比較エラー（文字列比較にフォールバック）: line1={}, line2={}", line1, line2);
                 return line1.compareTo(line2);
             }
         };
     }
     
     /**
-     * CSV行をBeanにパース
+     * CSV行をBeanにパース（ソート用）
      */
     private T parseCsvLine(String line) {
         try {
+            if (line == null || line.trim().isEmpty()) {
+                return null;
+            }
+            
             T bean = beanClass.getDeclaredConstructor().newInstance();
             String[] values = parseCsvValues(line);
             
-            java.lang.reflect.Field[] fields = beanClass.getDeclaredFields();
-            int index = 0;
-            
-            for (java.lang.reflect.Field field : fields) {
-                com.opencsv.bean.CsvBindByName annotation = 
-                    field.getAnnotation(com.opencsv.bean.CsvBindByName.class);
-                
-                if (annotation != null && index < values.length) {
-                    field.setAccessible(true);
-                    String value = values[index++];
+            // csvFieldsの順序に従ってフィールドに値を設定
+            for (int i = 0; i < csvFields.size() && i < values.length; i++) {
+                java.lang.reflect.Field field = csvFields.get(i);
+                if (field != null) {
+                    String value = values[i];
                     
-                    if (value != null && !value.isEmpty()) {
+                    if (value != null && !value.trim().isEmpty()) {
                         // 型に応じて変換
                         if (field.getType() == String.class) {
                             field.set(bean, value);
                         } else if (field.getType() == Integer.class || field.getType() == int.class) {
-                            field.set(bean, Integer.parseInt(value));
+                            field.set(bean, Integer.parseInt(value.trim()));
                         } else if (field.getType() == Long.class || field.getType() == long.class) {
-                            field.set(bean, Long.parseLong(value));
+                            field.set(bean, Long.parseLong(value.trim()));
                         } else if (field.getType() == Double.class || field.getType() == double.class) {
-                            field.set(bean, Double.parseDouble(value));
+                            field.set(bean, Double.parseDouble(value.trim()));
                         }
                     }
                 }
@@ -451,8 +512,8 @@ public class LargeDataGroupingSorter<T> {
             return bean;
             
         } catch (Exception e) {
-            log.warn("CSV行のパースエラー: line={}, error={}", line, e.getMessage());
-            throw new RuntimeException("CSV行のパースに失敗", e);
+            log.debug("CSV行のパースエラー（ソート用）: line={}, error={}", line, e.getMessage());
+            return null;  // エラー時はnullを返す
         }
     }
     
