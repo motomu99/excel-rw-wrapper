@@ -169,6 +169,86 @@ CsvWriterWrapper.execute(
 
 ---
 
+## 大容量CSV外部ソート機能 🚀
+
+**4GB～10GB程度の大きなCSVファイルをメモリに収まらなくても効率的にソートできます！**
+
+### 特徴
+
+- ✨ **メモリ効率**: 大きなファイルをチャンクに分割して処理
+- 🎯 **柔軟なソート**: 任意の列や複数列でのソートに対応
+- ⚡ **高速処理**: k-wayマージソートアルゴリズムを使用
+- 🧹 **自動クリーンアップ**: 一時ファイルを自動的に削除
+
+### 基本的な使い方
+
+```java
+import com.example.csv.CsvExternalSorter;
+import java.nio.file.Paths;
+
+// name列でソート
+CsvExternalSorter.builder(
+    Paths.get("large_input.csv"),
+    Paths.get("sorted_output.csv")
+)
+.chunkSize(100_000_000)  // 100MBごとにチャンク分割
+.comparator((line1, line2) -> {
+    String name1 = line1.split(",")[0];
+    String name2 = line2.split(",")[0];
+    return name1.compareTo(name2);
+})
+.sort();
+```
+
+### 数値列でのソート
+
+```java
+// ID列（数値）で昇順ソート
+CsvExternalSorter.builder(inputPath, outputPath)
+    .comparator((line1, line2) -> {
+        int id1 = Integer.parseInt(line1.split(",")[0]);
+        int id2 = Integer.parseInt(line2.split(",")[0]);
+        return Integer.compare(id1, id2);
+    })
+    .sort();
+```
+
+### 複数列でのソート
+
+```java
+// department列 → name列の順でソート
+CsvExternalSorter.builder(inputPath, outputPath)
+    .comparator((line1, line2) -> {
+        String[] cols1 = line1.split(",");
+        String[] cols2 = line2.split(",");
+        
+        // まずdepartment列で比較
+        int deptCompare = cols1[2].compareTo(cols2[2]);
+        if (deptCompare != 0) return deptCompare;
+        
+        // 同じならname列で比較
+        return cols1[1].compareTo(cols2[1]);
+    })
+    .sort();
+```
+
+### 設定オプション
+
+```java
+CsvExternalSorter.builder(inputPath, outputPath)
+    .chunkSize(500_000_000L)           // チャンクサイズ（バイト）
+    .charset(CharsetType.UTF_8)        // 文字エンコーディング
+    .fileType(FileType.CSV)            // ファイルタイプ
+    .skipHeader(true)                  // ヘッダー行をスキップ
+    .tempDirectory(Paths.get("/tmp"))  // 一時ディレクトリ
+    .comparator(...)                   // ソート条件
+    .sort();
+```
+
+**詳細は [EXTERNAL_SORT_USAGE.md](EXTERNAL_SORT_USAGE.md) を参照してください。**
+
+---
+
 ## アノテーションでの項目名指定
 
 ```java
