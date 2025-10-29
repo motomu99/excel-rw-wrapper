@@ -167,8 +167,12 @@ public class LargeDataGroupingSorter<T> {
             processEachGroup(sortedGroupFiles, processor);
             log.info("グループ処理完了");
             
+        } catch (Exception e) {
+            log.error("処理中にエラーが発生しました: {}", e.getMessage(), e);
+            throw e;
         } finally {
-            cleanup();
+            // cleanup();  // デバッグ用に一時的に無効化
+            log.info("一時ディレクトリ: {}", tempDirectory);
         }
     }
     
@@ -206,34 +210,10 @@ public class LargeDataGroupingSorter<T> {
      * フェーズ1: CSVを読み込み、グループキーごとにファイル分割
      */
     private Map<String, Path> splitByGroup() throws IOException {
-        Map<String, BufferedWriter> writerMap = new HashMap<>();
+        Map<String, CSVWriter> writerMap = new HashMap<>();
         Map<String, Path> groupFileMap = new HashMap<>();
-        String headerLine = null;
-        List<String> dataLines = new ArrayList<>();
+        String[] headers = null;
         
-        // ① まず全行を文字列として読み込む（メモリに載せるが、Beanよりは軽い）
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(
-                new FileInputStream(inputPath.toFile()), charset))) {
-            
-            // ヘッダー行
-            headerLine = reader.readLine();
-            if (headerLine == null) {
-                throw new IOException("CSVファイルが空です");
-            }
-            
-            //ヘッダーをパースしてフィールドマッピングを構築
-            initializeFieldMapping(headerLine);
-            
-            // データ行
-            String line;
-            while ((line = reader.readLine()) != null) {
-                dataLines.add(line);
-            }
-        }
-        
-        final String finalHeaderLine = headerLine;
-        
-        // ② OpenCSVで再度読み込んでBean変換
         try (Reader reader = new InputStreamReader(
                 new FileInputStream(inputPath.toFile()), charset)) {
             
@@ -241,14 +221,8 @@ public class LargeDataGroupingSorter<T> {
                     .withType(beanClass)
                     .build();
             
-            Iterator<T> beanIterator = csvToBean.iterator();
-            int lineIndex = 0;
             int totalLines = 0;
-            
-            while (beanIterator.hasNext() && lineIndex < dataLines.size()) {
-                T bean = beanIterator.next();
-                String originalLine = dataLines.get(lineIndex);
-                lineIndex++;
+            for (T bean : csvToBean) {
                 totalLines++;
                 
                 // グループキー取得
@@ -261,23 +235,18 @@ public class LargeDataGroupingSorter<T> {
                 }
                 
                 // グループキーごとにファイルに書き込み
-                BufferedWriter writer = writerMap.computeIfAbsent(groupKey, key -> {
-                    try {
-                        Path groupFile = tempDirectory.resolve(sanitizeFileName(key) + "_unsorted.csv");
-                        groupFileMap.put(key, groupFile);
-                        BufferedWriter w = Files.newBufferedWriter(groupFile, charset);
-                        // ヘッダー行を書き込み
-                        w.write(finalHeaderLine);
-                        w.newLine();
-                        return w;
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
-                    }
-                });
+                CSVWriter writer = writerMap.get(groupKey);
+                if (writer == null) {
+                    Path groupFile = tempDirectory.resolve(sanitizeFileName(groupKey) + "_unsorted.csv");
+                    groupFileMap.put(groupKey, groupFile);
+                    
+                    Writer fileWriter = Files.newBufferedWriter(groupFile, charset);
+                    writer = new CSVWriter(fileWriter);
+                    writerMap.put(groupKey, writer);
+                }
                 
-                // 元のCSV行をそのまま書き出す
-                writer.write(originalLine);
-                writer.newLine();
+                // BeanをCSV行として書き出し（OpenCSVを使用）
+                writeBeanAsCsvLine(writer, bean);
                 
                 // 進捗ログ
                 if (totalLines % 100000 == 0) {
@@ -289,7 +258,7 @@ public class LargeDataGroupingSorter<T> {
             
         } finally {
             // すべてのWriterをクローズ
-            for (BufferedWriter writer : writerMap.values()) {
+            for (CSVWriter writer : writerMap.values()) {
                 try {
                     writer.close();
                 } catch (IOException e) {
@@ -299,6 +268,33 @@ public class LargeDataGroupingSorter<T> {
         }
         
         return groupFileMap;
+    }
+    
+    /**
+     * BeanをCSV行として書き出し
+     */
+    private void writeBeanAsCsvLine(CSVWriter writer, T bean) {
+        try {
+            List<String> values = new ArrayList<>();
+            java.lang.reflect.Field[] fields = beanClass.getDeclaredFields();
+            
+            for (java.lang.reflect.Field field : fields) {
+                com.opencsv.bean.CsvBindByName annotation = 
+                    field.getAnnotation(com.opencsv.bean.CsvBindByName.class);
+                
+                if (annotation != null) {
+                    field.setAccessible(true);
+                    Object value = field.get(bean);
+                    values.add(value != null ? value.toString() : "");
+                }
+            }
+            
+            writer.writeNext(values.toArray(new String[0]));
+            
+        } catch (Exception e) {
+            log.error("BeanのCSV書き込みエラー: {}", e.getMessage());
+            throw new RuntimeException("BeanのCSV書き込みに失敗", e);
+        }
     }
     
     /**
