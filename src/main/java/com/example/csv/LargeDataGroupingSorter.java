@@ -1,10 +1,15 @@
 package com.example.csv;
 
+import com.opencsv.CSVWriter;
 import com.opencsv.bean.CsvToBean;
 import com.opencsv.bean.CsvToBeanBuilder;
+import com.opencsv.bean.StatefulBeanToCsv;
+import com.opencsv.bean.StatefulBeanToCsvBuilder;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.*;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -66,6 +71,7 @@ public class LargeDataGroupingSorter<T> {
     private final Path inputPath;
     private final Path tempDirectory;
     private CharsetType charsetType = CharsetType.UTF_8;
+    private Charset charset = StandardCharsets.UTF_8;
     
     // グルーピング設定
     private Function<T, String> groupKeyExtractor;
@@ -110,6 +116,7 @@ public class LargeDataGroupingSorter<T> {
      */
     public LargeDataGroupingSorter<T> charset(CharsetType charsetType) {
         this.charsetType = charsetType;
+        this.charset = Charset.forName(charsetType.getCharsetName());
         return this;
     }
     
@@ -206,8 +213,7 @@ public class LargeDataGroupingSorter<T> {
         
         // ① まず全行を文字列として読み込む（メモリに載せるが、Beanよりは軽い）
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(
-                new FileInputStream(inputPath.toFile()),
-                java.nio.charset.Charset.forName(charsetType.getCharsetName())))) {
+                new FileInputStream(inputPath.toFile()), charset))) {
             
             // ヘッダー行
             headerLine = reader.readLine();
@@ -229,8 +235,7 @@ public class LargeDataGroupingSorter<T> {
         
         // ② OpenCSVで再度読み込んでBean変換
         try (Reader reader = new InputStreamReader(
-                new FileInputStream(inputPath.toFile()),
-                java.nio.charset.Charset.forName(charsetType.getCharsetName()))) {
+                new FileInputStream(inputPath.toFile()), charset)) {
             
             CsvToBean<T> csvToBean = new CsvToBeanBuilder<T>(reader)
                     .withType(beanClass)
@@ -260,8 +265,7 @@ public class LargeDataGroupingSorter<T> {
                     try {
                         Path groupFile = tempDirectory.resolve(sanitizeFileName(key) + "_unsorted.csv");
                         groupFileMap.put(key, groupFile);
-                        BufferedWriter w = Files.newBufferedWriter(groupFile,
-                                java.nio.charset.Charset.forName(charsetType.getCharsetName()));
+                        BufferedWriter w = Files.newBufferedWriter(groupFile, charset);
                         // ヘッダー行を書き込み
                         w.write(finalHeaderLine);
                         w.newLine();
@@ -298,7 +302,8 @@ public class LargeDataGroupingSorter<T> {
     }
     
     /**
-     * フェーズ2: 各グループファイルをソート
+     * フェーズ2: 各グループファイルをメモリ内でソート
+     * （グループファイルは元ファイルより十分小さいため、メモリ内ソートで対応）
      */
     private Map<String, Path> sortGroupFiles(Map<String, Path> groupFiles) throws IOException {
         Map<String, Path> sortedFiles = new HashMap<>();
@@ -310,20 +315,101 @@ public class LargeDataGroupingSorter<T> {
             
             log.debug("グループソート開始: グループ={}, ファイル={}", groupKey, unsortedFile.getFileName());
             
-            // CsvExternalSorterでソート
-            CsvExternalSorter.builder(unsortedFile, sortedFile)
-                    .charset(charsetType)
-                    .skipHeader(true)  // ヘッダーあり
-                    .comparator(createLineComparator())
-                    .tempDirectory(tempDirectory.resolve("sort_" + sanitizeFileName(groupKey)))
-                    .sort();
+            // メモリ内でソート
+            List<String> lines = new ArrayList<>();
+            String header = null;
+            
+            try (BufferedReader reader = Files.newBufferedReader(unsortedFile, charset)) {
+                // ヘッダー行
+                header = reader.readLine();
+                
+                // データ行
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    lines.add(line);
+                }
+            }
+            
+            // Bean変換してソート（Comparatorが指定されている場合のみ）
+            if (comparator != null) {
+                // 元のCSV行とBeanをペアで保持
+                List<Pair<String, T>> pairs = new ArrayList<>();
+                
+                for (String line : lines) {
+                    T bean = parseCsvLine(line);
+                    if (bean != null) {
+                        pairs.add(new Pair<>(line, bean));
+                    }
+                }
+                
+                // Beanでソート
+                pairs.sort((p1, p2) -> comparator.compare(p1.second, p2.second));
+                
+                // ソート済みの元のCSV行を取得
+                lines.clear();
+                for (Pair<String, T> pair : pairs) {
+                    lines.add(pair.first);
+                }
+            } else if (useComparable) {
+                // Comparableインターフェース使用
+                List<Pair<String, T>> pairs = new ArrayList<>();
+                
+                for (String line : lines) {
+                    T bean = parseCsvLine(line);
+                    if (bean != null) {
+                        pairs.add(new Pair<>(line, bean));
+                    }
+                }
+                
+                pairs.sort((p1, p2) -> {
+                    @SuppressWarnings("unchecked")
+                    Comparable<T> c1 = (Comparable<T>) p1.second;
+                    return c1.compareTo(p2.second);
+                });
+                
+                lines.clear();
+                for (Pair<String, T> pair : pairs) {
+                    lines.add(pair.first);
+                }
+            } else {
+                // Comparatorが指定されていない場合は文字列ソート
+                lines.sort(String::compareTo);
+            }
+            
+            // ソート済みファイルに書き出し
+            try (BufferedWriter writer = Files.newBufferedWriter(sortedFile, charset)) {
+                // ヘッダー行
+                if (header != null) {
+                    writer.write(header);
+                    writer.newLine();
+                }
+                
+                // データ行
+                for (String line : lines) {
+                    writer.write(line);
+                    writer.newLine();
+                }
+            }
             
             sortedFiles.put(groupKey, sortedFile);
             
-            log.debug("グループソート完了: グループ={}", groupKey);
+            log.debug("グループソート完了: グループ={}, 行数={}", groupKey, lines.size());
         }
         
         return sortedFiles;
+    }
+    
+    /**
+     * ペアクラス（内部使用）
+     */
+    private static class Pair<F, S> {
+        final F first;
+        final S second;
+        
+        Pair(F first, S second) {
+            this.first = first;
+            this.second = second;
+        }
     }
     
     /**
@@ -338,8 +424,7 @@ public class LargeDataGroupingSorter<T> {
             log.debug("グループ処理開始: グループ={}", groupKey);
             
             try (Reader reader = new InputStreamReader(
-                    new FileInputStream(sortedFile.toFile()),
-                    java.nio.charset.Charset.forName(charsetType.getCharsetName()))) {
+                    new FileInputStream(sortedFile.toFile()), charset)) {
                 
                 CsvToBean<T> csvToBean = new CsvToBeanBuilder<T>(reader)
                         .withType(beanClass)

@@ -37,7 +37,7 @@ public class LargeDataGroupingSorterTest {
      * テスト用の大量CSVファイルを作成
      */
     private static void createLargeTestCsv(Path filePath, int rowCount) throws IOException {
-        try (BufferedWriter writer = Files.newBufferedWriter(filePath)) {
+        try (BufferedWriter writer = Files.newBufferedWriter(filePath, java.nio.charset.StandardCharsets.UTF_8)) {
             // ヘッダー行
             writer.write("名前,年齢,職業,出身地");
             writer.newLine();
