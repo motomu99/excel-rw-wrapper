@@ -8,27 +8,27 @@
  *
  * <h3>CSV読み込み</h3>
  * <ul>
- *   <li>{@link com.example.csv.CsvReaderWrapper} - CSV/TSVファイルを一括読み込み</li>
- *   <li>{@link com.example.csv.CsvStreamReader} - CSV/TSVファイルをStream APIで処理</li>
+ *   <li>{@link com.example.csv.reader.CsvReaderWrapper} - CSV/TSVファイルを一括読み込み</li>
+ *   <li>{@link com.example.csv.reader.CsvStreamReader} - CSV/TSVファイルをStream APIで処理</li>
  * </ul>
  *
  * <h3>CSV書き込み</h3>
  * <ul>
- *   <li>{@link com.example.csv.CsvWriterWrapper} - CSV/TSVファイルに一括書き込み</li>
- *   <li>{@link com.example.csv.CsvStreamWriter} - Stream APIを使ってCSV/TSVファイルに書き込み</li>
+ *   <li>{@link com.example.csv.writer.CsvWriterWrapper} - CSV/TSVファイルに一括書き込み</li>
+ *   <li>{@link com.example.csv.writer.CsvStreamWriter} - Stream APIを使ってCSV/TSVファイルに書き込み</li>
  * </ul>
  *
  * <h3>設定用列挙型</h3>
  * <ul>
- *   <li>{@link com.example.csv.CharsetType} - 文字エンコーディングの指定</li>
- *   <li>{@link com.example.csv.FileType} - ファイル形式（CSV/TSV）の指定</li>
- *   <li>{@link com.example.csv.LineSeparatorType} - 改行コードの指定</li>
+ *   <li>{@link com.example.common.config.CharsetType} - 文字エンコーディングの指定</li>
+ *   <li>{@link com.example.common.config.FileType} - ファイル形式（CSV/TSV）の指定</li>
+ *   <li>{@link com.example.common.config.LineSeparatorType} - 改行コードの指定</li>
  * </ul>
  *
  * <h3>例外クラス</h3>
  * <ul>
- *   <li>{@link com.example.csv.CsvReadException} - CSV読み込み時の例外</li>
- *   <li>{@link com.example.csv.CsvWriteException} - CSV書き込み時の例外</li>
+ *   <li>{@link com.example.exception.CsvReadException} - CSV読み込み時の例外</li>
+ *   <li>{@link com.example.exception.CsvWriteException} - CSV書き込み時の例外</li>
  * </ul>
  *
  * <h2>基本的な使い方</h2>
