@@ -176,16 +176,16 @@ public class LargeDataGroupingSorter<T> {
         }
         
         // GroupingSortableからグループキーとComparatorを自動取得
-        this.groupKeyExtractor = bean -> {
+        // 型安全性: beanClassがGroupingSortableであることは172行目で確認済み
+        Function<T, String> keyExtractor = bean -> {
             GroupingSortable<?> sortable = (GroupingSortable<?>) bean;
             return String.valueOf(sortable.getGroupKey());
         };
+        this.groupKeyExtractor = keyExtractor;
         
-        this.comparator = (a, b) -> {
-            GroupingSortable<Object> sa = (GroupingSortable<Object>) a;
-            GroupingSortable<Object> sb = (GroupingSortable<Object>) b;
-            return sa.compareTo(sb);
-        };
+        // GroupingSortableを実装しているBeanを比較
+        // ジェネリクス型パラメータKは実行時に消去されるため、rawタイプを使用
+        this.comparator = createComparatorFromGroupingSortable();
         
         processGroups(processor);
     }
@@ -242,9 +242,7 @@ public class LargeDataGroupingSorter<T> {
             if (comparator != null) {
                 beans.sort(comparator);
             } else if (useComparable) {
-                @SuppressWarnings("unchecked")
-                List<Comparable<T>> comparables = (List<Comparable<T>>) (List<?>) beans;
-                comparables.sort((a, b) -> a.compareTo((T) b));
+                sortComparableBeans(beans);
             }
             
             // ソート済みBeanをCSVファイルに書き込み
@@ -290,7 +288,6 @@ public class LargeDataGroupingSorter<T> {
     /**
      * グループキーを抽出
      */
-    @SuppressWarnings("unchecked")
     private String extractGroupKey(T bean) {
         if (groupKeyExtractor != null) {
             return groupKeyExtractor.apply(bean);
@@ -339,7 +336,31 @@ public class LargeDataGroupingSorter<T> {
     private String sanitizeFileName(String fileName) {
         return fileName.replaceAll("[^a-zA-Z0-9._-]", "_");
     }
-    
+
+    /**
+     * Comparableインターフェースを実装しているBeanをソート
+     *
+     * <p>型安全性: useComparableがtrueの場合、beanClassがComparableを実装していることが保証される</p>
+     *
+     * @param beans ソート対象のBeanリスト
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void sortComparableBeans(List<T> beans) {
+        List<Comparable> comparables = (List) beans;
+        comparables.sort(Comparable::compareTo);
+    }
+
+    /**
+     * GroupingSortable実装向けのComparatorを生成（警告の局所化のために分離）
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private Comparator<T> createComparatorFromGroupingSortable() {
+        return (a, b) -> {
+            Comparable comparable = (Comparable) a;
+            return comparable.compareTo(b);
+        };
+    }
+
     /**
      * 一時ファイルをクリーンアップ
      */
@@ -361,6 +382,6 @@ public class LargeDataGroupingSorter<T> {
             log.warn("クリーンアップエラー: {}", e.getMessage());
         }
     }
-    
+
 }
 
