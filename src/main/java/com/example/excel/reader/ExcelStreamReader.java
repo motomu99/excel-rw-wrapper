@@ -49,6 +49,12 @@ public class ExcelStreamReader<T> {
 
     /** デフォルトのヘッダー探索行数 */
     private static final int DEFAULT_HEADER_SEARCH_ROWS = 10;
+    
+    /** StreamingReaderのデフォルト行キャッシュサイズ（メモリに保持する行数） */
+    private static final int DEFAULT_ROW_CACHE_SIZE = 100;
+    
+    /** StreamingReaderのデフォルトバッファサイズ（バイト単位） */
+    private static final int DEFAULT_BUFFER_SIZE = 4096;
 
 
     private final Class<T> beanClass;
@@ -181,8 +187,8 @@ public class ExcelStreamReader<T> {
 
         try (FileInputStream fis = new FileInputStream(filePath.toFile());
              Workbook workbook = StreamingReader.builder()
-                 .rowCacheSize(100)    // メモリに保持する行数
-                 .bufferSize(4096)      // バッファサイズ
+                 .rowCacheSize(DEFAULT_ROW_CACHE_SIZE)
+                 .bufferSize(DEFAULT_BUFFER_SIZE)
                  .open(fis)) {
 
             Sheet sheet;

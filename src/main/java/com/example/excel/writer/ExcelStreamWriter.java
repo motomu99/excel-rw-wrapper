@@ -179,71 +179,69 @@ public class ExcelStreamWriter<T> {
      * @throws IOException ファイル書き込みエラーが発生した場合
      */
     public void write(Stream<T> stream) throws IOException {
-        Workbook workbook = null;
-        FileOutputStream fos = null;
+        // データを事前にリスト化（Streamは1回しか使えないため）
+        List<T> dataList = stream.toList();
         
         try {
-            // 既存ファイルを開くか新規作成
-            if (loadExisting && Files.exists(filePath)) {
-                try (FileInputStream fis = new FileInputStream(filePath.toFile())) {
-                    workbook = WorkbookFactory.create(fis);
-                    log.info("既存のExcelファイルを開きました: {}", filePath);
+            // 既存ファイルを開くか新規作成してWorkbookを取得
+            Workbook workbook = loadExistingWorkbook();
+            
+            // try-with-resourcesでWorkbookとFileOutputStreamを管理
+            try (workbook; FileOutputStream fos = new FileOutputStream(filePath.toFile())) {
+                // スタイルの初期化
+                initializeStyles(workbook);
+                
+                // シートを取得または作成
+                Sheet sheet = getOrCreateSheet(workbook);
+                
+                // フィールドキャッシュを構築
+                fieldMappingCache = new FieldMappingCache(beanClass);
+                
+                // ヘッダー行を作成
+                createHeaderRow(sheet);
+                
+                // データ行を作成
+                int rowIndex = startRow + 1;
+                for (T bean : dataList) {
+                    Row row = sheet.getRow(rowIndex);
+                    if (row == null) {
+                        row = sheet.createRow(rowIndex);
+                    }
+                    writeDataRow(row, bean);
+                    rowIndex++;
                 }
-            } else {
-                workbook = new XSSFWorkbook();
-                log.info("新規Excelファイルを作成します: {}", filePath);
+                
+                // ファイルに書き込み
+                workbook.write(fos);
+                log.info("Excelファイルを保存しました: {}", filePath);
             }
-            
-            // スタイルの初期化
-            initializeStyles(workbook);
-            
-            // シートを取得または作成
-            Sheet sheet = getOrCreateSheet(workbook);
-            
-            // フィールドキャッシュを構築
-            fieldMappingCache = new FieldMappingCache(beanClass);
-            
-            // ヘッダー行を作成
-            createHeaderRow(sheet);
-            
-            // データ行を作成
-            List<T> dataList = stream.toList();
-            int rowIndex = startRow + 1;
-            for (T bean : dataList) {
-                Row row = sheet.getRow(rowIndex);
-                if (row == null) {
-                    row = sheet.createRow(rowIndex);
-                }
-                writeDataRow(row, bean);
-                rowIndex++;
-            }
-            
-            // ファイルに書き込み
-            fos = new FileOutputStream(filePath.toFile());
-            workbook.write(fos);
-            log.info("Excelファイルを保存しました: {}", filePath);
             
         } catch (IOException e) {
-            log.error("Excelファイル書き込み中にエラーが発生: ファイルパス={}, エラー={}", filePath, e.getMessage(), e);
+            log.error("Excelファイル書き込み中にエラーが発生: ファイルパス={}, エラー={}", 
+                filePath, e.getMessage(), e);
             throw e;
         } catch (Exception e) {
-            log.error("Excel処理中にエラーが発生: ファイルパス={}, エラー={}", filePath, e.getMessage(), e);
+            log.error("Excel処理中にエラーが発生: ファイルパス={}, エラー={}", 
+                filePath, e.getMessage(), e);
             throw new IOException("Excel処理中にエラーが発生しました", e);
-        } finally {
-            if (fos != null) {
-                try {
-                    fos.close();
-                } catch (IOException e) {
-                    log.warn("FileOutputStreamのクローズに失敗: {}", e.getMessage());
-                }
+        }
+    }
+    
+    /**
+     * 既存のWorkbookを読み込むか、新規Workbookを作成
+     * 
+     * @return Workbookインスタンス
+     * @throws IOException ファイル読み込みエラー
+     */
+    private Workbook loadExistingWorkbook() throws IOException {
+        if (loadExisting && Files.exists(filePath)) {
+            try (FileInputStream fis = new FileInputStream(filePath.toFile())) {
+                log.info("既存のExcelファイルを開きました: {}", filePath);
+                return WorkbookFactory.create(fis);
             }
-            if (workbook != null) {
-                try {
-                    workbook.close();
-                } catch (IOException e) {
-                    log.warn("Workbookのクローズに失敗: {}", e.getMessage());
-                }
-            }
+        } else {
+            log.info("新規Excelファイルを作成します: {}", filePath);
+            return new XSSFWorkbook();
         }
     }
 
