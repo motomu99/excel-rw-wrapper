@@ -13,7 +13,9 @@ OpenCSVをラップしたシンプルなCSV読み込みライブラリです。
 ## 依存関係
 
 - Java 21以上
-- OpenCSV 5.9
+- OpenCSV 5.9 (CSV読み書き用)
+- Apache POI 5.2.5 (Excel読み書き用)
+- Excel Streaming Reader 4.3.0 (大容量Excel読み込み用)
 - Lombok 1.18.30 (Beanクラスの自動生成用)
 
 ## ビルド
@@ -278,6 +280,20 @@ CsvStreamReader.builder(Person.class, Paths.get("input.csv"))
     });
 ```
 
+#### ExcelStreamWriterと組み合わせて使う（CSV → Excel変換）
+
+```java
+import com.example.excel.writer.ExcelStreamWriter;
+
+// CSVから読み込んでExcelに書き込む
+CsvStreamReader.builder(Person.class, Paths.get("input.csv"))
+    .process(stream -> {
+        ExcelStreamWriter.builder(Person.class, Paths.get("output.xlsx"))
+            .sheetName("社員データ")
+            .write(stream);
+    });
+```
+
 ---
 
 ### CsvWriterWrapper（推奨）
@@ -428,6 +444,263 @@ CsvExternalSorter.builder(inputPath, outputPath)
 ```
 
 **詳細は [EXTERNAL_SORT_USAGE.md](EXTERNAL_SORT_USAGE.md) を参照してください。**
+
+---
+
+## Excel読み込み機能 📊
+
+Apache POIとExcel Streaming ReaderをラップしたシンプルなExcel読み込みライブラリです。
+
+### ExcelStreamReader（Stream APIでの読み込み）
+
+レコードをJava Streamとして扱えるExcelリーダー。メモリ効率の良いストリーミング処理が可能！
+
+#### 基本的な使い方
+
+```java
+import com.example.excel.reader.ExcelStreamReader;
+import com.example.model.Person;
+import java.nio.file.Paths;
+import java.util.List;
+import java.util.stream.Collectors;
+
+// 基本的な読み込み（Listに集約）
+List<Person> persons = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
+    .process(stream -> stream.collect(Collectors.toList()));
+```
+
+#### シート指定
+
+```java
+// シートインデックスで指定（0から始まる）
+List<Person> persons = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
+    .sheetIndex(0)
+    .process(stream -> stream.collect(Collectors.toList()));
+
+// シート名で指定
+List<Person> persons = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
+    .sheetName("データ")
+    .process(stream -> stream.collect(Collectors.toList()));
+```
+
+#### ヘッダー行の自動検出
+
+```java
+// ヘッダー行を自動検出（上から10行以内で「名前」列を探す）
+List<Person> persons = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
+    .headerKey("名前")
+    .process(stream -> stream.collect(Collectors.toList()));
+
+// ヘッダー行の探索範囲を20行に拡張
+List<Person> persons = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
+    .headerKey("名前")
+    .headerSearchRows(20)
+    .process(stream -> stream.collect(Collectors.toList()));
+```
+
+#### 行のスキップ
+
+```java
+// 最初の2行をスキップ（タイトル行などがある場合）
+List<Person> persons = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
+    .skip(2)
+    .process(stream -> stream.collect(Collectors.toList()));
+```
+
+#### ヘッダーなしExcelの読み込み
+
+```java
+// 位置ベースのマッピングを使用
+List<PersonWithoutHeader> persons = ExcelStreamReader.builder(PersonWithoutHeader.class, Paths.get("no_header.xlsx"))
+    .usePositionMapping()
+    .process(stream -> stream.collect(Collectors.toList()));
+```
+
+#### フィルタ／マップなどのStream操作
+
+```java
+// 年齢30歳以上でフィルタ
+List<Person> filtered = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
+    .process(stream -> stream
+        .filter(p -> p.getAge() >= 30)
+        .collect(Collectors.toList()));
+
+// 名前だけを抽出
+List<String> names = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
+    .process(stream -> stream
+        .map(Person::getName)
+        .collect(Collectors.toList()));
+```
+
+#### メソッドチェーンで一気に
+
+```java
+List<Person> persons = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
+    .sheetIndex(0)
+    .skip(1)
+    .headerKey("名前")
+    .headerSearchRows(20)
+    .process(stream -> stream
+        .filter(p -> p.getAge() >= 25)
+        .collect(Collectors.toList()));
+```
+
+---
+
+## Excel書き込み機能 📝
+
+Apache POIをラップしたシンプルなExcel書き込みライブラリです。
+
+### ExcelStreamWriter（Stream APIでの書き込み）
+
+Streamを直接書き込めるライター。`ExcelStreamReader`とセットで使うと、ストリーム処理が完結するよ！
+
+#### 基本的な使い方
+
+```java
+import com.example.excel.writer.ExcelStreamWriter;
+import com.example.model.Person;
+import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.List;
+
+List<Person> persons = Arrays.asList(
+    new Person("田中太郎", 25, "エンジニア", "東京"),
+    new Person("佐藤花子", 30, "デザイナー", "大阪")
+);
+
+// 基本的な書き込み
+ExcelStreamWriter.builder(Person.class, Paths.get("output.xlsx"))
+    .write(persons.stream());
+```
+
+#### シート名の指定
+
+```java
+// シート名を指定
+ExcelStreamWriter.builder(Person.class, Paths.get("output.xlsx"))
+    .sheetName("社員データ")
+    .write(persons.stream());
+```
+
+#### ヘッダーなしExcelの書き込み
+
+```java
+// 位置ベースのマッピングを使用
+ExcelStreamWriter.builder(PersonWithoutHeader.class, Paths.get("output.xlsx"))
+    .usePositionMapping()
+    .write(persons.stream());
+```
+
+#### 既存ファイル（テンプレート）に書き込み
+
+```java
+// 既存のExcelファイルを開いて、指定したシートにデータを追加
+ExcelStreamWriter.builder(Person.class, Paths.get("template.xlsx"))
+    .loadExisting()           // 既存ファイルを読み込む
+    .sheetName("データ")       // シート名を指定
+    .startCell(2, 0)          // A3セルから書き込み開始（0ベース）
+    .write(persons.stream());
+```
+
+#### 開始セルの指定
+
+```java
+// 指定したセル位置から書き込み開始
+ExcelStreamWriter.builder(Person.class, Paths.get("output.xlsx"))
+    .startCell(3, 1)  // B4セルから書き込み開始（行: 3, 列: 1）
+    .write(persons.stream());
+```
+
+#### メソッドチェーンで一気に
+
+```java
+ExcelStreamWriter.builder(Person.class, Paths.get("output.xlsx"))
+    .sheetName("社員データ")
+    .loadExisting()
+    .startCell(2, 0)
+    .write(persons.stream()
+        .filter(p -> p.getAge() >= 30));
+```
+
+#### ExcelStreamReaderと組み合わせて使う
+
+```java
+// 読み込み → フィルタ → 書き込みの一連の流れ
+ExcelStreamReader.builder(Person.class, Paths.get("input.xlsx"))
+    .process(stream -> {
+        ExcelStreamWriter.builder(Person.class, Paths.get("output.xlsx"))
+            .write(stream.filter(p -> p.getAge() >= 30));
+    });
+```
+
+#### CSVStreamReaderと組み合わせて使う（CSV → Excel変換）
+
+```java
+import com.example.csv.reader.CsvStreamReader;
+import com.example.excel.writer.ExcelStreamWriter;
+
+// CSVから読み込んでExcelに書き込む
+CsvStreamReader.builder(Person.class, Paths.get("input.csv"))
+    .process(stream -> {
+        ExcelStreamWriter.builder(Person.class, Paths.get("output.xlsx"))
+            .sheetName("社員データ")
+            .write(stream);
+    });
+
+// CSVから読み込んでフィルタしてExcelに書き込む
+CsvStreamReader.builder(Person.class, Paths.get("input.csv"))
+    .charset(CharsetType.S_JIS)  // Shift_JISのCSVファイル
+    .process(stream -> {
+        ExcelStreamWriter.builder(Person.class, Paths.get("output.xlsx"))
+            .sheetName("30歳以上")
+            .write(stream.filter(p -> p.getAge() >= 30));
+    });
+```
+
+#### ExcelStreamReaderとCsvStreamWriterを組み合わせて使う（Excel → CSV変換）
+
+```java
+import com.example.excel.reader.ExcelStreamReader;
+import com.example.csv.writer.CsvStreamWriter;
+
+// Excelから読み込んでCSVに書き込む
+ExcelStreamReader.builder(Person.class, Paths.get("input.xlsx"))
+    .process(stream -> {
+        CsvStreamWriter.builder(Person.class, Paths.get("output.csv"))
+            .charset(CharsetType.UTF_8)
+            .write(stream);
+    });
+
+// Excelから読み込んでフィルタしてCSVに書き込む
+ExcelStreamReader.builder(Person.class, Paths.get("input.xlsx"))
+    .sheetName("データ")
+    .skip(1)  // タイトル行をスキップ
+    .process(stream -> {
+        CsvStreamWriter.builder(Person.class, Paths.get("output.csv"))
+            .charset(CharsetType.S_JIS)
+            .fileType(FileType.CSV)
+            .lineSeparator(LineSeparatorType.CRLF)
+            .write(stream.filter(p -> p.getAge() >= 25));
+    });
+```
+
+### 対応する型
+
+ExcelStreamWriterは以下の型を適切に変換してExcelファイルに書き込みます：
+
+- `String` - 文字列
+- `Integer` / `int` - 整数
+- `Long` / `long` - 長整数
+- `Double` / `double` - 浮動小数点数
+- `Boolean` / `boolean` - 真偽値
+- `LocalDate` - 日付（自動的に日付フォーマットで書き込まれます）
+- `LocalDateTime` - 日時（自動的に日時フォーマットで書き込まれます）
+- `Date` - 従来のDate型（自動的に日時フォーマットで書き込まれます）
+
+### 日付型の自動フォーマット
+
+日付型（`LocalDate`, `LocalDateTime`, `Date`）は自動的に適切なExcelの日付/日時フォーマットで書き込まれます。特別な設定は不要です。
 
 ---
 
