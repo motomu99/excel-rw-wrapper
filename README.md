@@ -107,14 +107,14 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.stream.Collectors;
 
-List<Person> persons = CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.csv"))
+List<Person> persons = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.csv"))
     .process(stream -> stream.collect(Collectors.toList()));
 ```
 
 #### フィルタ／マップなどのStream操作
 
 ```java
-List<String> namesOver30 = CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.csv"))
+List<String> namesOver30 = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.csv"))
     .process(stream -> stream
         .filter(p -> p.getAge() >= 30)
         .map(Person::getName)
@@ -124,7 +124,7 @@ List<String> namesOver30 = CsvStreamReader.of(Person.class, Paths.get("src/test/
 #### 行スキップ
 
 ```java
-List<Person> skipped = CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.csv"))
+List<Person> skipped = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.csv"))
     .skip(2)
     .process(stream -> stream.collect(Collectors.toList()));
 ```
@@ -135,11 +135,11 @@ List<Person> skipped = CsvStreamReader.of(Person.class, Paths.get("src/test/reso
 import com.example.common.config.CharsetType;
 import com.example.common.config.FileType;
 
-List<Person> sjis = CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample_sjis.csv"))
+List<Person> sjis = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample_sjis.csv"))
     .charset(CharsetType.S_JIS)
     .process(stream -> stream.collect(Collectors.toList()));
 
-List<Person> tsv = CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.tsv"))
+List<Person> tsv = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.tsv"))
     .fileType(FileType.TSV)
     .process(stream -> stream.collect(Collectors.toList()));
 ```
@@ -148,14 +148,14 @@ List<Person> tsv = CsvStreamReader.of(Person.class, Paths.get("src/test/resource
 
 ```java
 // ヘッダー付き（デフォルト）
-List<Person> withHeader = CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.csv"))
+List<Person> withHeader = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.csv"))
     .useHeaderMapping() // 省略可（デフォルト）
     .process(stream -> stream.collect(Collectors.toList()));
 
 // ヘッダーなし（位置ベース）
 import com.example.model.PersonWithoutHeader;
 
-List<PersonWithoutHeader> noHeader = CsvStreamReader.of(PersonWithoutHeader.class, Paths.get("src/test/resources/sample_no_header.csv"))
+List<PersonWithoutHeader> noHeader = CsvStreamReader.builder(PersonWithoutHeader.class, Paths.get("src/test/resources/sample_no_header.csv"))
     .usePositionMapping()
     .process(stream -> stream.collect(Collectors.toList()));
 ```
@@ -163,7 +163,7 @@ List<PersonWithoutHeader> noHeader = CsvStreamReader.of(PersonWithoutHeader.clas
 #### 戻り値なし（副作用系）
 
 ```java
-CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.csv"))
+CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.csv"))
     .process(stream -> {
         stream.forEach(p -> System.out.println(p.getName()));
     });
@@ -173,11 +173,11 @@ CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.csv"))
 
 ```java
 // 件数だけ欲しい場合
-long count = CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.csv"))
+long count = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.csv"))
     .process(stream -> stream.count());
 
 // メソッドチェーンで一気に
-List<String> names = CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.csv"))
+List<String> names = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.csv"))
     .skip(1)
     .charset(CharsetType.UTF_8)
     .fileType(FileType.CSV)
@@ -212,14 +212,14 @@ List<Person> persons = Arrays.asList(
     new Person("佐藤花子", 30, "デザイナー", "大阪")
 );
 
-CsvStreamWriter.of(Person.class, Paths.get("output.csv"))
+CsvStreamWriter.builder(Person.class, Paths.get("output.csv"))
     .write(persons.stream());
 ```
 
 #### フィルタ付き書き込み
 
 ```java
-CsvStreamWriter.of(Person.class, Paths.get("output.csv"))
+CsvStreamWriter.builder(Person.class, Paths.get("output.csv"))
     .write(persons.stream()
         .filter(p -> p.getAge() >= 30));
 ```
@@ -231,7 +231,7 @@ import com.example.common.config.CharsetType;
 import com.example.common.config.FileType;
 import com.example.common.config.LineSeparatorType;
 
-CsvStreamWriter.of(Person.class, Paths.get("output.tsv"))
+CsvStreamWriter.builder(Person.class, Paths.get("output.tsv"))
     .charset(CharsetType.S_JIS)           // 文字セット指定
     .fileType(FileType.TSV)                // TSVファイル
     .lineSeparator(LineSeparatorType.LF)   // 改行コード
@@ -242,14 +242,14 @@ CsvStreamWriter.of(Person.class, Paths.get("output.tsv"))
 
 ```java
 // ヘッダー付き（デフォルト）
-CsvStreamWriter.of(Person.class, Paths.get("output.csv"))
+CsvStreamWriter.builder(Person.class, Paths.get("output.csv"))
     .useHeaderMapping() // 省略可（デフォルト）
     .write(persons.stream());
 
 // ヘッダーなし（位置ベース）
 import com.example.model.PersonWithoutHeader;
 
-CsvStreamWriter.of(PersonWithoutHeader.class, Paths.get("output.csv"))
+CsvStreamWriter.builder(PersonWithoutHeader.class, Paths.get("output.csv"))
     .usePositionMapping()
     .write(persons.stream());
 ```
@@ -257,7 +257,7 @@ CsvStreamWriter.of(PersonWithoutHeader.class, Paths.get("output.csv"))
 #### メソッドチェーンで一気に
 
 ```java
-CsvStreamWriter.of(Person.class, Paths.get("output.csv"))
+CsvStreamWriter.builder(Person.class, Paths.get("output.csv"))
     .charset(CharsetType.UTF_8)
     .fileType(FileType.CSV)
     .lineSeparator(LineSeparatorType.LF)
@@ -271,9 +271,9 @@ CsvStreamWriter.of(Person.class, Paths.get("output.csv"))
 
 ```java
 // 読み込み → フィルタ → 書き込みの一連の流れ
-CsvStreamReader.of(Person.class, Paths.get("input.csv"))
+CsvStreamReader.builder(Person.class, Paths.get("input.csv"))
     .process(stream -> {
-        CsvStreamWriter.of(Person.class, Paths.get("output.csv"))
+        CsvStreamWriter.builder(Person.class, Paths.get("output.csv"))
             .write(stream.filter(p -> p.getAge() >= 30));
     });
 ```

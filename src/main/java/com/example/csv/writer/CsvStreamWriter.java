@@ -24,11 +24,11 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * CSVファイルにStreamを書き込むビルダークラス
- * ビルダーパターンを使用してCSV書き込み処理を抽象化
+ * Builderパターンを使用してCSV書き込み処理を抽象化
  * 
  * 使用例:
  * <pre>
- * CsvStreamWriter.of(Person.class, Paths.get("output.csv"))
+ * CsvStreamWriter.builder(Person.class, Paths.get("output.csv"))
  *     .charset(CharsetType.UTF_8)
  *     .fileType(FileType.CSV)
  *     .lineSeparator(LineSeparatorType.LF)
@@ -40,10 +40,10 @@ public class CsvStreamWriter<T> {
     
     private final Class<T> beanClass;
     private final Path filePath;
-    private CharsetType charsetType = CharsetType.UTF_8;
-    private FileType fileType = FileType.CSV;
-    private LineSeparatorType lineSeparatorType = LineSeparatorType.CRLF;
-    private boolean usePositionMapping = false;
+    CharsetType charsetType = CharsetType.UTF_8;
+    FileType fileType = FileType.CSV;
+    LineSeparatorType lineSeparatorType = LineSeparatorType.CRLF;
+    boolean usePositionMapping = false;
     
     private CsvStreamWriter(Class<T> beanClass, Path filePath) {
         this.beanClass = beanClass;
@@ -51,68 +51,15 @@ public class CsvStreamWriter<T> {
     }
     
     /**
-     * CsvStreamWriterのインスタンスを作成
+     * Builderインスタンスを生成
      * 
      * @param <T> Beanの型
      * @param beanClass マッピング元のBeanクラス
      * @param filePath CSVファイルのパス
-     * @return CsvStreamWriterのインスタンス
+     * @return Builderインスタンス
      */
-    public static <T> CsvStreamWriter<T> of(Class<T> beanClass, Path filePath) {
-        return new CsvStreamWriter<>(beanClass, filePath);
-    }
-    
-    /**
-     * 文字エンコーディングを設定
-     * 
-     * @param charsetType 文字エンコーディングタイプ
-     * @return このインスタンス
-     */
-    public CsvStreamWriter<T> charset(CharsetType charsetType) {
-        this.charsetType = charsetType;
-        return this;
-    }
-    
-    /**
-     * ファイルタイプを設定
-     * 
-     * @param fileType ファイルタイプ
-     * @return このインスタンス
-     */
-    public CsvStreamWriter<T> fileType(FileType fileType) {
-        this.fileType = fileType;
-        return this;
-    }
-    
-    /**
-     * 改行コードを設定
-     * 
-     * @param lineSeparatorType 改行コードタイプ
-     * @return このインスタンス
-     */
-    public CsvStreamWriter<T> lineSeparator(LineSeparatorType lineSeparatorType) {
-        this.lineSeparatorType = lineSeparatorType;
-        return this;
-    }
-    
-    /**
-     * 位置ベースマッピングを使用（ヘッダーなし）
-     * 
-     * @return このインスタンス
-     */
-    public CsvStreamWriter<T> usePositionMapping() {
-        this.usePositionMapping = true;
-        return this;
-    }
-    
-    /**
-     * ヘッダーベースマッピングを使用（ヘッダーあり、デフォルト）
-     * 
-     * @return このインスタンス
-     */
-    public CsvStreamWriter<T> useHeaderMapping() {
-        this.usePositionMapping = false;
-        return this;
+    public static <T> Builder<T> builder(Class<T> beanClass, Path filePath) {
+        return new Builder<>(beanClass, filePath);
     }
     
     /**
@@ -121,7 +68,7 @@ public class CsvStreamWriter<T> {
      * @param stream 書き込むBeanのStream
      * @throws IOException ファイル書き込みエラー
      */
-    public void write(Stream<T> stream) throws IOException {
+    private void write(Stream<T> stream) throws IOException {
         // Streamを一度Listに変換（OpenCSVの制約）
         List<T> beans = stream.collect(Collectors.toList());
         
@@ -151,6 +98,84 @@ public class CsvStreamWriter<T> {
         } catch (CsvDataTypeMismatchException | CsvRequiredFieldEmptyException e) {
             log.error("CSV書き込み中にデータ型エラーが発生: ファイルパス={}, エラー={}", filePath, e.getMessage(), e);
             throw new CsvWriteException("CSVデータの変換に失敗しました: " + filePath, e);
+        }
+    }
+    
+    /**
+     * CsvStreamWriterのBuilderクラス
+     * 
+     * <p>Builderパターンを使用して、CsvStreamWriterの設定を行います。
+     * メソッドチェーンで設定を積み重ね、最後に{@link #write(Stream)}を呼び出すことで
+     * CSVファイルに書き込みます。</p>
+     */
+    public static class Builder<T> {
+        private final CsvStreamWriter<T> writer;
+        
+        private Builder(Class<T> beanClass, Path filePath) {
+            this.writer = new CsvStreamWriter<>(beanClass, filePath);
+        }
+        
+        /**
+         * 文字エンコーディングを設定
+         * 
+         * @param charsetType 文字エンコーディングタイプ
+         * @return このBuilderインスタンス
+         */
+        public Builder<T> charset(CharsetType charsetType) {
+            writer.charsetType = charsetType;
+            return this;
+        }
+        
+        /**
+         * ファイルタイプを設定
+         * 
+         * @param fileType ファイルタイプ
+         * @return このBuilderインスタンス
+         */
+        public Builder<T> fileType(FileType fileType) {
+            writer.fileType = fileType;
+            return this;
+        }
+        
+        /**
+         * 改行コードを設定
+         * 
+         * @param lineSeparatorType 改行コードタイプ
+         * @return このBuilderインスタンス
+         */
+        public Builder<T> lineSeparator(LineSeparatorType lineSeparatorType) {
+            writer.lineSeparatorType = lineSeparatorType;
+            return this;
+        }
+        
+        /**
+         * 位置ベースマッピングを使用（ヘッダーなし）
+         * 
+         * @return このBuilderインスタンス
+         */
+        public Builder<T> usePositionMapping() {
+            writer.usePositionMapping = true;
+            return this;
+        }
+        
+        /**
+         * ヘッダーベースマッピングを使用（ヘッダーあり、デフォルト）
+         * 
+         * @return このBuilderインスタンス
+         */
+        public Builder<T> useHeaderMapping() {
+            writer.usePositionMapping = false;
+            return this;
+        }
+        
+        /**
+         * Streamを書き込む
+         * 
+         * @param stream 書き込むBeanのStream
+         * @throws IOException ファイル書き込みエラー
+         */
+        public void write(Stream<T> stream) throws IOException {
+            writer.write(stream);
         }
     }
 }

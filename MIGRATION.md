@@ -98,6 +98,43 @@ try {
 BOM (Byte Order Mark) 処理が独立したユーティリティクラスになりました。
 他のクラスでも再利用可能です。
 
+### 3. CsvStreamReader / CsvStreamWriter の builder() パターン統一
+
+`CsvStreamReader` と `CsvStreamWriter` が `of()` メソッドから `builder()` メソッドに統一されました。
+これにより、`CsvReaderWrapper` と `CsvWriterWrapper` と一貫したAPI設計になりました。
+
+#### CsvStreamReader
+
+**Before (旧API)**
+```java
+List<Person> persons = CsvStreamReader.of(Person.class, Paths.get("sample.csv"))
+    .charset(CharsetType.UTF_8)
+    .process(stream -> stream.collect(Collectors.toList()));
+```
+
+**After (新API - 推奨)**
+```java
+List<Person> persons = CsvStreamReader.builder(Person.class, Paths.get("sample.csv"))
+    .charset(CharsetType.UTF_8)
+    .process(stream -> stream.collect(Collectors.toList()));
+```
+
+#### CsvStreamWriter
+
+**Before (旧API)**
+```java
+CsvStreamWriter.of(Person.class, Paths.get("output.csv"))
+    .charset(CharsetType.UTF_8)
+    .write(persons.stream());
+```
+
+**After (新API - 推奨)**
+```java
+CsvStreamWriter.builder(Person.class, Paths.get("output.csv"))
+    .charset(CharsetType.UTF_8)
+    .write(persons.stream());
+```
+
 ```java
 // 読み込み時のBOMスキップ
 InputStream is = BomSkipper.skip(fileInputStream);

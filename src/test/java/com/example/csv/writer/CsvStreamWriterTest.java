@@ -4,7 +4,6 @@ import com.example.common.config.CharsetType;
 import com.example.common.config.FileType;
 import com.example.common.config.LineSeparatorType;
 import com.example.csv.reader.CsvReaderWrapper;
-import com.example.csv.writer.CsvStreamWriter;
 import com.example.model.Person;
 import com.example.model.PersonWithoutHeader;
 
@@ -50,7 +49,7 @@ public class CsvStreamWriterTest {
         persons.add(new Person("鈴木花子", 32, "デザイナー", "京都"));
         persons.add(new Person("高橋次郎", 45, "マネージャー", "福岡"));
 
-        CsvStreamWriter.of(Person.class, outputPath)
+        CsvStreamWriter.builder(Person.class, outputPath)
             .write(persons.stream());
 
         // ファイルが作成されたことを確認
@@ -77,7 +76,7 @@ public class CsvStreamWriterTest {
         persons.add(new Person("鈴木花子", 32, "デザイナー", "京都"));
         persons.add(new Person("高橋次郎", 45, "マネージャー", "福岡"));
 
-        CsvStreamWriter.of(Person.class, outputPath)
+        CsvStreamWriter.builder(Person.class, outputPath)
             .write(persons.stream()
                 .filter(person -> person.getAge() >= 30));
 
@@ -103,7 +102,7 @@ public class CsvStreamWriterTest {
         persons.add(new Person("テスト太郎", 25, "エンジニア", "東京"));
         persons.add(new Person("テスト花子", 30, "デザイナー", "大阪"));
 
-        CsvStreamWriter.of(Person.class, outputPath)
+        CsvStreamWriter.builder(Person.class, outputPath)
             .charset(CharsetType.S_JIS)
             .write(persons.stream());
 
@@ -130,7 +129,7 @@ public class CsvStreamWriterTest {
         persons.add(new Person("山田太郎", 28, "プログラマー", "神奈川"));
         persons.add(new Person("鈴木花子", 32, "デザイナー", "京都"));
 
-        CsvStreamWriter.of(Person.class, outputPath)
+        CsvStreamWriter.builder(Person.class, outputPath)
             .fileType(FileType.TSV)
             .write(persons.stream());
 
@@ -157,7 +156,7 @@ public class CsvStreamWriterTest {
         persons.add(new Person("山田太郎", 28, "プログラマー", "神奈川"));
         persons.add(new Person("鈴木花子", 32, "デザイナー", "京都"));
 
-        CsvStreamWriter.of(Person.class, outputPath)
+        CsvStreamWriter.builder(Person.class, outputPath)
             .lineSeparator(LineSeparatorType.LF)
             .write(persons.stream());
 
@@ -181,7 +180,7 @@ public class CsvStreamWriterTest {
         persons.add(new PersonWithoutHeader("山田太郎", 28, "プログラマー", "神奈川"));
         persons.add(new PersonWithoutHeader("鈴木花子", 32, "デザイナー", "京都"));
 
-        CsvStreamWriter.of(PersonWithoutHeader.class, outputPath)
+        CsvStreamWriter.builder(PersonWithoutHeader.class, outputPath)
             .usePositionMapping()
             .write(persons.stream());
 
@@ -205,7 +204,7 @@ public class CsvStreamWriterTest {
         persons.add(new Person("山田太郎", 28, "プログラマー", "神奈川"));
         persons.add(new Person("鈴木花子", 32, "デザイナー", "京都"));
 
-        CsvStreamWriter.of(Person.class, outputPath)
+        CsvStreamWriter.builder(Person.class, outputPath)
             .useHeaderMapping()
             .write(persons.stream());
 
@@ -231,7 +230,7 @@ public class CsvStreamWriterTest {
         persons.add(new Person("高橋次郎", 45, "マネージャー", "福岡"));
         persons.add(new Person("田中美咲", 22, "学生", "北海道"));
 
-        CsvStreamWriter.of(Person.class, outputPath)
+        CsvStreamWriter.builder(Person.class, outputPath)
             .charset(CharsetType.UTF_8)
             .fileType(FileType.CSV)
             .lineSeparator(LineSeparatorType.LF)
@@ -259,7 +258,7 @@ public class CsvStreamWriterTest {
         Path outputPath = Paths.get("src/test/resources/output_stream_empty_test.csv");
         filesToDelete.add(outputPath);
 
-        CsvStreamWriter.of(Person.class, outputPath)
+        CsvStreamWriter.builder(Person.class, outputPath)
             .write(Stream.empty());
 
         // ファイルが作成されたことを確認
