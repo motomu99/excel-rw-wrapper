@@ -28,6 +28,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 @DisplayName("ExcelStreamWriter: Stream APIを使用したExcel書き込み")
@@ -355,7 +356,7 @@ public class ExcelStreamWriterTest {
         
         // 読み込み
         List<Person> readPersons = ExcelStreamReader.of(Person.class, outputPath)
-            .process(stream -> stream.toList());
+            .process((Function<Stream<Person>, List<Person>>) stream -> stream.toList());
         
         assertEquals(3, readPersons.size());
         assertEquals("田中太郎", readPersons.get(0).getName());
@@ -380,7 +381,7 @@ public class ExcelStreamWriterTest {
         
         // 読み込み
         List<PersonWithAllTypes> readPersons = ExcelStreamReader.of(PersonWithAllTypes.class, outputPath)
-            .process(stream -> stream.toList());
+            .process((Function<Stream<PersonWithAllTypes>, List<PersonWithAllTypes>>) stream -> stream.toList());
         
         assertEquals(2, readPersons.size());
         assertEquals("田中太郎", readPersons.get(0).getName());
@@ -405,7 +406,7 @@ public class ExcelStreamWriterTest {
         
         // 読み込み
         List<PersonWithDate> readPersons = ExcelStreamReader.of(PersonWithDate.class, outputPath)
-            .process(stream -> stream.toList());
+            .process((Function<Stream<PersonWithDate>, List<PersonWithDate>>) stream -> stream.toList());
         
         assertEquals(1, readPersons.size());
         assertEquals("田中太郎", readPersons.get(0).getName());
@@ -514,7 +515,7 @@ public class ExcelStreamWriterTest {
         
         // 読み込んで確認
         List<Person> readPersons = ExcelStreamReader.of(Person.class, outputPath)
-            .process(stream -> stream.toList());
+            .process((Function<Stream<Person>, List<Person>>) stream -> stream.toList());
         
         assertEquals(2, readPersons.size());
         assertEquals("田中\"太郎\"", readPersons.get(0).getName());

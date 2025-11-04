@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.Spliterators;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -249,6 +250,19 @@ public class ExcelStreamReader<T> {
             log.error("Excel処理中にエラーが発生: ファイルパス={}, エラー={}", filePath, e.getMessage(), e);
             throw new IOException("Excel処理中にエラーが発生しました", e);
         }
+    }
+
+    /**
+     * 戻り値不要の処理用ショートカット
+     *
+     * @param consumer Streamを消費する処理
+     * @throws IOException ファイル読み込みエラー
+     */
+    public void process(Consumer<Stream<T>> consumer) throws IOException {
+        process(stream -> {
+            consumer.accept(stream);
+            return null;
+        });
     }
 
     /**

@@ -16,6 +16,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 /**
  * 🔥 真のストリーミング処理デモ 🔥
@@ -59,7 +62,7 @@ public class RealStreamingDemo {
         
         AtomicInteger savedCount = new AtomicInteger(0);
         ExcelStreamReader.of(Person.class, largeExcel)
-            .process(stream -> {
+            .process((Consumer<Stream<Person>>) (stream -> {
                 stream.forEach(person -> {
                     // ここで1件ずつDB保存（実際のコード例）
                     // personRepository.save(person);
@@ -73,8 +76,7 @@ public class RealStreamingDemo {
                         System.out.println("   💾 保存完了: " + savedCount.get() + "件");
                     }
                 });
-                return null;
-            });
+            }));
         
         long elapsed = System.currentTimeMillis() - startTime;
         System.out.println("   ✅ 全件保存完了！ 件数: " + savedCount.get() + "件");
@@ -93,7 +95,7 @@ public class RealStreamingDemo {
         final int BATCH_SIZE = 100;
         
         ExcelStreamReader.of(Person.class, largeExcel)
-            .process(stream -> {
+            .process((Consumer<Stream<Person>>) (stream -> {
                 stream.forEach(person -> {
                     batch.add(person);
                     
@@ -118,8 +120,7 @@ public class RealStreamingDemo {
                     batchCount.addAndGet(batch.size());
                     batch.clear();
                 }
-                return null;
-            });
+            }));
         
         elapsed = System.currentTimeMillis() - startTime;
         System.out.println("   ✅ バッチ保存完了！ 件数: " + batchCount.get() + "件");
@@ -135,21 +136,21 @@ public class RealStreamingDemo {
         
         // カウント
         long totalCount = ExcelStreamReader.of(Person.class, largeExcel)
-            .process(stream -> stream.count());
+            .process((Function<Stream<Person>, Long>) (Stream::count));
         
         // 平均年齢
         double averageAge = ExcelStreamReader.of(Person.class, largeExcel)
-            .process(stream -> stream
+            .process((Function<Stream<Person>, Double>) (stream -> stream
                 .mapToInt(Person::getAge)
                 .average()
-                .orElse(0.0));
+                .orElse(0.0)));
         
         // 最高年齢
         int maxAge = ExcelStreamReader.of(Person.class, largeExcel)
-            .process(stream -> stream
+            .process((Function<Stream<Person>, Integer>) (stream -> stream
                 .mapToInt(Person::getAge)
                 .max()
-                .orElse(0));
+                .orElse(0)));
         
         elapsed = System.currentTimeMillis() - startTime;
         System.out.println("   ✅ 集計完了！");
@@ -168,15 +169,14 @@ public class RealStreamingDemo {
         
         AtomicInteger processedCount = new AtomicInteger(0);
         ExcelStreamReader.of(Person.class, largeExcel)
-            .process(stream -> {
+            .process((Consumer<Stream<Person>>) (stream -> {
                 stream
                     .limit(100)  // 最初の100件だけ！
                     .forEach(person -> {
                         // 処理
                         processedCount.incrementAndGet();
                     });
-                return null;
-            });
+            }));
         
         elapsed = System.currentTimeMillis() - startTime;
         System.out.println("   ✅ 処理完了！ 件数: " + processedCount.get() + "件");

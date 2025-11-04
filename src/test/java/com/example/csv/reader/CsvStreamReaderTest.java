@@ -15,6 +15,7 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.function.Function;
 import com.opencsv.exceptions.CsvException;
 
 @DisplayName("CsvStreamReader: Stream APIを使用したCSV読み込み")
@@ -26,7 +27,7 @@ public class CsvStreamReaderTest {
         // 基本的なStream処理のテスト
         
         List<Person> result = CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.csv"))
-            .process(stream -> stream.collect(Collectors.toList()));
+            .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
         
         assertNotNull(result);
         assertEquals(5, result.size()); // ヘッダーを除いた5件のデータ
@@ -45,7 +46,7 @@ public class CsvStreamReaderTest {
         // フィルタリング付きのStream処理のテスト
         
         List<Person> result = CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.csv"))
-            .process(stream -> stream
+            .process((Function<Stream<Person>, List<Person>>) stream -> stream
                 .filter(person -> person.getAge() >= 30)
                 .collect(Collectors.toList()));
         
@@ -62,7 +63,7 @@ public class CsvStreamReaderTest {
         // マッピング付きのStream処理のテスト
         
         List<String> names = CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.csv"))
-            .process(stream -> stream
+            .process((Function<Stream<Person>, List<String>>) stream -> stream
                 .map(Person::getName)
                 .collect(Collectors.toList()));
         
@@ -79,7 +80,7 @@ public class CsvStreamReaderTest {
         
         List<Person> result = CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.csv"))
             .skip(2)
-            .process(stream -> stream.collect(Collectors.toList()));
+            .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
         
         assertNotNull(result);
         assertEquals(3, result.size()); // 2行スキップして3件
@@ -96,7 +97,7 @@ public class CsvStreamReaderTest {
         
         List<Person> result = CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample_sjis.csv"))
             .charset(CharsetType.S_JIS)
-            .process(stream -> stream.collect(Collectors.toList()));
+            .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
         
         assertNotNull(result);
         assertEquals(5, result.size());
@@ -113,7 +114,7 @@ public class CsvStreamReaderTest {
         
         List<Person> result = CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.tsv"))
             .fileType(FileType.TSV)
-            .process(stream -> stream.collect(Collectors.toList()));
+            .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
         
         assertNotNull(result);
         assertEquals(5, result.size());
@@ -130,7 +131,7 @@ public class CsvStreamReaderTest {
         
         List<PersonWithoutHeader> result = CsvStreamReader.of(PersonWithoutHeader.class, Paths.get("src/test/resources/sample_no_header.csv"))
             .usePositionMapping()
-            .process(stream -> stream.collect(Collectors.toList()));
+            .process((Function<Stream<PersonWithoutHeader>, List<PersonWithoutHeader>>) stream -> stream.collect(Collectors.toList()));
         
         assertNotNull(result);
         assertEquals(5, result.size());
@@ -148,7 +149,7 @@ public class CsvStreamReaderTest {
         
         List<Person> result = CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.csv"))
             .useHeaderMapping()
-            .process(stream -> stream.collect(Collectors.toList()));
+            .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
         
         assertNotNull(result);
         assertEquals(5, result.size());
@@ -168,7 +169,7 @@ public class CsvStreamReaderTest {
             .charset(CharsetType.UTF_8)
             .fileType(FileType.CSV)
             .useHeaderMapping()
-            .process(stream -> stream
+            .process((Function<Stream<Person>, List<String>>) stream -> stream
                 .filter(person -> person.getAge() >= 25)
                 .map(Person::getName)
                 .collect(Collectors.toList()));
@@ -187,7 +188,7 @@ public class CsvStreamReaderTest {
         // カウント操作のテスト
         
         Long count = CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.csv"))
-            .process(Stream::count);
+            .process((Function<Stream<Person>, Long>) (Stream::count));
         
         assertNotNull(count);
         assertEquals(5L, count);
@@ -203,11 +204,41 @@ public class CsvStreamReaderTest {
         CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.csv"))
             .process(stream -> {
                 stream.forEach(person -> names.append(person.getName()).append(","));
-                return null;
             });
         
         String result = names.toString();
         assertTrue(result.contains("田中太郎"));
         assertTrue(result.contains("佐藤花子"));
+    }
+
+    @Test
+    @DisplayName("Consumerオーバーロード - 戻り値なしで副作用処理ができること")
+    void testConsumerOverloadBasic() throws IOException, CsvException {
+        StringBuilder names = new StringBuilder();
+
+        CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.csv"))
+            .process(stream -> {
+                stream.map(Person::getName).forEach(name -> names.append(name).append(","));
+            });
+
+        String result = names.toString();
+        assertTrue(result.contains("田中太郎"));
+        assertTrue(result.contains("佐藤花子"));
+        assertTrue(result.contains("山田次郎"));
+    }
+
+    @Test
+    @DisplayName("Consumerオーバーロード + skip - 行スキップ後に副作用処理できること")
+    void testConsumerOverloadWithSkip() throws IOException, CsvException {
+        StringBuilder names = new StringBuilder();
+
+        CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.csv"))
+            .skip(2)
+            .process((java.util.function.Consumer<Stream<Person>>) (stream -> stream.forEach(person -> names.append(person.getName()).append(","))));
+
+        String result = names.toString();
+        assertFalse(result.contains("田中太郎")); // スキップされているはず
+        assertFalse(result.contains("佐藤花子")); // スキップされているはず
+        assertTrue(result.contains("山田次郎"));
     }
 }

@@ -7,6 +7,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.function.Function;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import com.opencsv.exceptions.CsvException;
@@ -149,6 +150,20 @@ public class CsvStreamReader<T> {
             log.error("CSVファイル読み込み中にエラーが発生: ファイルパス={}, エラー={}", filePath, e.getMessage(), e);
             throw new CsvReadException("CSVファイルの読み込みに失敗しました: " + filePath, e);
         }
+    }
+
+    /**
+     * 戻り値不要の処理用ショートカット
+     * 
+     * @param consumer Streamを消費する処理
+     * @throws IOException ファイル読み込みエラー
+     * @throws CsvException CSV解析エラー
+     */
+    public void process(Consumer<Stream<T>> consumer) throws IOException, CsvException {
+        process(stream -> {
+            consumer.accept(stream);
+            return null;
+        });
     }
 }
 

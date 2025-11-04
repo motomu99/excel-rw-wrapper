@@ -14,6 +14,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -44,7 +46,7 @@ public class LargeExcelStreamDemo {
         
         // 全件数をカウント
         long totalCount = ExcelStreamReader.of(Person.class, largeExcel)
-            .process(stream -> stream.count());
+            .process((Function<Stream<Person>, Long>) (Stream::count));
         
         long endTime = System.currentTimeMillis();
         System.out.println("✅ 読み込み完了！ 件数: " + totalCount + "件");
@@ -56,7 +58,7 @@ public class LargeExcelStreamDemo {
         startTime = System.currentTimeMillis();
         
         List<Person> filtered = ExcelStreamReader.of(Person.class, largeExcel)
-            .process(stream -> stream
+            .process((Function<Stream<Person>, List<Person>>) stream -> stream
                 .filter(person -> person.getAge() >= 30)
                 .limit(10)  // 最初の10件のみ取得
                 .collect(Collectors.toList()));
@@ -78,7 +80,7 @@ public class LargeExcelStreamDemo {
         startTime = System.currentTimeMillis();
         
         List<String> names = ExcelStreamReader.of(Person.class, largeExcel)
-            .process(stream -> stream
+            .process((Function<Stream<Person>, List<String>>) stream -> stream
                 .map(Person::getName)
                 .limit(10)
                 .collect(Collectors.toList()));
