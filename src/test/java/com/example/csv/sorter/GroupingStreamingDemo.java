@@ -59,7 +59,7 @@ public class GroupingStreamingDemo {
         // 職業ごとの人数と平均年齢
         Map<String, OccupationStats> statsMap = new ConcurrentHashMap<>();
         
-        ExcelStreamReader.of(Person.class, largeExcel)
+        ExcelStreamReader.builder(Person.class, largeExcel)
             .process(stream -> {
                 stream.forEach(person -> {
                     String occupation = person.getOccupation();
@@ -93,7 +93,7 @@ public class GroupingStreamingDemo {
         Map<String, List<Person>> batchMap = new HashMap<>();
         Map<String, Integer> saveCount = new HashMap<>();
         
-        ExcelStreamReader.of(Person.class, largeExcel)
+        ExcelStreamReader.builder(Person.class, largeExcel)
             .process(stream -> {
                 stream.forEach(person -> {
                     String occupation = person.getOccupation();
@@ -146,7 +146,7 @@ public class GroupingStreamingDemo {
         Map<String, TopNCollector> topNMap = new HashMap<>();
         final int TOP_N = 10;
         
-        ExcelStreamReader.of(Person.class, largeExcel)
+        ExcelStreamReader.builder(Person.class, largeExcel)
             .process(stream -> {
                 stream.forEach(person -> {
                     String city = person.getBirthplace();
@@ -179,7 +179,7 @@ public class GroupingStreamingDemo {
         
         Map<String, AtomicInteger> seniorCount = new HashMap<>();
         
-        ExcelStreamReader.of(Person.class, largeExcel)
+        ExcelStreamReader.builder(Person.class, largeExcel)
             .process(stream -> {
                 stream
                     .filter(person -> person.getAge() >= 50)  // 50歳以上のみ

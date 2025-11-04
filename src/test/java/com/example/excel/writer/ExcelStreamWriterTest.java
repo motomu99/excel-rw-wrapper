@@ -53,7 +53,7 @@ public class ExcelStreamWriterTest {
             new Person("山田次郎", 28, "営業", "福岡")
         );
         
-        ExcelStreamWriter.of(Person.class, outputPath)
+        ExcelStreamWriter.builder(Person.class, outputPath)
             .write(persons.stream());
         
         // ファイルが作成されたことを確認
@@ -90,7 +90,7 @@ public class ExcelStreamWriterTest {
     void testWriteEmptyStream() throws IOException {
         Path outputPath = TEST_OUTPUT_DIR.resolve("empty_stream.xlsx");
         
-        ExcelStreamWriter.of(Person.class, outputPath)
+        ExcelStreamWriter.builder(Person.class, outputPath)
             .write(Stream.empty());
         
         assertTrue(Files.exists(outputPath));
@@ -118,7 +118,7 @@ public class ExcelStreamWriterTest {
             new Person("田中太郎", 25, "エンジニア", "東京")
         );
         
-        ExcelStreamWriter.of(Person.class, outputPath)
+        ExcelStreamWriter.builder(Person.class, outputPath)
             .sheetName("社員データ")
             .write(persons.stream());
         
@@ -163,7 +163,7 @@ public class ExcelStreamWriterTest {
             new PersonWithAllTypes("山田次郎", 28, 3003L, 500000.0, true)
         );
         
-        ExcelStreamWriter.of(PersonWithAllTypes.class, outputPath)
+        ExcelStreamWriter.builder(PersonWithAllTypes.class, outputPath)
             .write(persons.stream());
         
         assertTrue(Files.exists(outputPath));
@@ -204,7 +204,7 @@ public class ExcelStreamWriterTest {
             new PersonWithDate("佐藤花子", LocalDate.of(1985, 12, 25), LocalDateTime.of(2024, 2, 20, 15, 45, 30))
         );
         
-        ExcelStreamWriter.of(PersonWithDate.class, outputPath)
+        ExcelStreamWriter.builder(PersonWithDate.class, outputPath)
             .write(persons.stream());
         
         assertTrue(Files.exists(outputPath));
@@ -238,7 +238,7 @@ public class ExcelStreamWriterTest {
             new PersonWithoutHeader("佐藤花子", 30, "デザイナー", "大阪")
         );
         
-        ExcelStreamWriter.of(PersonWithoutHeader.class, outputPath)
+        ExcelStreamWriter.builder(PersonWithoutHeader.class, outputPath)
             .usePositionMapping()
             .write(persons.stream());
         
@@ -275,7 +275,7 @@ public class ExcelStreamWriterTest {
             persons.add(new Person("田中太郎" + i, 20 + (i % 50), "エンジニア", "東京"));
         }
         
-        ExcelStreamWriter.of(Person.class, outputPath)
+        ExcelStreamWriter.builder(Person.class, outputPath)
             .write(persons.stream());
         
         assertTrue(Files.exists(outputPath));
@@ -298,7 +298,7 @@ public class ExcelStreamWriterTest {
             new Person("佐藤花子", 30, "デザイナー", null)
         );
         
-        ExcelStreamWriter.of(Person.class, outputPath)
+        ExcelStreamWriter.builder(Person.class, outputPath)
             .write(persons.stream());
         
         assertTrue(Files.exists(outputPath));
@@ -324,7 +324,7 @@ public class ExcelStreamWriterTest {
             new Person("田中太郎", 25, "エンジニア", "東京")
         );
         
-        ExcelStreamWriter.of(Person.class, outputPath)
+        ExcelStreamWriter.builder(Person.class, outputPath)
             .sheetName("シート1")
             .write(persons.stream());
         
@@ -351,11 +351,11 @@ public class ExcelStreamWriterTest {
         );
         
         // 書き込み
-        ExcelStreamWriter.of(Person.class, outputPath)
+        ExcelStreamWriter.builder(Person.class, outputPath)
             .write(originalPersons.stream());
         
         // 読み込み
-        List<Person> readPersons = ExcelStreamReader.of(Person.class, outputPath)
+        List<Person> readPersons = ExcelStreamReader.builder(Person.class, outputPath)
             .process((Function<Stream<Person>, List<Person>>) stream -> stream.toList());
         
         assertEquals(3, readPersons.size());
@@ -376,11 +376,11 @@ public class ExcelStreamWriterTest {
         );
         
         // 書き込み
-        ExcelStreamWriter.of(PersonWithAllTypes.class, outputPath)
+        ExcelStreamWriter.builder(PersonWithAllTypes.class, outputPath)
             .write(originalPersons.stream());
         
         // 読み込み
-        List<PersonWithAllTypes> readPersons = ExcelStreamReader.of(PersonWithAllTypes.class, outputPath)
+        List<PersonWithAllTypes> readPersons = ExcelStreamReader.builder(PersonWithAllTypes.class, outputPath)
             .process((Function<Stream<PersonWithAllTypes>, List<PersonWithAllTypes>>) stream -> stream.toList());
         
         assertEquals(2, readPersons.size());
@@ -401,11 +401,11 @@ public class ExcelStreamWriterTest {
         );
         
         // 書き込み
-        ExcelStreamWriter.of(PersonWithDate.class, outputPath)
+        ExcelStreamWriter.builder(PersonWithDate.class, outputPath)
             .write(originalPersons.stream());
         
         // 読み込み
-        List<PersonWithDate> readPersons = ExcelStreamReader.of(PersonWithDate.class, outputPath)
+        List<PersonWithDate> readPersons = ExcelStreamReader.builder(PersonWithDate.class, outputPath)
             .process((Function<Stream<PersonWithDate>, List<PersonWithDate>>) stream -> stream.toList());
         
         assertEquals(1, readPersons.size());
@@ -424,7 +424,7 @@ public class ExcelStreamWriterTest {
         );
         
         assertThrows(IOException.class, () -> {
-            ExcelStreamWriter.of(Person.class, invalidPath)
+            ExcelStreamWriter.builder(Person.class, invalidPath)
                 .write(persons.stream());
         });
     }
@@ -439,7 +439,7 @@ public class ExcelStreamWriterTest {
         );
         
         // sheetIndex() メソッドを呼び出す（カバレッジ向上のため）
-        ExcelStreamWriter.of(Person.class, outputPath)
+        ExcelStreamWriter.builder(Person.class, outputPath)
             .sheetIndex(0)
             .sheetName("データ")
             .write(persons.stream());
@@ -464,7 +464,7 @@ public class ExcelStreamWriterTest {
             new Person("佐藤花子", 30, "デザイナー", "大阪")
         );
         
-        ExcelStreamWriter.of(Person.class, outputPath)
+        ExcelStreamWriter.builder(Person.class, outputPath)
             .useHeaderMapping()
             .write(persons.stream());
         
@@ -489,7 +489,7 @@ public class ExcelStreamWriterTest {
             new Person("田中太郎", 25, "エンジニア", "東京")
         );
         
-        ExcelStreamWriter.of(Person.class, outputPath)
+        ExcelStreamWriter.builder(Person.class, outputPath)
             .sheetName("テスト")
             .sheetIndex(0)
             .useHeaderMapping()
@@ -508,13 +508,13 @@ public class ExcelStreamWriterTest {
             new Person("佐藤,花子", 30, "デザイナー", "大阪,京都")
         );
         
-        ExcelStreamWriter.of(Person.class, outputPath)
+        ExcelStreamWriter.builder(Person.class, outputPath)
             .write(persons.stream());
         
         assertTrue(Files.exists(outputPath));
         
         // 読み込んで確認
-        List<Person> readPersons = ExcelStreamReader.of(Person.class, outputPath)
+        List<Person> readPersons = ExcelStreamReader.builder(Person.class, outputPath)
             .process((Function<Stream<Person>, List<Person>>) stream -> stream.toList());
         
         assertEquals(2, readPersons.size());
@@ -533,7 +533,7 @@ public class ExcelStreamWriterTest {
         );
         
         // B3セル（行2、列1）から書き込み開始
-        ExcelStreamWriter.of(Person.class, outputPath)
+        ExcelStreamWriter.builder(Person.class, outputPath)
             .startCell(2, 1)
             .write(persons.stream());
         
@@ -585,7 +585,7 @@ public class ExcelStreamWriterTest {
             new Person("佐藤花子", 30, "デザイナー", "大阪")
         );
         
-        ExcelStreamWriter.of(Person.class, templatePath)
+        ExcelStreamWriter.builder(Person.class, templatePath)
             .sheetName("テンプレート")
             .startCell(2, 0)  // A3セルから書き込み
             .loadExisting()
@@ -639,7 +639,7 @@ public class ExcelStreamWriterTest {
             new Person("田中太郎", 25, "エンジニア", "東京")
         );
         
-        ExcelStreamWriter.of(Person.class, existingPath)
+        ExcelStreamWriter.builder(Person.class, existingPath)
             .sheetName("新規シート")
             .loadExisting()
             .write(persons.stream());
@@ -671,7 +671,7 @@ public class ExcelStreamWriterTest {
         );
         
         // 新規ファイルでもstartCell()を使用可能
-        ExcelStreamWriter.of(Person.class, outputPath)
+        ExcelStreamWriter.builder(Person.class, outputPath)
             .startCell(5, 3)  // D6セルから開始
             .write(persons.stream());
         

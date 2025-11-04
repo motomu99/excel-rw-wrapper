@@ -6,7 +6,7 @@
 
 ```java
 // ❌ これはNG！全件メモリに載る！
-List<Person> allData = ExcelStreamReader.of(Person.class, path)
+List<Person> allData = ExcelStreamReader.builder(Person.class, path)
     .process(stream -> stream.collect(Collectors.toList()));
 // ↑ 10万件とかあったらメモリ不足で死ぬ！
 ```
@@ -16,7 +16,7 @@ List<Person> allData = ExcelStreamReader.of(Person.class, path)
 ### 1. forEach で1件ずつDB保存（メモリ最小）
 
 ```java
-ExcelStreamReader.of(Person.class, path)
+ExcelStreamReader.builder(Person.class, path)
     .process(stream -> {
         stream.forEach(person -> {
             // 1件ずつDB保存
@@ -37,7 +37,7 @@ ExcelStreamReader.of(Person.class, path)
 List<Person> batch = new ArrayList<>();
 final int BATCH_SIZE = 100;
 
-ExcelStreamReader.of(Person.class, path)
+ExcelStreamReader.builder(Person.class, path)
     .process(stream -> {
         stream.forEach(person -> {
             batch.add(person);
@@ -65,18 +65,18 @@ ExcelStreamReader.of(Person.class, path)
 
 ```java
 // 件数カウント
-long totalCount = ExcelStreamReader.of(Person.class, path)
+long totalCount = ExcelStreamReader.builder(Person.class, path)
     .process(stream -> stream.count());
 
 // 平均年齢
-double averageAge = ExcelStreamReader.of(Person.class, path)
+double averageAge = ExcelStreamReader.builder(Person.class, path)
     .process(stream -> stream
         .mapToInt(Person::getAge)
         .average()
         .orElse(0.0));
 
 // 最高年齢
-int maxAge = ExcelStreamReader.of(Person.class, path)
+int maxAge = ExcelStreamReader.builder(Person.class, path)
     .process(stream -> stream
         .mapToInt(Person::getAge)
         .max()
@@ -89,7 +89,7 @@ int maxAge = ExcelStreamReader.of(Person.class, path)
 ### 4. フィルタリング＋1件ずつ処理
 
 ```java
-ExcelStreamReader.of(Person.class, path)
+ExcelStreamReader.builder(Person.class, path)
     .process(stream -> {
         stream
             .filter(person -> person.getAge() >= 30)  // 30歳以上
@@ -107,7 +107,7 @@ ExcelStreamReader.of(Person.class, path)
 ### 5. 必要な件数だけ処理（早期終了）
 
 ```java
-ExcelStreamReader.of(Person.class, path)
+ExcelStreamReader.builder(Person.class, path)
     .process(stream -> {
         stream
             .limit(1000)  // 最初の1000件だけ
@@ -124,7 +124,7 @@ ExcelStreamReader.of(Person.class, path)
 
 ```java
 try (BufferedWriter writer = Files.newBufferedWriter(outputPath)) {
-    ExcelStreamReader.of(Person.class, path)
+    ExcelStreamReader.builder(Person.class, path)
         .process(stream -> {
             stream.forEach(person -> {
                 try {
@@ -148,7 +148,7 @@ try (BufferedWriter writer = Files.newBufferedWriter(outputPath)) {
 
 ```java
 // ❌ NG！
-List<Person> all = ExcelStreamReader.of(Person.class, path)
+List<Person> all = ExcelStreamReader.builder(Person.class, path)
     .process(stream -> stream.collect(Collectors.toList()));
 ```
 
@@ -156,7 +156,7 @@ List<Person> all = ExcelStreamReader.of(Person.class, path)
 
 ```java
 // ❌ NG！
-Map<String, Person> map = ExcelStreamReader.of(Person.class, path)
+Map<String, Person> map = ExcelStreamReader.builder(Person.class, path)
     .process(stream -> stream.collect(
         Collectors.toMap(Person::getName, p -> p)
     ));
@@ -166,7 +166,7 @@ Map<String, Person> map = ExcelStreamReader.of(Person.class, path)
 
 ```java
 // ❌ NG！
-ExcelStreamReader.of(Person.class, path)
+ExcelStreamReader.builder(Person.class, path)
     .process(stream -> {
         List<Person> list = stream.collect(Collectors.toList());  // 全件メモリに！
         list.forEach(p -> save(p));  // これじゃ意味ない
@@ -199,7 +199,7 @@ public class PersonImportService {
         List<Person> batch = new ArrayList<>();
         final int BATCH_SIZE = 1000;
         
-        ExcelStreamReader.of(Person.class, excelPath)
+        ExcelStreamReader.builder(Person.class, excelPath)
             .headerKey("名前")  // ヘッダー自動検出
             .process(stream -> {
                 stream.forEach(person -> {
@@ -228,7 +228,7 @@ public class PersonImportService {
 ```java
 AtomicInteger processedCount = new AtomicInteger(0);
 
-ExcelStreamReader.of(Person.class, path)
+ExcelStreamReader.builder(Person.class, path)
     .process(stream -> {
         stream.forEach(person -> {
             save(person);
