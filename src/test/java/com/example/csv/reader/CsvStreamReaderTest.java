@@ -15,6 +15,7 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import com.opencsv.exceptions.CsvException;
 
@@ -234,7 +235,7 @@ public class CsvStreamReaderTest {
 
         CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.csv"))
             .skip(2)
-            .process((java.util.function.Consumer<Stream<Person>>) (stream -> stream.forEach(person -> names.append(person.getName()).append(","))));
+            .process((Consumer<Stream<Person>>) (stream -> stream.forEach(person -> names.append(person.getName()).append(","))));
 
         String result = names.toString();
         assertFalse(result.contains("田中太郎")); // スキップされているはず
