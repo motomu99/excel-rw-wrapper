@@ -16,7 +16,7 @@
  * <h2>使用例</h2>
  * <pre>
  * try {
- *     List&lt;Person&gt; persons = ExcelStreamReader.of(Person.class, Paths.get("sample.xlsx"))
+ *     List&lt;Person&gt; persons = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
  *         .headerKey("名前")
  *         .process(stream -&gt; stream.collect(Collectors.toList()));
  * } catch (HeaderNotFoundException e) {

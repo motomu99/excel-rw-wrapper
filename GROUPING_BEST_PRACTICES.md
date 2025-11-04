@@ -6,7 +6,7 @@
 
 ```java
 // ❌ これは絶対ダメ！10万件全部メモリに載る！
-Map<String, List<Person>> grouped = ExcelStreamReader.of(Person.class, path)
+Map<String, List<Person>> grouped = ExcelStreamReader.builder(Person.class, path)
     .process(stream -> stream.collect(
         Collectors.groupingBy(Person::getOccupation)
     ));
@@ -23,7 +23,7 @@ Map<String, List<Person>> grouped = ExcelStreamReader.of(Person.class, path)
 // 職業ごとの統計情報を保持（実データは保持しない）
 Map<String, OccupationStats> statsMap = new ConcurrentHashMap<>();
 
-ExcelStreamReader.of(Person.class, path)
+ExcelStreamReader.builder(Person.class, path)
     .process(stream -> {
         stream.forEach(person -> {
             String occupation = person.getOccupation();
@@ -66,7 +66,7 @@ class OccupationStats {
 final int BATCH_SIZE = 100;
 Map<String, List<Person>> batchMap = new HashMap<>();
 
-ExcelStreamReader.of(Person.class, path)
+ExcelStreamReader.builder(Person.class, path)
     .process(stream -> {
         stream.forEach(person -> {
             String occupation = person.getOccupation();
@@ -106,7 +106,7 @@ ExcelStreamReader.of(Person.class, path)
 Map<String, TopNCollector> topNMap = new HashMap<>();
 final int TOP_N = 10;
 
-ExcelStreamReader.of(Person.class, path)
+ExcelStreamReader.builder(Person.class, path)
     .process(stream -> {
         stream.forEach(person -> {
             String city = person.getBirthplace();
@@ -159,7 +159,7 @@ class TopNCollector {
 ```java
 Map<String, AtomicInteger> seniorCount = new HashMap<>();
 
-ExcelStreamReader.of(Person.class, path)
+ExcelStreamReader.builder(Person.class, path)
     .process(stream -> {
         stream
             .filter(person -> person.getAge() >= 50)  // 50歳以上のみ
@@ -190,7 +190,7 @@ seniorCount.forEach((occupation, count) -> {
 final int MAX_PER_GROUP = 1000;  // 各グループ最大1000件まで
 Map<String, List<Person>> limitedGroups = new HashMap<>();
 
-ExcelStreamReader.of(Person.class, path)
+ExcelStreamReader.builder(Person.class, path)
     .process(stream -> {
         stream.forEach(person -> {
             String occupation = person.getOccupation();
@@ -236,7 +236,7 @@ public class DepartmentStatsService {
     public void calculateStatsFromExcel(Path excelPath) throws IOException {
         Map<String, DepartmentStats> statsMap = new ConcurrentHashMap<>();
         
-        ExcelStreamReader.of(Employee.class, excelPath)
+        ExcelStreamReader.builder(Employee.class, excelPath)
             .headerKey("社員番号")
             .process(stream -> {
                 stream.forEach(employee -> {
@@ -282,7 +282,7 @@ public class MonthlyDataService {
         Map<String, BufferedWriter> writerMap = new HashMap<>();
         
         try {
-            ExcelStreamReader.of(Transaction.class, excelPath)
+            ExcelStreamReader.builder(Transaction.class, excelPath)
                 .process(stream -> {
                     stream.forEach(transaction -> {
                         try {

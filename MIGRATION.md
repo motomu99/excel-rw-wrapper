@@ -105,14 +105,7 @@ BOM (Byte Order Mark) 処理が独立したユーティリティクラスにな�
 
 #### CsvStreamReader
 
-**Before (旧API)**
-```java
-List<Person> persons = CsvStreamReader.of(Person.class, Paths.get("sample.csv"))
-    .charset(CharsetType.UTF_8)
-    .process(stream -> stream.collect(Collectors.toList()));
-```
-
-**After (新API - 推奨)**
+**統一後のAPI（推奨）**
 ```java
 List<Person> persons = CsvStreamReader.builder(Person.class, Paths.get("sample.csv"))
     .charset(CharsetType.UTF_8)
@@ -121,14 +114,7 @@ List<Person> persons = CsvStreamReader.builder(Person.class, Paths.get("sample.c
 
 #### CsvStreamWriter
 
-**Before (旧API)**
-```java
-CsvStreamWriter.of(Person.class, Paths.get("output.csv"))
-    .charset(CharsetType.UTF_8)
-    .write(persons.stream());
-```
-
-**After (新API - 推奨)**
+**統一後のAPI（推奨）**
 ```java
 CsvStreamWriter.builder(Person.class, Paths.get("output.csv"))
     .charset(CharsetType.UTF_8)

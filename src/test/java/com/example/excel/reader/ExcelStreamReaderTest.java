@@ -262,7 +262,7 @@ public class ExcelStreamReaderTest {
     @Test
     @DisplayName("基本的なStream処理 - ExcelファイルをStreamとして読み込み、Listに変換できること")
     void testBasicStreamProcessing() throws IOException {
-        List<Person> result = ExcelStreamReader.of(Person.class, SAMPLE_EXCEL)
+        List<Person> result = ExcelStreamReader.builder(Person.class, SAMPLE_EXCEL)
             .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
 
         assertNotNull(result);
@@ -279,7 +279,7 @@ public class ExcelStreamReaderTest {
     @Test
     @DisplayName("フィルタリング - Stream.filter()を使用してデータを絞り込めること")
     void testStreamWithFiltering() throws IOException {
-        List<Person> result = ExcelStreamReader.of(Person.class, SAMPLE_EXCEL)
+        List<Person> result = ExcelStreamReader.builder(Person.class, SAMPLE_EXCEL)
             .process((Function<Stream<Person>, List<Person>>) stream -> stream
                 .filter(person -> person.getAge() >= 30)
                 .collect(Collectors.toList()));
@@ -294,7 +294,7 @@ public class ExcelStreamReaderTest {
     @Test
     @DisplayName("マッピング - Stream.map()を使用してデータを変換できること")
     void testStreamWithMapping() throws IOException {
-        List<String> names = ExcelStreamReader.of(Person.class, SAMPLE_EXCEL)
+        List<String> names = ExcelStreamReader.builder(Person.class, SAMPLE_EXCEL)
             .process((Function<Stream<Person>, List<String>>) stream -> stream
                 .map(Person::getName)
                 .collect(Collectors.toList()));
@@ -308,7 +308,7 @@ public class ExcelStreamReaderTest {
     @Test
     @DisplayName("行スキップ - skip()メソッドで指定行数をスキップできること")
     void testStreamWithSkip() throws IOException {
-        List<Person> result = ExcelStreamReader.of(Person.class, SAMPLE_EXCEL)
+        List<Person> result = ExcelStreamReader.builder(Person.class, SAMPLE_EXCEL)
             .skip(2)
             .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
 
@@ -324,7 +324,7 @@ public class ExcelStreamReaderTest {
     @DisplayName("シート指定 - sheetIndex()メソッドで特定のシートを読み込めること")
     void testStreamWithSheetIndex() throws IOException {
         // Sheet1（インデックス0）を読み込む
-        List<Person> result1 = ExcelStreamReader.of(Person.class, SAMPLE_EXCEL_MULTI_SHEET)
+        List<Person> result1 = ExcelStreamReader.builder(Person.class, SAMPLE_EXCEL_MULTI_SHEET)
             .sheetIndex(0)
             .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
 
@@ -333,7 +333,7 @@ public class ExcelStreamReaderTest {
         assertEquals("田中太郎", result1.get(0).getName());
 
         // Sheet2（インデックス1）を読み込む
-        List<Person> result2 = ExcelStreamReader.of(Person.class, SAMPLE_EXCEL_MULTI_SHEET)
+        List<Person> result2 = ExcelStreamReader.builder(Person.class, SAMPLE_EXCEL_MULTI_SHEET)
             .sheetIndex(1)
             .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
 
@@ -345,7 +345,7 @@ public class ExcelStreamReaderTest {
     @Test
     @DisplayName("シート名指定 - sheetName()メソッドで特定のシートを読み込めること")
     void testStreamWithSheetName() throws IOException {
-        List<Person> result = ExcelStreamReader.of(Person.class, SAMPLE_EXCEL_MULTI_SHEET)
+        List<Person> result = ExcelStreamReader.builder(Person.class, SAMPLE_EXCEL_MULTI_SHEET)
             .sheetName("データ2")
             .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
 
@@ -357,7 +357,7 @@ public class ExcelStreamReaderTest {
     @Test
     @DisplayName("位置ベースマッピング - usePositionMapping()でヘッダーなしExcelを読み込めること")
     void testStreamWithPositionMapping() throws IOException {
-        List<PersonWithoutHeader> result = ExcelStreamReader.of(PersonWithoutHeader.class, SAMPLE_EXCEL_NO_HEADER)
+        List<PersonWithoutHeader> result = ExcelStreamReader.builder(PersonWithoutHeader.class, SAMPLE_EXCEL_NO_HEADER)
             .usePositionMapping()
             .process((Function<Stream<PersonWithoutHeader>, List<PersonWithoutHeader>>) stream -> stream.collect(Collectors.toList()));
 
@@ -373,7 +373,7 @@ public class ExcelStreamReaderTest {
     @Test
     @DisplayName("ヘッダーマッピング - useHeaderMapping()でヘッダー付きExcelを読み込めること")
     void testStreamWithHeaderMapping() throws IOException {
-        List<Person> result = ExcelStreamReader.of(Person.class, SAMPLE_EXCEL)
+        List<Person> result = ExcelStreamReader.builder(Person.class, SAMPLE_EXCEL)
             .useHeaderMapping()
             .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
 
@@ -388,7 +388,7 @@ public class ExcelStreamReaderTest {
     @Test
     @DisplayName("メソッドチェーン - 複数の設定とStream操作を組み合わせて使用できること")
     void testStreamWithChainedOperations() throws IOException {
-        List<String> result = ExcelStreamReader.of(Person.class, SAMPLE_EXCEL)
+        List<String> result = ExcelStreamReader.builder(Person.class, SAMPLE_EXCEL)
             .skip(1)
             .sheetIndex(0)
             .useHeaderMapping()
@@ -409,7 +409,7 @@ public class ExcelStreamReaderTest {
     @Test
     @DisplayName("カウント操作 - Stream.count()でレコード数を取得できること")
     void testStreamCount() throws IOException {
-        Long count = ExcelStreamReader.of(Person.class, SAMPLE_EXCEL)
+        Long count = ExcelStreamReader.builder(Person.class, SAMPLE_EXCEL)
             .process((Function<Stream<Person>, Long>) (Stream::count));
 
         assertNotNull(count);
@@ -421,7 +421,7 @@ public class ExcelStreamReaderTest {
     void testStreamForEach() throws IOException {
         StringBuilder names = new StringBuilder();
 
-        ExcelStreamReader.of(Person.class, SAMPLE_EXCEL)
+        ExcelStreamReader.builder(Person.class, SAMPLE_EXCEL)
             .process(stream -> {
                 stream.forEach(person -> names.append(person.getName()).append(","));
                 return null;
@@ -437,7 +437,7 @@ public class ExcelStreamReaderTest {
     void testConsumerOverloadBasic() throws IOException {
         StringBuilder names = new StringBuilder();
 
-        ExcelStreamReader.of(Person.class, SAMPLE_EXCEL)
+        ExcelStreamReader.builder(Person.class, SAMPLE_EXCEL)
             .process(stream -> {
                 stream.map(Person::getName).forEach(name -> names.append(name).append(","));
             });
@@ -451,7 +451,7 @@ public class ExcelStreamReaderTest {
     @Test
     @DisplayName("ヘッダー自動検出 - headerKey()でヘッダー行を自動検出できること")
     void testHeaderAutoDetection() throws IOException {
-        List<Person> result = ExcelStreamReader.of(Person.class, SAMPLE_EXCEL_WITH_TITLE)
+        List<Person> result = ExcelStreamReader.builder(Person.class, SAMPLE_EXCEL_WITH_TITLE)
             .headerKey("名前")
             .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
 
@@ -469,7 +469,7 @@ public class ExcelStreamReaderTest {
     @Test
     @DisplayName("キー列終了判定 - キー列が空になったら読み込みを終了すること")
     void testStopReadingWhenKeyColumnIsEmpty() throws IOException {
-        List<Person> result = ExcelStreamReader.of(Person.class, SAMPLE_EXCEL_WITH_EMPTY_KEY)
+        List<Person> result = ExcelStreamReader.builder(Person.class, SAMPLE_EXCEL_WITH_EMPTY_KEY)
             .headerKey("名前")
             .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
 
@@ -489,7 +489,7 @@ public class ExcelStreamReaderTest {
     @Test
     @DisplayName("ヘッダー探索範囲 - headerSearchRows()でヘッダー探索範囲を指定できること")
     void testHeaderSearchRows() throws IOException {
-        List<Person> result = ExcelStreamReader.of(Person.class, SAMPLE_EXCEL_WITH_TITLE)
+        List<Person> result = ExcelStreamReader.builder(Person.class, SAMPLE_EXCEL_WITH_TITLE)
             .headerKey("名前")
             .headerSearchRows(5)
             .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
@@ -503,7 +503,7 @@ public class ExcelStreamReaderTest {
     @DisplayName("ヘッダー未検出 - ヘッダーが見つからない場合はHeaderNotFoundExceptionを投げること")
     void testHeaderNotFound() {
         HeaderNotFoundException exception = assertThrows(HeaderNotFoundException.class, () -> {
-            ExcelStreamReader.of(Person.class, SAMPLE_EXCEL_WITH_TITLE)
+            ExcelStreamReader.builder(Person.class, SAMPLE_EXCEL_WITH_TITLE)
                 .headerKey("存在しない列名")
                 .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
         });
@@ -515,7 +515,7 @@ public class ExcelStreamReaderTest {
     @Test
     @DisplayName("ヘッダー自動検出とStream操作の組み合わせ")
     void testHeaderAutoDetectionWithStreamOperations() throws IOException {
-        List<String> names = ExcelStreamReader.of(Person.class, SAMPLE_EXCEL_WITH_TITLE)
+        List<String> names = ExcelStreamReader.builder(Person.class, SAMPLE_EXCEL_WITH_TITLE)
             .headerKey("名前")
             .process((Function<Stream<Person>, List<String>>) stream -> stream
                 .filter(person -> person.getAge() >= 28)
@@ -532,7 +532,7 @@ public class ExcelStreamReaderTest {
     @DisplayName("キー列がヘッダーに存在しない - 指定したキー列を持つヘッダー行が見つからない場合はHeaderNotFoundExceptionを投げること")
     void testKeyColumnNotInHeader() {
         HeaderNotFoundException exception = assertThrows(HeaderNotFoundException.class, () -> {
-            ExcelStreamReader.of(Person.class, SAMPLE_EXCEL)
+            ExcelStreamReader.builder(Person.class, SAMPLE_EXCEL)
                 .headerKey("存在しない列")
                 .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
         });
@@ -544,7 +544,7 @@ public class ExcelStreamReaderTest {
     @DisplayName("型変換エラー - 数字項目に文字列が来た場合はCellValueConversionExceptionを投げること")
     void testCellValueConversionError() {
         CellValueConversionException exception = assertThrows(CellValueConversionException.class, () -> {
-            ExcelStreamReader.of(Person.class, SAMPLE_EXCEL_INVALID_TYPE)
+            ExcelStreamReader.builder(Person.class, SAMPLE_EXCEL_INVALID_TYPE)
                 .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
         });
 
@@ -606,7 +606,7 @@ public class ExcelStreamReaderTest {
     @Test
     @DisplayName("Long型変換 - Long型フィールドを正しく読み込めること")
     void testLongTypeConversion() throws IOException {
-        List<PersonWithAllTypes> result = ExcelStreamReader.of(PersonWithAllTypes.class, SAMPLE_EXCEL_ALL_TYPES)
+        List<PersonWithAllTypes> result = ExcelStreamReader.builder(PersonWithAllTypes.class, SAMPLE_EXCEL_ALL_TYPES)
             .process((Function<Stream<PersonWithAllTypes>, List<PersonWithAllTypes>>) stream -> stream.collect(Collectors.toList()));
 
         assertNotNull(result);
@@ -621,7 +621,7 @@ public class ExcelStreamReaderTest {
     @Test
     @DisplayName("Double型変換 - Double型フィールドを正しく読み込めること")
     void testDoubleTypeConversion() throws IOException {
-        List<PersonWithAllTypes> result = ExcelStreamReader.of(PersonWithAllTypes.class, SAMPLE_EXCEL_ALL_TYPES)
+        List<PersonWithAllTypes> result = ExcelStreamReader.builder(PersonWithAllTypes.class, SAMPLE_EXCEL_ALL_TYPES)
             .process((Function<Stream<PersonWithAllTypes>, List<PersonWithAllTypes>>) stream -> stream.collect(Collectors.toList()));
 
         assertNotNull(result);
@@ -636,7 +636,7 @@ public class ExcelStreamReaderTest {
     @Test
     @DisplayName("Boolean型変換 - Boolean型フィールドを正しく読み込めること")
     void testBooleanTypeConversion() throws IOException {
-        List<PersonWithAllTypes> result = ExcelStreamReader.of(PersonWithAllTypes.class, SAMPLE_EXCEL_ALL_TYPES)
+        List<PersonWithAllTypes> result = ExcelStreamReader.builder(PersonWithAllTypes.class, SAMPLE_EXCEL_ALL_TYPES)
             .process((Function<Stream<PersonWithAllTypes>, List<PersonWithAllTypes>>) stream -> stream.collect(Collectors.toList()));
 
         assertNotNull(result);
@@ -654,7 +654,7 @@ public class ExcelStreamReaderTest {
     @DisplayName("存在しないシート名 - SheetNotFoundExceptionを投げること")
     void testInvalidSheetName() {
         SheetNotFoundException exception = assertThrows(SheetNotFoundException.class, () -> {
-            ExcelStreamReader.of(Person.class, SAMPLE_EXCEL)
+            ExcelStreamReader.builder(Person.class, SAMPLE_EXCEL)
                 .sheetName("存在しないシート")
                 .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
         });
@@ -730,7 +730,7 @@ public class ExcelStreamReaderTest {
     @Test
     @DisplayName("LocalDate型変換 - 日付セルからLocalDateを正しく読み込めること")
     void testLocalDateConversion() throws IOException {
-        List<PersonWithDate> result = ExcelStreamReader.of(PersonWithDate.class, SAMPLE_EXCEL_WITH_DATE)
+        List<PersonWithDate> result = ExcelStreamReader.builder(PersonWithDate.class, SAMPLE_EXCEL_WITH_DATE)
             .process((Function<Stream<PersonWithDate>, List<PersonWithDate>>) stream -> stream.collect(Collectors.toList()));
 
         assertNotNull(result);
@@ -745,7 +745,7 @@ public class ExcelStreamReaderTest {
     @Test
     @DisplayName("LocalDateTime型変換 - 日時セルからLocalDateTimeを正しく読み込めること")
     void testLocalDateTimeConversion() throws IOException {
-        List<PersonWithDate> result = ExcelStreamReader.of(PersonWithDate.class, SAMPLE_EXCEL_WITH_DATE)
+        List<PersonWithDate> result = ExcelStreamReader.builder(PersonWithDate.class, SAMPLE_EXCEL_WITH_DATE)
             .process((Function<Stream<PersonWithDate>, List<PersonWithDate>>) stream -> stream.collect(Collectors.toList()));
 
         assertNotNull(result);
@@ -798,7 +798,7 @@ public class ExcelStreamReaderTest {
     void testFormulaCell() {
         // 数式セルは文字列として扱われるため、Integer変換で例外が発生する
         assertThrows(Exception.class, () -> {
-            ExcelStreamReader.of(Person.class, SAMPLE_EXCEL_WITH_FORMULA)
+            ExcelStreamReader.builder(Person.class, SAMPLE_EXCEL_WITH_FORMULA)
                 .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
         });
     }
@@ -814,7 +814,7 @@ public class ExcelStreamReaderTest {
             workbook.write(fos);
         }
 
-        List<Person> result = ExcelStreamReader.of(Person.class, emptyExcel)
+        List<Person> result = ExcelStreamReader.builder(Person.class, emptyExcel)
             .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
 
         assertNotNull(result);
@@ -827,7 +827,7 @@ public class ExcelStreamReaderTest {
         Path nonExistentFile = TEST_RESOURCES_DIR.resolve("non_existent.xlsx");
         
         assertThrows(Exception.class, () -> {
-            ExcelStreamReader.of(Person.class, nonExistentFile)
+            ExcelStreamReader.builder(Person.class, nonExistentFile)
                 .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
         });
     }
@@ -874,7 +874,7 @@ public class ExcelStreamReaderTest {
             workbook.write(fos);
         }
 
-        List<Person> result = ExcelStreamReader.of(Person.class, complexExcel)
+        List<Person> result = ExcelStreamReader.builder(Person.class, complexExcel)
             .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
 
         assertNotNull(result);
@@ -917,7 +917,7 @@ public class ExcelStreamReaderTest {
             workbook.write(fos);
         }
 
-        List<Person> result = ExcelStreamReader.of(Person.class, allEmptyExcel)
+        List<Person> result = ExcelStreamReader.builder(Person.class, allEmptyExcel)
             .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
 
         assertNotNull(result);

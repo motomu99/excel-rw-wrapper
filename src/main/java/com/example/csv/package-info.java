@@ -66,14 +66,14 @@
  * <h3>Stream APIを使った処理</h3>
  * <pre>
  * // 読み込み時にフィルタリング
- * List&lt;Person&gt; adults = CsvStreamReader.of(Person.class, Paths.get("data.csv"))
+ * List&lt;Person&gt; adults = CsvStreamReader.builder(Person.class, Paths.get("data.csv"))
  *     .charset(CharsetType.UTF_8)
  *     .process(stream -&gt; stream
  *         .filter(p -&gt; p.getAge() &gt;= 20)
  *         .collect(Collectors.toList()));
  *
  * // Stream APIで書き込み
- * CsvStreamWriter.of(Person.class, Paths.get("output.csv"))
+ * CsvStreamWriter.builder(Person.class, Paths.get("output.csv"))
  *     .charset(CharsetType.UTF_8_BOM)
  *     .write(persons.stream());
  * </pre>
