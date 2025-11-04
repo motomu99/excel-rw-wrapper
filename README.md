@@ -94,9 +94,191 @@ List<Person> persons = CsvReaderWrapper.execute(
 
 **詳細は [MIGRATION.md](MIGRATION.md) を参照してください。**
 
+### CsvStreamReader（Stream APIでの読み込み）
+
+レコードをJava Streamとして扱える軽量リーダー。メモリに載せずに逐次処理したいときに最適だよ！
+
+#### 基本（Listに集約）
+
+```java
+import com.example.csv.reader.CsvStreamReader;
+import com.example.model.Person;
+import java.nio.file.Paths;
+import java.util.List;
+import java.util.stream.Collectors;
+
+List<Person> persons = CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.csv"))
+    .process(stream -> stream.collect(Collectors.toList()));
+```
+
+#### フィルタ／マップなどのStream操作
+
+```java
+List<String> namesOver30 = CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.csv"))
+    .process(stream -> stream
+        .filter(p -> p.getAge() >= 30)
+        .map(Person::getName)
+        .collect(Collectors.toList()));
+```
+
+#### 行スキップ
+
+```java
+List<Person> skipped = CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.csv"))
+    .skip(2)
+    .process(stream -> stream.collect(Collectors.toList()));
+```
+
+#### 文字セット・区切り指定（CSV/TSVなど）
+
+```java
+import com.example.common.config.CharsetType;
+import com.example.common.config.FileType;
+
+List<Person> sjis = CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample_sjis.csv"))
+    .charset(CharsetType.S_JIS)
+    .process(stream -> stream.collect(Collectors.toList()));
+
+List<Person> tsv = CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.tsv"))
+    .fileType(FileType.TSV)
+    .process(stream -> stream.collect(Collectors.toList()));
+```
+
+#### ヘッダー有無のマッピング
+
+```java
+// ヘッダー付き（デフォルト）
+List<Person> withHeader = CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.csv"))
+    .useHeaderMapping() // 省略可（デフォルト）
+    .process(stream -> stream.collect(Collectors.toList()));
+
+// ヘッダーなし（位置ベース）
+import com.example.model.PersonWithoutHeader;
+
+List<PersonWithoutHeader> noHeader = CsvStreamReader.of(PersonWithoutHeader.class, Paths.get("src/test/resources/sample_no_header.csv"))
+    .usePositionMapping()
+    .process(stream -> stream.collect(Collectors.toList()));
+```
+
+#### 戻り値なし（副作用系）
+
+```java
+CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.csv"))
+    .process(stream -> {
+        stream.forEach(p -> System.out.println(p.getName()));
+    });
+```
+
+#### そのほかの小技
+
+```java
+// 件数だけ欲しい場合
+long count = CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.csv"))
+    .process(stream -> stream.count());
+
+// メソッドチェーンで一気に
+List<String> names = CsvStreamReader.of(Person.class, Paths.get("src/test/resources/sample.csv"))
+    .skip(1)
+    .charset(CharsetType.UTF_8)
+    .fileType(FileType.CSV)
+    .useHeaderMapping()
+    .process(stream -> stream
+        .filter(p -> p.getAge() >= 25)
+        .map(Person::getName)
+        .collect(Collectors.toList()));
+```
+
+> ベストプラクティスやパフォーマンスTipsは [STREAMING_BEST_PRACTICES.md](STREAMING_BEST_PRACTICES.md) もチェックしてね。
+
 ---
 
 ## CSV書き込み機能
+
+### CsvStreamWriter（Stream APIでの書き込み）
+
+Streamを直接書き込めるライター。`CsvStreamReader`とセットで使うと、ストリーム処理が完結するよ！
+
+#### 基本（Streamを書き込み）
+
+```java
+import com.example.csv.writer.CsvStreamWriter;
+import com.example.model.Person;
+import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.List;
+
+List<Person> persons = Arrays.asList(
+    new Person("田中太郎", 25, "エンジニア", "東京"),
+    new Person("佐藤花子", 30, "デザイナー", "大阪")
+);
+
+CsvStreamWriter.of(Person.class, Paths.get("output.csv"))
+    .write(persons.stream());
+```
+
+#### フィルタ付き書き込み
+
+```java
+CsvStreamWriter.of(Person.class, Paths.get("output.csv"))
+    .write(persons.stream()
+        .filter(p -> p.getAge() >= 30));
+```
+
+#### 文字セット・改行コード・区切り指定
+
+```java
+import com.example.common.config.CharsetType;
+import com.example.common.config.FileType;
+import com.example.common.config.LineSeparatorType;
+
+CsvStreamWriter.of(Person.class, Paths.get("output.tsv"))
+    .charset(CharsetType.S_JIS)           // 文字セット指定
+    .fileType(FileType.TSV)                // TSVファイル
+    .lineSeparator(LineSeparatorType.LF)   // 改行コード
+    .write(persons.stream());
+```
+
+#### ヘッダー有無のマッピング
+
+```java
+// ヘッダー付き（デフォルト）
+CsvStreamWriter.of(Person.class, Paths.get("output.csv"))
+    .useHeaderMapping() // 省略可（デフォルト）
+    .write(persons.stream());
+
+// ヘッダーなし（位置ベース）
+import com.example.model.PersonWithoutHeader;
+
+CsvStreamWriter.of(PersonWithoutHeader.class, Paths.get("output.csv"))
+    .usePositionMapping()
+    .write(persons.stream());
+```
+
+#### メソッドチェーンで一気に
+
+```java
+CsvStreamWriter.of(Person.class, Paths.get("output.csv"))
+    .charset(CharsetType.UTF_8)
+    .fileType(FileType.CSV)
+    .lineSeparator(LineSeparatorType.LF)
+    .useHeaderMapping()
+    .write(persons.stream()
+        .filter(p -> p.getAge() >= 25)
+        .filter(p -> !p.getOccupation().equals("学生")));
+```
+
+#### CsvStreamReaderと組み合わせて使う
+
+```java
+// 読み込み → フィルタ → 書き込みの一連の流れ
+CsvStreamReader.of(Person.class, Paths.get("input.csv"))
+    .process(stream -> {
+        CsvStreamWriter.of(Person.class, Paths.get("output.csv"))
+            .write(stream.filter(p -> p.getAge() >= 30));
+    });
+```
+
+---
 
 ### CsvWriterWrapper（推奨）
 
