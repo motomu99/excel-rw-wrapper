@@ -704,6 +704,34 @@ ExcelStreamWriterは以下の型を適切に変換してExcelファイルに書�
 
 ---
 
+## 例外ポリシー
+
+本ライブラリの主な例外方針は以下の通りです。
+
+- Excel 書き込み（`ExcelStreamWriter`）
+  - 書き込み時の I/O エラーは **非チェック例外**の `UncheckedIOException` としてスローされます。
+  - その他の想定外例外は原因を保持したうえで `UncheckedIOException` に包まれる場合があります。
+  - そのため、ラムダ内で `try-catch` は基本的に不要です。
+
+- Excel 読み込み（`ExcelStreamReader`）
+  - `process(...)` は **`IOException`（チェック例外）** をスローします。呼び出し元で `try-catch` するか、メソッドに `throws IOException` を付与してください。
+  - シートやヘッダー関連のドメイン例外（例: `SheetNotFoundException`, `HeaderNotFoundException`, `KeyColumnNotFoundException`）は、状況に応じて非チェック例外としてスローされます。
+
+- CSV 読み込み（`CsvStreamReader`）
+  - `process(...)` は **`IOException`（チェック例外）** と **`CsvException`（チェック例外）** をスローします。
+
+- CSV 書き込み（`CsvStreamWriter` / `CsvWriterWrapper`）
+  - 書き込み時のエラーは **非チェック例外**の `CsvWriteException` に変換されます。
+
+- 内部実装での例外ラップ
+  - ストリーム処理（ラムダ）内でチェック例外を扱う必要がある箇所では、内部的に `UncheckedExcelException` 等でラップすることがあります。呼び出し側で原因（`getCause()`）をたどれるようになっています。
+
+ガイダンス:
+- ストリームの「読み込み側」失敗は外側境界で明確に扱えるようチェック例外を維持。
+- 「書き込み側」は呼び出し簡素化のため非チェック化し、必要に応じて上位で一括ハンドリングしてください。
+
+---
+
 ## アノテーションでの項目名指定
 
 ```java
