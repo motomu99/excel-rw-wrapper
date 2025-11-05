@@ -65,3 +65,4 @@ public class BomWriterTest {
         assertEquals("forced", ex.getMessage());
     }
 }
+

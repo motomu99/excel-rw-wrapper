@@ -3,6 +3,7 @@ package com.example.excel.writer;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
@@ -109,9 +110,8 @@ public class ExcelStreamWriter<T> {
      * 日付型（LocalDate, LocalDateTime）は自動的に適切なフォーマットで書き込まれます。</p>
      *
      * @param stream 書き込むデータのStream
-     * @throws IOException ファイル書き込みエラーが発生した場合
      */
-    private void write(Stream<T> stream) throws IOException {
+    private void write(Stream<T> stream) {
         // データを事前にリスト化（Streamは1回しか使えないため）
         List<T> dataList = stream.toList();
         
@@ -152,11 +152,11 @@ public class ExcelStreamWriter<T> {
         } catch (IOException e) {
             log.error("Excelファイル書き込み中にエラーが発生: ファイルパス={}, エラー={}", 
                 filePath, e.getMessage(), e);
-            throw e;
+            throw new UncheckedIOException(e);
         } catch (Exception e) {
             log.error("Excel処理中にエラーが発生: ファイルパス={}, エラー={}", 
                 filePath, e.getMessage(), e);
-            throw new IOException("Excel処理中にエラーが発生しました", e);
+            throw new UncheckedIOException(new IOException("Excel処理中にエラーが発生しました", e));
         }
     }
     
@@ -164,7 +164,6 @@ public class ExcelStreamWriter<T> {
      * 既存のWorkbookを読み込むか、新規Workbookを作成
      * 
      * @return Workbookインスタンス
-     * @throws IOException ファイル読み込みエラー
      */
     private Workbook loadExistingWorkbook() throws IOException {
         if (loadExisting && Files.exists(filePath)) {
@@ -386,9 +385,8 @@ public class ExcelStreamWriter<T> {
          * 日付型（LocalDate, LocalDateTime）は自動的に適切なフォーマットで書き込まれます。</p>
          *
          * @param stream 書き込むデータのStream
-         * @throws IOException ファイル書き込みエラーが発生した場合
          */
-        public void write(Stream<T> stream) throws IOException {
+        public void write(Stream<T> stream) {
             writer.write(stream);
         }
     }
