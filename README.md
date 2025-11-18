@@ -704,6 +704,134 @@ ExcelStreamWriterは以下の型を適切に変換してExcelファイルに書�
 
 ---
 
+## BookWriter（DDD設計によるExcel書き込み）📚
+
+**DDD（ドメイン駆動設計）的な設計に基づき、`Book`、`Sheet`、`Table`のドメインモデルを使用してExcelファイルに書き込む方法です。**
+
+複雑なExcel構造を扱う場合や、長期的なメンテナンスが必要な場合に推奨されます。
+
+### 基本的な使い方
+
+```java
+import com.example.excel.domain.Book;
+import com.example.excel.domain.Sheet;
+import com.example.excel.domain.Table;
+import com.example.excel.writer.BookWriter;
+import com.example.model.Person;
+import com.example.model.Order;
+import java.nio.file.Paths;
+
+// Personデータ
+List<Person> persons = List.of(
+    new Person("田中太郎", 25, "エンジニア", "東京"),
+    new Person("佐藤花子", 30, "デザイナー", "大阪")
+);
+
+// Orderデータ
+List<Order> orders = List.of(
+    new Order("O001", "U001", 1200, "2025-01-01"),
+    new Order("O002", "U002", 3000, "2025-01-02")
+);
+
+// DDDモデルを構築
+Book book = Book.of(Paths.get("output.xlsx"))
+    .addSheet(Sheet.of("Report")
+        .addTable(Table.builder(Person.class)
+            .anchor("A1")
+            .data(persons)
+            .build())
+        .addTable(Table.builder(Order.class)
+            .anchor("A20")
+            .data(orders)
+            .build()));
+
+// 書き込み
+BookWriter.write(book);
+```
+
+### 複数シートの書き込み
+
+```java
+Book book = Book.of(Paths.get("output.xlsx"))
+    .addSheet(Sheet.of("Users")
+        .addTable(Table.builder(Person.class)
+            .anchor("A1")
+            .data(users)
+            .build()))
+    .addSheet(Sheet.of("Orders")
+        .addTable(Table.builder(Order.class)
+            .anchor("A1")
+            .data(orders)
+            .build()));
+
+BookWriter.write(book);
+```
+
+### 既存ファイルに追記
+
+```java
+Book book = Book.of(Paths.get("template.xlsx"))
+    .withLoadExisting()
+    .addSheet(Sheet.of("Report")
+        .addTable(Table.builder(Person.class)
+            .anchor("A1")
+            .data(users)
+            .build()));
+
+BookWriter.write(book);
+```
+
+### Anchor値オブジェクトの使用
+
+```java
+import com.example.excel.domain.Anchor;
+
+// Anchor値オブジェクトを使用
+Anchor anchor = Anchor.of("B5");
+
+Book book = Book.of(Paths.get("output.xlsx"))
+    .addSheet(Sheet.of("Test")
+        .addTable(Table.builder(Person.class)
+            .anchor(anchor)
+            .data(persons)
+            .build()));
+
+BookWriter.write(book);
+```
+
+### @CsvBindByNameアノテーションからのヘッダー自動抽出
+
+`Table`は`@CsvBindByName`アノテーションから自動的にヘッダーを抽出します。特別な設定は不要です。
+
+```java
+// Person Beanクラス（@CsvBindByNameアノテーション付き）
+public class Person {
+    @CsvBindByName(column = "名前")
+    private String name;
+    
+    @CsvBindByName(column = "年齢")
+    private Integer age;
+    // ...
+}
+
+// Tableは自動的にヘッダーを抽出
+Table<Person> table = Table.builder(Person.class)
+    .anchor("A1")
+    .data(persons)
+    .build();
+```
+
+### ドメインモデルの特徴
+
+- **`Book`**（エンティティ）: Excelファイル全体を表す
+- **`Sheet`**（エンティティ）: Excelシートを表す
+- **`Table`**（値オブジェクト）: Excelシート内の1つのテーブル（ブロック）を表す
+- **`Anchor`**（値オブジェクト）: Excelセルの位置を表す
+
+詳細は [DDD_DESIGN_EXAMPLE.md](DDD_DESIGN_EXAMPLE.md) を参照してください。
+
+---
+
 ## 例外ポリシー
 
 本ライブラリの主な例外方針は以下の通りです。
