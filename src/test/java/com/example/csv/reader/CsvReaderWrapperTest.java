@@ -2,7 +2,6 @@ package com.example.csv.reader;
 
 import com.example.common.config.CharsetType;
 import com.example.common.config.FileType;
-import com.example.csv.reader.CsvReaderWrapper;
 import com.example.exception.CsvReadException;
 import com.example.model.Person;
 import com.example.model.PersonWithoutHeader;
@@ -156,6 +155,25 @@ public class CsvReaderWrapperTest {
         // Builderパターンで存在しないファイル
         assertThrows(CsvReadException.class, () -> {
             CsvReaderWrapper.builder(Person.class, Paths.get("src/test/resources/nonexistent.csv"))
+                .read();
+        });
+    }
+
+    @Test
+    @DisplayName("異常系 - CSV列数が不一致の場合にCsvReadExceptionをスローすること")
+    void testBuilderWithColumnMismatchCsv() {
+        assertThrows(CsvReadException.class, () -> {
+            CsvReaderWrapper.builder(Person.class, Paths.get("src/test/resources/sample_invalid_columns.csv"))
+                .read();
+        });
+    }
+
+    @Test
+    @DisplayName("異常系 - TSV列数が不一致の場合にCsvReadExceptionをスローすること")
+    void testBuilderWithColumnMismatchTsv() {
+        assertThrows(CsvReadException.class, () -> {
+            CsvReaderWrapper.builder(Person.class, Paths.get("src/test/resources/sample_invalid_columns.tsv"))
+                .fileType(FileType.TSV)
                 .read();
         });
     }

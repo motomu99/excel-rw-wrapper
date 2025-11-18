@@ -109,6 +109,8 @@ public class CsvReaderWrapper {
      * @throws CsvReadException CSV読み込みエラー
      */
     public <T> List<T> read() {
+        CsvColumnValidator.validate(filePath, charset, withBom, fileType.getDelimiter().charAt(0));
+
         try (FileInputStream fis = new FileInputStream(filePath.toFile());
              InputStream is = withBom ? BomHandler.skipBom(fis) : fis;
              InputStreamReader isr = new InputStreamReader(is, charset)) {

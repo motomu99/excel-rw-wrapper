@@ -71,9 +71,12 @@ public class CsvStreamReader<T> {
      * @throws CsvException CSV解析エラー
      */
     private <R> R process(Function<Stream<T>, R> processor) throws IOException, CsvException {
+        Charset charset = Charset.forName(charsetType.getCharsetName());
+        CsvColumnValidator.validate(filePath, charset, charsetType.isWithBom(), fileType.getDelimiter().charAt(0));
+
         try (FileInputStream fis = new FileInputStream(filePath.toFile());
              InputStream is = charsetType.isWithBom() ? BomHandler.skipBom(fis) : fis;
-             InputStreamReader isr = new InputStreamReader(is, Charset.forName(charsetType.getCharsetName()))) {
+             InputStreamReader isr = new InputStreamReader(is, charset)) {
             
             MappingStrategy<T> strategy = MappingStrategyFactory.createStrategy(beanClass, usePositionMapping);
             
