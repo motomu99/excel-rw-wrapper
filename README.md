@@ -9,6 +9,7 @@ OpenCSVをラップしたシンプルなCSV読み込みライブラリです。
 - 🔧 **柔軟**: ファイルパス指定、InputStream対応
 - 📊 **便利**: ヘッダー分離、データのみ取得などの便利機能
 - 🎯 **Bean対応**: アノテーションで項目名を指定してBeanにマッピング
+- ✅ **列数検証**: CSV/TSVファイルの列数不整合を自動検出し、エラーを早期に検知
 
 ## 依存関係
 
@@ -82,6 +83,29 @@ List<Person> persons = CsvReaderWrapper.builder(Person.class, Paths.get("no_head
     .read();
 ```
 
+#### 列数検証機能
+
+CSV/TSVファイルを読み込む前に、自動的に列数の整合性をチェックします。ダブルクォートが外れている行や、タブ/カンマの数が他の行と異なる行を検出し、`CsvReadException`をスローします。
+
+```java
+// 列数が不一致のファイルを読み込もうとすると例外が発生
+try {
+    List<Person> persons = CsvReaderWrapper.builder(Person.class, Paths.get("invalid.csv"))
+        .read();
+} catch (CsvReadException e) {
+    // エラーメッセージには行番号、期待される列数、実際の列数、行内容が含まれます
+    // 例: "列数が不一致です (ファイル=invalid.csv, 行番号=3, 期待値=4, 実際=5, 行内容=...)")
+    System.err.println(e.getMessage());
+}
+```
+
+**検証の仕組み:**
+- 最初の非空行（通常はヘッダー行）の列数を基準として設定
+- 以降の各行の列数をチェック
+- 列数が不一致の場合、即座に`CsvReadException`をスロー
+- CSV/TSVの両方で動作（区切り文字は自動判定）
+- ダブルクォート内の区切り文字は正しく処理されます
+
 #### 従来のAPI（互換性維持）
 
 既存コードとの互換性のため、従来の`execute()`メソッドも引き続き使用できます。
@@ -99,6 +123,8 @@ List<Person> persons = CsvReaderWrapper.execute(
 ### CsvStreamReader（Stream APIでの読み込み）
 
 レコードをJava Streamとして扱える軽量リーダー。メモリに載せずに逐次処理したいときに最適だよ！
+
+**注意:** `CsvStreamReader`も`CsvReaderWrapper`と同様に、読み込み前に自動的に列数検証が行われます。列数が不一致の場合は`CsvReadException`がスローされます。
 
 #### 基本（Listに集約）
 
@@ -845,8 +871,10 @@ Table<Person> table = Table.builder(Person.class)
   - `process(...)` は **`IOException`（チェック例外）** をスローします。呼び出し元で `try-catch` するか、メソッドに `throws IOException` を付与してください。
   - シートやヘッダー関連のドメイン例外（例: `SheetNotFoundException`, `HeaderNotFoundException`, `KeyColumnNotFoundException`）は、状況に応じて非チェック例外としてスローされます。
 
-- CSV 読み込み（`CsvStreamReader`）
+- CSV 読み込み（`CsvStreamReader` / `CsvReaderWrapper`）
   - `process(...)` は **`IOException`（チェック例外）** と **`CsvException`（チェック例外）** をスローします。
+  - 列数が不一致の場合、**非チェック例外**の `CsvReadException` がスローされます。
+  - エラーメッセージには行番号、期待される列数、実際の列数、該当行の内容（プレビュー）が含まれます。
 
 - CSV 書き込み（`CsvStreamWriter` / `CsvWriterWrapper`）
   - 書き込み時のエラーは **非チェック例外**の `CsvWriteException` に変換されます。
