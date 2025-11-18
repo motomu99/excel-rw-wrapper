@@ -19,6 +19,19 @@ OpenCSVをラップしたシンプルなCSV読み込みライブラリです。
 - Excel Streaming Reader 4.3.0 (大容量Excel読み込み用)
 - Lombok 1.18.30 (Beanクラスの自動生成用)
 
+## 📚 ドキュメント
+
+**完全ガイド**: [docs/GUIDE.md](docs/GUIDE.md) - 全機能とベストプラクティスをまとめた統合ガイド
+
+### 個別ガイド
+
+- [ストリーミング処理のベストプラクティス](docs/STREAMING_BEST_PRACTICES.md) - 大量データをメモリ効率よく処理する方法
+- [グルーピング処理のベストプラクティス](docs/GROUPING_BEST_PRACTICES.md) - グルーピング処理でメモリを節約する方法
+- [大量データグルーピング＆ソート機能](docs/LARGE_DATA_GROUPING_USAGE.md) - 5GB以上の大容量ファイルを処理
+- [CSV外部ソート機能](docs/EXTERNAL_SORT_USAGE.md) - 4GB～10GBのCSVファイルをソート
+- [DDD設計によるExcel書き込み](docs/DDD_DESIGN_EXAMPLE.md) - DDD設計パターンでのExcel書き込み
+- [移行ガイド](docs/MIGRATION.md) - 新しいBuilderパターンへの移行方法
+
 ## ビルド
 
 ```bash
@@ -118,7 +131,7 @@ List<Person> persons = CsvReaderWrapper.execute(
 );
 ```
 
-**詳細は [MIGRATION.md](MIGRATION.md) を参照してください。**
+**詳細は [docs/MIGRATION.md](docs/MIGRATION.md) を参照してください。**
 
 ### CsvStreamReader（Stream APIでの読み込み）
 
@@ -216,7 +229,7 @@ List<String> names = CsvStreamReader.builder(Person.class, Paths.get("src/test/r
         .collect(Collectors.toList()));
 ```
 
-> ベストプラクティスやパフォーマンスTipsは [STREAMING_BEST_PRACTICES.md](STREAMING_BEST_PRACTICES.md) もチェックしてね。
+> ベストプラクティスやパフォーマンスTipsは [docs/STREAMING_BEST_PRACTICES.md](docs/STREAMING_BEST_PRACTICES.md) もチェックしてね。
 
 ---
 
@@ -389,7 +402,7 @@ CsvWriterWrapper.execute(
 );
 ```
 
-**詳細は [MIGRATION.md](MIGRATION.md) を参照してください。**
+**詳細は [docs/MIGRATION.md](docs/MIGRATION.md) を参照してください。**
 
 ---
 
@@ -469,7 +482,7 @@ CsvExternalSorter.builder(inputPath, outputPath)
     .sort();
 ```
 
-**詳細は [EXTERNAL_SORT_USAGE.md](EXTERNAL_SORT_USAGE.md) を参照してください。**
+**詳細は [docs/EXTERNAL_SORT_USAGE.md](docs/EXTERNAL_SORT_USAGE.md) を参照してください。**
 
 ---
 
@@ -854,7 +867,7 @@ Table<Person> table = Table.builder(Person.class)
 - **`Table`**（値オブジェクト）: Excelシート内の1つのテーブル（ブロック）を表す
 - **`Anchor`**（値オブジェクト）: Excelセルの位置を表す
 
-詳細は [DDD_DESIGN_EXAMPLE.md](DDD_DESIGN_EXAMPLE.md) を参照してください。
+詳細は [docs/DDD_DESIGN_EXAMPLE.md](docs/DDD_DESIGN_EXAMPLE.md) を参照してください。
 
 ---
 
