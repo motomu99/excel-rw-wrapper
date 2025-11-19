@@ -6,6 +6,7 @@ import com.example.excel.domain.Sheet;
 import com.example.excel.domain.Table;
 import com.example.model.Order;
 import com.example.model.Person;
+import com.example.model.PersonWithoutHeader;
 
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
@@ -240,6 +241,47 @@ public class BookWriterTest {
             
             // データ行がないことを確認
             assertEquals(1, sheet.getPhysicalNumberOfRows()); // ヘッダーのみ
+        }
+    }
+
+    @Test
+    @DisplayName("位置ベースマッピング - position順にヘッダーが生成されフィールド名が使われること")
+    void testPositionMappingHeaderGeneration() throws IOException {
+        Path outputPath = TEST_OUTPUT_DIR.resolve("position_mapping_header.xlsx");
+
+        List<PersonWithoutHeader> people = List.of(
+            new PersonWithoutHeader("花子", 22, "デザイナー", "大阪")
+        );
+
+        Book book = Book.of(outputPath)
+            .addSheet(Sheet.of("Position")
+                .addTable(Table.builder(PersonWithoutHeader.class)
+                    .anchor("B3")
+                    .data(people)
+                    .usePositionMapping()
+                    .build()));
+
+        BookWriter.write(book);
+
+        assertTrue(Files.exists(outputPath));
+
+        try (FileInputStream fis = new FileInputStream(outputPath.toFile());
+             Workbook workbook = WorkbookFactory.create(fis)) {
+
+            org.apache.poi.ss.usermodel.Sheet sheet = workbook.getSheet("Position");
+            assertNotNull(sheet);
+
+            Row headerRow = sheet.getRow(2); // 3行目 (0-based)
+            assertEquals("name", getCellValueAsString(headerRow.getCell(1)));
+            assertEquals("age", getCellValueAsString(headerRow.getCell(2)));
+            assertEquals("occupation", getCellValueAsString(headerRow.getCell(3)));
+            assertEquals("birthplace", getCellValueAsString(headerRow.getCell(4)));
+
+            Row dataRow = sheet.getRow(3);
+            assertEquals("花子", getCellValueAsString(dataRow.getCell(1)));
+            assertEquals(22, getCellValueAsNumber(dataRow.getCell(2)));
+            assertEquals("デザイナー", getCellValueAsString(dataRow.getCell(3)));
+            assertEquals("大阪", getCellValueAsString(dataRow.getCell(4)));
         }
     }
     
