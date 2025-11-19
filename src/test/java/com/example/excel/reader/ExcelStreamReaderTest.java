@@ -27,6 +27,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -449,6 +450,60 @@ public class ExcelStreamReaderTest {
     }
 
     @Test
+    @DisplayName("複数ファイル読み込み - ファイル順を保って1つのStreamとして連結されること")
+    void testMultiFileSequentialStream() throws IOException {
+        List<Path> files = Arrays.asList(
+            SAMPLE_EXCEL,
+            SAMPLE_EXCEL_MULTI_SHEET
+        );
+
+        List<Person> persons = ExcelStreamReader.builder(Person.class, files)
+            .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
+
+        assertNotNull(persons);
+        assertEquals(7, persons.size()); // 5人 + 2人
+        assertEquals("田中太郎", persons.get(0).getName()); // sample.xlsx 1人目
+        assertEquals("伊藤美咲", persons.get(4).getName()); // sample.xlsx 5人目
+        assertEquals("田中太郎", persons.get(5).getName()); // sample_multi_sheet.xlsx - データ1の1人目
+        assertEquals("佐藤花子", persons.get(6).getName()); // sample_multi_sheet.xlsx - データ1の2人目
+    }
+
+    @Test
+    @DisplayName("複数ファイルスキップ - skip()は各ファイルの先頭行をスキップすること")
+    void testSkipPerFileInMultiFileStream() throws IOException {
+        List<Person> file1Rows = Arrays.asList(
+            new Person("ファイル1-行1", 20, "職1", "地1"),
+            new Person("ファイル1-行2", 21, "職2", "地2"),
+            new Person("ファイル1-行3", 22, "職3", "地3")
+        );
+        List<Person> file2Rows = Arrays.asList(
+            new Person("ファイル2-行1", 30, "職A", "地A"),
+            new Person("ファイル2-行2", 31, "職B", "地B"),
+            new Person("ファイル2-行3", 32, "職C", "地C")
+        );
+
+        Path file1 = createTempExcel(file1Rows);
+        Path file2 = createTempExcel(file2Rows);
+
+        try {
+            List<String> names = ExcelStreamReader.builder(Person.class, Arrays.asList(file1, file2))
+                .skip(1)
+                .process((Function<Stream<Person>, List<String>>) stream -> stream
+                    .map(Person::getName)
+                    .collect(Collectors.toList()));
+
+            assertEquals(4, names.size());
+            assertEquals("ファイル1-行2", names.get(0));
+            assertEquals("ファイル1-行3", names.get(1));
+            assertEquals("ファイル2-行2", names.get(2));
+            assertEquals("ファイル2-行3", names.get(3));
+        } finally {
+            Files.deleteIfExists(file1);
+            Files.deleteIfExists(file2);
+        }
+    }
+
+    @Test
     @DisplayName("ヘッダー自動検出 - headerKey()でヘッダー行を自動検出できること")
     void testHeaderAutoDetection() throws IOException {
         List<Person> result = ExcelStreamReader.builder(Person.class, SAMPLE_EXCEL_WITH_TITLE)
@@ -601,6 +656,37 @@ public class ExcelStreamReaderTest {
 
             workbook.write(fos);
         }
+    }
+    
+    private static Path createTempExcel(List<Person> rows) throws IOException {
+        Path tempFile = Files.createTempFile("excel-multi-skip", ".xlsx");
+        tempFile.toFile().deleteOnExit();
+
+        try (Workbook workbook = new XSSFWorkbook();
+             FileOutputStream fos = new FileOutputStream(tempFile.toFile())) {
+            Sheet sheet = workbook.createSheet("Sheet1");
+
+            Row header = sheet.createRow(0);
+            header.createCell(0).setCellValue("名前");
+            header.createCell(1).setCellValue("年齢");
+            header.createCell(2).setCellValue("職業");
+            header.createCell(3).setCellValue("出身地");
+
+            for (int i = 0; i < rows.size(); i++) {
+                Person person = rows.get(i);
+                Row row = sheet.createRow(i + 1);
+                row.createCell(0).setCellValue(person.getName());
+                if (person.getAge() != null) {
+                    row.createCell(1).setCellValue(person.getAge());
+                }
+                row.createCell(2).setCellValue(person.getOccupation());
+                row.createCell(3).setCellValue(person.getBirthplace());
+            }
+
+            workbook.write(fos);
+        }
+
+        return tempFile;
     }
 
     @Test

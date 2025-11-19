@@ -133,6 +133,25 @@ List<Person> persons = CsvReaderWrapper.execute(
 
 **詳細は [docs/MIGRATION.md](docs/MIGRATION.md) を参照してください。**
 
+#### 複数ファイルの並列読み込み 🔄
+
+複数のCSVファイルを並列に読み込み、順序を維持して結合することができます。
+
+```java
+import java.util.Arrays;
+
+List<Path> files = Arrays.asList(
+    Paths.get("data1.csv"),
+    Paths.get("data2.csv")
+);
+
+// 複数ファイルを並列処理で一括読み込み
+List<Person> persons = CsvReaderWrapper.builder(Person.class, files)
+    .skipLines(1)                // 全ファイル共通の設定
+    .parallelism(4)              // 4並列で読み込み（順序は維持されます！）
+    .readAll();                  // 全ファイルを結合してListで返す
+```
+
 ### CsvStreamReader（Stream APIでの読み込み）
 
 レコードをJava Streamとして扱える軽量リーダー。メモリに載せずに逐次処理したいときに最適だよ！
@@ -582,6 +601,25 @@ List<Person> persons = ExcelStreamReader.builder(Person.class, Paths.get("sample
     .process(stream -> stream
         .filter(p -> p.getAge() >= 25)
         .collect(Collectors.toList()));
+```
+
+#### 複数ファイルの読み込み 🔄
+
+複数のExcelファイルを連結して、1つのストリームとして処理できます。メモリ消費を抑えるため、内部的にはファイルを1つずつ順番に処理します。
+
+```java
+List<Path> excelFiles = Arrays.asList(
+    Paths.get("data1.xlsx"),
+    Paths.get("data2.xlsx")
+);
+
+// 複数ファイルを連結してストリーム処理
+ExcelStreamReader.builder(Person.class, excelFiles)
+    .sheetName("Data")           // 全ファイル共通の設定
+    .process(stream -> stream
+        .filter(p -> p.getAge() >= 20)
+        .collect(Collectors.toList())
+    );
 ```
 
 ---

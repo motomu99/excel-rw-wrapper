@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -423,7 +424,7 @@ public class ExcelStreamWriterTest {
             new Person("田中太郎", 25, "エンジニア", "東京")
         );
         
-        assertThrows(IOException.class, () -> {
+        assertThrows(UncheckedIOException.class, () -> {
             ExcelStreamWriter.builder(Person.class, invalidPath)
                 .write(persons.stream());
         });

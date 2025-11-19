@@ -65,6 +65,22 @@ public class CsvReaderWrapper {
     }
 
     /**
+     * 現在の設定をコピーし、新しいファイルパスを設定したインスタンスを作成
+     * 
+     * @param newPath 新しいファイルパス
+     * @return 設定がコピーされた新しいインスタンス
+     */
+    private CsvReaderWrapper cloneConfig(Path newPath) {
+        CsvReaderWrapper clone = new CsvReaderWrapper(this.beanClass, newPath);
+        clone.skipLines = this.skipLines;
+        clone.charset = this.charset;
+        clone.fileType = this.fileType;
+        clone.usePositionMapping = this.usePositionMapping;
+        clone.withBom = this.withBom;
+        return clone;
+    }
+
+    /**
      * Builderインスタンスを生成（推奨される使い方）
      * 
      * @param beanClass マッピング先のBeanクラス
@@ -73,6 +89,17 @@ public class CsvReaderWrapper {
      */
     public static Builder builder(Class<?> beanClass, Path filePath) {
         return new Builder(beanClass, filePath);
+    }
+
+    /**
+     * Builderインスタンスを生成（複数ファイル用）
+     * 
+     * @param beanClass マッピング先のBeanクラス
+     * @param filePaths CSVファイルのパスリスト
+     * @return Builderインスタンス
+     */
+    public static Builder builder(Class<?> beanClass, List<Path> filePaths) {
+        return new Builder(beanClass, filePaths);
     }
 
     /**
@@ -230,9 +257,20 @@ public class CsvReaderWrapper {
      */
     public static class Builder {
         private final CsvReaderWrapper wrapper;
+        private final List<Path> filePaths;
+        private int parallelism = 1;
         
         private Builder(Class<?> beanClass, Path filePath) {
             this.wrapper = new CsvReaderWrapper(beanClass, filePath);
+            this.filePaths = java.util.Collections.singletonList(filePath);
+        }
+
+        private Builder(Class<?> beanClass, List<Path> filePaths) {
+            if (filePaths == null || filePaths.isEmpty()) {
+                throw new IllegalArgumentException("filePaths must not be empty or null");
+            }
+            this.wrapper = new CsvReaderWrapper(beanClass, filePaths.get(0));
+            this.filePaths = filePaths;
         }
         
         /**
@@ -302,7 +340,38 @@ public class CsvReaderWrapper {
          * @throws CsvReadException CSV読み込みエラー
          */
         public <T> List<T> read() {
+            if (filePaths.size() > 1) {
+                return readAll();
+            }
             return wrapper.read();
+        }
+
+        /**
+         * 並列度を設定
+         * 
+         * @param parallelism 並列度（1以下の場合は逐次処理）
+         * @return このBuilderインスタンス
+         */
+        public Builder parallelism(int parallelism) {
+            this.parallelism = parallelism;
+            return this;
+        }
+
+        /**
+         * 全ファイルを読み込む
+         * 
+         * <p>設定されたファイルリストを読み込み、
+         * 並列度に従って処理を実行します。</p>
+         * 
+         * @param <T> Beanの型
+         * @return BeanのList
+         */
+        public <T> List<T> readAll() {
+            return com.example.common.reader.ParallelReadExecutor.readAll(
+                filePaths,
+                path -> wrapper.cloneConfig(path).read(),
+                parallelism
+            );
         }
     }
 }

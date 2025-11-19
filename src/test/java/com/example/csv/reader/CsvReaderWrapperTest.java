@@ -236,4 +236,45 @@ public class CsvReaderWrapperTest {
         assertEquals("佐藤花子", firstPerson.getName());
         assertEquals(30, firstPerson.getAge());
     }
+
+    @Test
+    @DisplayName("複数ファイル読み込み - 複数のCSVファイルを結合して読み込めること")
+    void testBuilderWithMultipleFiles() {
+        List<java.nio.file.Path> paths = java.util.Arrays.asList(
+            Paths.get("src/test/resources/sample.csv"),
+            Paths.get("src/test/resources/sample_lf.csv")
+        );
+
+        List<Person> persons = CsvReaderWrapper.builder(Person.class, paths)
+            .readAll();
+
+        assertNotNull(persons);
+        assertEquals(5 + 3, persons.size()); // 5 + 3 = 8
+        
+        // 順序確認: sample.csv の最後 -> sample_lf.csv の最初
+        assertEquals("田中太郎", persons.get(0).getName()); // sample.csv 1人目
+        assertEquals("高橋健太", persons.get(4).getName()); // sample.csv 5人目
+        assertEquals("田中太郎", persons.get(5).getName()); // sample_lf.csv 1人目
+        assertEquals("鈴木一郎", persons.get(7).getName()); // sample_lf.csv 3人目
+    }
+
+    @Test
+    @DisplayName("複数ファイル並列読み込み - 並列処理でも順序が維持されること")
+    void testBuilderWithMultipleFilesParallel() {
+        List<java.nio.file.Path> paths = java.util.Arrays.asList(
+            Paths.get("src/test/resources/sample.csv"),
+            Paths.get("src/test/resources/sample_lf.csv")
+        );
+
+        List<Person> persons = CsvReaderWrapper.builder(Person.class, paths)
+            .parallelism(2)
+            .readAll();
+
+        assertNotNull(persons);
+        assertEquals(8, persons.size());
+        
+        assertEquals("田中太郎", persons.get(0).getName());
+        assertEquals("高橋健太", persons.get(4).getName());
+        assertEquals("鈴木一郎", persons.get(7).getName());
+    }
 }
