@@ -30,6 +30,7 @@ public class ExcelRowIterator<T> implements Iterator<T> {
     private final String headerKeyColumn;
     private final int headerSearchRows;
     private final boolean usePositionMapping;
+    private final boolean treatFirstRowAsData;
     
     private ExcelHeaderDetector headerDetector = null;
     private FieldMappingCache fieldMappingCache = null;
@@ -37,6 +38,7 @@ public class ExcelRowIterator<T> implements Iterator<T> {
     private T nextBean = null;
     private boolean hasNext = false;
     private boolean hasNextComputed = false;
+    private Row pendingFirstDataRow = null;
 
     /**
      * ExcelRowIteratorを作成
@@ -49,12 +51,13 @@ public class ExcelRowIterator<T> implements Iterator<T> {
      */
     public ExcelRowIterator(Iterator<Row> rowIterator, Class<T> beanClass, 
                            String headerKeyColumn, int headerSearchRows, 
-                           boolean usePositionMapping) {
+                           boolean usePositionMapping, boolean treatFirstRowAsData) {
         this.rowIterator = rowIterator;
         this.beanClass = beanClass;
         this.headerKeyColumn = headerKeyColumn;
         this.headerSearchRows = headerSearchRows;
         this.usePositionMapping = usePositionMapping;
+        this.treatFirstRowAsData = treatFirstRowAsData;
     }
 
     @Override
@@ -82,8 +85,8 @@ public class ExcelRowIterator<T> implements Iterator<T> {
 
         // 次のBeanを取得
         try {
-            while (rowIterator.hasNext()) {
-                Row row = rowIterator.next();
+            Row row;
+            while ((row = fetchNextRow()) != null) {
                 
                 // 空行をスキップ
                 if (row == null || isEmptyRow(row)) {
@@ -145,6 +148,10 @@ public class ExcelRowIterator<T> implements Iterator<T> {
 
         // フィールドキャッシュを構築
         fieldMappingCache = new FieldMappingCache(beanClass);
+
+        if (treatFirstRowAsData && headerKeyColumn == null && usePositionMapping && headerDetector.getHeaderRow() != null) {
+            pendingFirstDataRow = headerDetector.getHeaderRow();
+        }
     }
 
     /**
@@ -187,6 +194,15 @@ public class ExcelRowIterator<T> implements Iterator<T> {
         }
 
         return bean;
+    }
+
+    private Row fetchNextRow() {
+        if (pendingFirstDataRow != null) {
+            Row row = pendingFirstDataRow;
+            pendingFirstDataRow = null;
+            return row;
+        }
+        return rowIterator.hasNext() ? rowIterator.next() : null;
     }
 
     /**

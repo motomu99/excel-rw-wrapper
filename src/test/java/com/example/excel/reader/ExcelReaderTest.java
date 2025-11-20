@@ -1,0 +1,419 @@
+package com.example.excel.reader;
+
+import com.example.exception.HeaderNotFoundException;
+import com.example.exception.SheetNotFoundException;
+import com.example.model.Person;
+import com.example.model.PersonWithoutHeader;
+
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.List;
+
+@DisplayName("ExcelReader: 一括読み込み")
+public class ExcelReaderTest {
+
+    private static final Path TEST_RESOURCES_DIR = Paths.get("src/test/resources");
+    private static final Path SAMPLE_EXCEL = TEST_RESOURCES_DIR.resolve("sample.xlsx");
+    private static final Path SAMPLE_EXCEL_NO_HEADER = TEST_RESOURCES_DIR.resolve("sample_no_header.xlsx");
+    private static final Path SAMPLE_EXCEL_MULTI_SHEET = TEST_RESOURCES_DIR.resolve("sample_multi_sheet.xlsx");
+    private static final Path SAMPLE_EXCEL_WITH_TITLE = TEST_RESOURCES_DIR.resolve("sample_with_title.xlsx");
+    private static final Path SAMPLE_EXCEL_WITH_EMPTY_KEY = TEST_RESOURCES_DIR.resolve("sample_with_empty_key.xlsx");
+
+    @BeforeAll
+    static void setUp() throws IOException {
+        // テストリソースディレクトリを作成
+        Files.createDirectories(TEST_RESOURCES_DIR);
+
+        // 基本的なサンプルExcelファイルを作成
+        createSampleExcel();
+
+        // ヘッダーなしのサンプルExcelファイルを作成
+        createSampleExcelNoHeader();
+
+        // 複数シートのサンプルExcelファイルを作成
+        createSampleExcelMultiSheet();
+
+        // タイトル付きサンプルExcelファイルを作成（ヘッダーが3行目）
+        createSampleExcelWithTitle();
+
+        // キー列が途中で空になるサンプルExcelファイルを作成
+        createSampleExcelWithEmptyKey();
+    }
+
+    private static void createSampleExcel() throws IOException {
+        try (Workbook workbook = new XSSFWorkbook();
+             FileOutputStream fos = new FileOutputStream(SAMPLE_EXCEL.toFile())) {
+
+            Sheet sheet = workbook.createSheet("Sheet1");
+
+            // ヘッダー行を作成
+            Row headerRow = sheet.createRow(0);
+            headerRow.createCell(0).setCellValue("名前");
+            headerRow.createCell(1).setCellValue("年齢");
+            headerRow.createCell(2).setCellValue("職業");
+            headerRow.createCell(3).setCellValue("出身地");
+
+            // データ行を作成
+            createDataRow(sheet, 1, "田中太郎", 25, "エンジニア", "東京");
+            createDataRow(sheet, 2, "佐藤花子", 30, "デザイナー", "大阪");
+            createDataRow(sheet, 3, "山田次郎", 28, "営業", "福岡");
+            createDataRow(sheet, 4, "高橋健太", 35, "マネージャー", "名古屋");
+            createDataRow(sheet, 5, "伊藤美咲", 22, "デザイナー", "横浜");
+
+            workbook.write(fos);
+        }
+    }
+
+    private static void createDataRow(Sheet sheet, int rowIndex, String name, int age, String occupation, String birthplace) {
+        Row row = sheet.createRow(rowIndex);
+        row.createCell(0).setCellValue(name);
+        row.createCell(1).setCellValue(age);
+        row.createCell(2).setCellValue(occupation);
+        row.createCell(3).setCellValue(birthplace);
+    }
+
+    private static void createSampleExcelNoHeader() throws IOException {
+        try (Workbook workbook = new XSSFWorkbook();
+             FileOutputStream fos = new FileOutputStream(SAMPLE_EXCEL_NO_HEADER.toFile())) {
+
+            Sheet sheet = workbook.createSheet("Sheet1");
+
+            // ヘッダーなしでデータ行を作成
+            createDataRow(sheet, 0, "田中太郎", 25, "エンジニア", "東京");
+            createDataRow(sheet, 1, "佐藤花子", 30, "デザイナー", "大阪");
+            createDataRow(sheet, 2, "山田次郎", 28, "営業", "福岡");
+            createDataRow(sheet, 3, "高橋健太", 35, "マネージャー", "名古屋");
+            createDataRow(sheet, 4, "伊藤美咲", 22, "デザイナー", "横浜");
+
+            workbook.write(fos);
+        }
+    }
+
+    private static void createSampleExcelMultiSheet() throws IOException {
+        try (Workbook workbook = new XSSFWorkbook();
+             FileOutputStream fos = new FileOutputStream(SAMPLE_EXCEL_MULTI_SHEET.toFile())) {
+
+            // Sheet1
+            Sheet sheet1 = workbook.createSheet("データ1");
+            Row headerRow1 = sheet1.createRow(0);
+            headerRow1.createCell(0).setCellValue("名前");
+            headerRow1.createCell(1).setCellValue("年齢");
+            headerRow1.createCell(2).setCellValue("職業");
+            headerRow1.createCell(3).setCellValue("出身地");
+            createDataRow(sheet1, 1, "田中太郎", 25, "エンジニア", "東京");
+            createDataRow(sheet1, 2, "佐藤花子", 30, "デザイナー", "大阪");
+
+            // Sheet2
+            Sheet sheet2 = workbook.createSheet("データ2");
+            Row headerRow2 = sheet2.createRow(0);
+            headerRow2.createCell(0).setCellValue("名前");
+            headerRow2.createCell(1).setCellValue("年齢");
+            headerRow2.createCell(2).setCellValue("職業");
+            headerRow2.createCell(3).setCellValue("出身地");
+            createDataRow(sheet2, 1, "山田次郎", 28, "営業", "福岡");
+            createDataRow(sheet2, 2, "高橋健太", 35, "マネージャー", "名古屋");
+            createDataRow(sheet2, 3, "伊藤美咲", 22, "デザイナー", "横浜");
+
+            workbook.write(fos);
+        }
+    }
+
+    private static void createSampleExcelWithTitle() throws IOException {
+        try (Workbook workbook = new XSSFWorkbook();
+             FileOutputStream fos = new FileOutputStream(SAMPLE_EXCEL_WITH_TITLE.toFile())) {
+
+            Sheet sheet = workbook.createSheet("Sheet1");
+
+            // タイトル行（1行目）
+            Row titleRow = sheet.createRow(0);
+            titleRow.createCell(0).setCellValue("社員一覧");
+
+            // 空行（2行目）
+            sheet.createRow(1);
+
+            // ヘッダー行（3行目）
+            Row headerRow = sheet.createRow(2);
+            headerRow.createCell(0).setCellValue("名前");
+            headerRow.createCell(1).setCellValue("年齢");
+            headerRow.createCell(2).setCellValue("職業");
+            headerRow.createCell(3).setCellValue("出身地");
+
+            // データ行（4行目以降）
+            createDataRow(sheet, 3, "田中太郎", 25, "エンジニア", "東京");
+            createDataRow(sheet, 4, "佐藤花子", 30, "デザイナー", "大阪");
+            createDataRow(sheet, 5, "山田次郎", 28, "営業", "福岡");
+
+            workbook.write(fos);
+        }
+    }
+
+    private static void createSampleExcelWithEmptyKey() throws IOException {
+        try (Workbook workbook = new XSSFWorkbook();
+             FileOutputStream fos = new FileOutputStream(SAMPLE_EXCEL_WITH_EMPTY_KEY.toFile())) {
+
+            Sheet sheet = workbook.createSheet("Sheet1");
+
+            // ヘッダー行
+            Row headerRow = sheet.createRow(0);
+            headerRow.createCell(0).setCellValue("名前");
+            headerRow.createCell(1).setCellValue("年齢");
+            headerRow.createCell(2).setCellValue("職業");
+            headerRow.createCell(3).setCellValue("出身地");
+
+            // データ行（キー列「名前」が途中で空になる）
+            createDataRow(sheet, 1, "田中太郎", 25, "エンジニア", "東京");
+            createDataRow(sheet, 2, "佐藤花子", 30, "デザイナー", "大阪");
+            createDataRow(sheet, 3, "", 0, "", ""); // 空行
+            createDataRow(sheet, 4, "山田次郎", 28, "営業", "福岡"); // この行は読み込まれない
+
+            workbook.write(fos);
+        }
+    }
+
+    @Test
+    @DisplayName("基本的な読み込み - Excelファイルを一括で読み込めること")
+    void testBasicRead() throws IOException {
+        List<Person> result = ExcelReader.builder(Person.class, SAMPLE_EXCEL)
+            .read();
+
+        assertNotNull(result);
+        assertEquals(5, result.size());
+
+        // 最初のPersonの確認
+        Person firstPerson = result.get(0);
+        assertEquals("田中太郎", firstPerson.getName());
+        assertEquals(25, firstPerson.getAge());
+        assertEquals("エンジニア", firstPerson.getOccupation());
+        assertEquals("東京", firstPerson.getBirthplace());
+    }
+
+    @Test
+    @DisplayName("行スキップ - skip()メソッドで指定行数をスキップできること")
+    void testReadWithSkip() throws IOException {
+        List<Person> result = ExcelReader.builder(Person.class, SAMPLE_EXCEL)
+            .skip(2)
+            .read();
+
+        assertNotNull(result);
+        assertEquals(3, result.size());
+
+        // 最初のPersonの確認（3番目のデータ）
+        Person firstPerson = result.get(0);
+        assertEquals("山田次郎", firstPerson.getName());
+    }
+
+    @Test
+    @DisplayName("シート指定 - sheetIndex()メソッドで特定のシートを読み込めること")
+    void testReadWithSheetIndex() throws IOException {
+        // Sheet1（インデックス0）を読み込む
+        List<Person> result1 = ExcelReader.builder(Person.class, SAMPLE_EXCEL_MULTI_SHEET)
+            .sheetIndex(0)
+            .read();
+
+        assertNotNull(result1);
+        assertEquals(2, result1.size());
+        assertEquals("田中太郎", result1.get(0).getName());
+
+        // Sheet2（インデックス1）を読み込む
+        List<Person> result2 = ExcelReader.builder(Person.class, SAMPLE_EXCEL_MULTI_SHEET)
+            .sheetIndex(1)
+            .read();
+
+        assertNotNull(result2);
+        assertEquals(3, result2.size());
+        assertEquals("山田次郎", result2.get(0).getName());
+    }
+
+    @Test
+    @DisplayName("シート名指定 - sheetName()メソッドで特定のシートを読み込めること")
+    void testReadWithSheetName() throws IOException {
+        List<Person> result = ExcelReader.builder(Person.class, SAMPLE_EXCEL_MULTI_SHEET)
+            .sheetName("データ2")
+            .read();
+
+        assertNotNull(result);
+        assertEquals(3, result.size());
+        assertEquals("山田次郎", result.get(0).getName());
+    }
+
+    @Test
+    @DisplayName("位置ベースマッピング - usePositionMapping()でヘッダーなしExcelを読み込めること")
+    void testReadWithPositionMapping() throws IOException {
+        List<PersonWithoutHeader> result = ExcelReader.builder(PersonWithoutHeader.class, SAMPLE_EXCEL_NO_HEADER)
+            .usePositionMapping()
+            .noHeaderRow()
+            .read();
+
+        assertNotNull(result);
+        assertEquals(5, result.size());
+
+        // 最初のPersonWithoutHeaderの確認
+        PersonWithoutHeader firstPerson = result.get(0);
+        assertEquals("田中太郎", firstPerson.getName());
+        assertEquals(25, firstPerson.getAge());
+    }
+
+    @Test
+    @DisplayName("ヘッダーマッピング - useHeaderMapping()でヘッダー付きExcelを読み込めること")
+    void testReadWithHeaderMapping() throws IOException {
+        List<Person> result = ExcelReader.builder(Person.class, SAMPLE_EXCEL)
+            .useHeaderMapping()
+            .read();
+
+        assertNotNull(result);
+        assertEquals(5, result.size());
+
+        // 最初のPersonの確認
+        Person firstPerson = result.get(0);
+        assertEquals("田中太郎", firstPerson.getName());
+    }
+
+    @Test
+    @DisplayName("ヘッダー自動検出 - headerKey()でヘッダー行を自動検出できること")
+    void testReadWithHeaderKey() throws IOException {
+        List<Person> result = ExcelReader.builder(Person.class, SAMPLE_EXCEL_WITH_TITLE)
+            .headerKey("名前")
+            .headerSearchRows(5)
+            .read();
+
+        assertNotNull(result);
+        assertEquals(3, result.size());
+
+        // 最初のPersonの確認
+        Person firstPerson = result.get(0);
+        assertEquals("田中太郎", firstPerson.getName());
+    }
+
+    @Test
+    @DisplayName("キー列による終了判定 - headerKey()でキー列が空になったら読み込みを終了すること")
+    void testReadWithEmptyKey() throws IOException {
+        List<Person> result = ExcelReader.builder(Person.class, SAMPLE_EXCEL_WITH_EMPTY_KEY)
+            .headerKey("名前")
+            .read();
+
+        assertNotNull(result);
+        assertEquals(2, result.size()); // 空行の前まで読み込まれる
+
+        assertEquals("田中太郎", result.get(0).getName());
+        assertEquals("佐藤花子", result.get(1).getName());
+    }
+
+    @Test
+    @DisplayName("メソッドチェーン - 複数の設定を組み合わせて使用できること")
+    void testReadWithChainedSettings() throws IOException {
+        List<Person> result = ExcelReader.builder(Person.class, SAMPLE_EXCEL)
+            .skip(1)
+            .sheetIndex(0)
+            .useHeaderMapping()
+            .read();
+
+        assertNotNull(result);
+        assertEquals(4, result.size()); // 1行スキップして4件
+
+        assertEquals("佐藤花子", result.get(0).getName());
+    }
+
+    @Test
+    @DisplayName("複数ファイル読み込み - 複数ファイルを順番に読み込めること")
+    void testReadMultipleFiles() throws IOException {
+        List<Person> result = ExcelReader.builder(Person.class, Arrays.asList(SAMPLE_EXCEL, SAMPLE_EXCEL))
+            .read();
+
+        assertNotNull(result);
+        assertEquals(10, result.size()); // 2ファイル × 5件 = 10件
+
+        // 最初のファイルの最初のデータ
+        assertEquals("田中太郎", result.get(0).getName());
+        // 2番目のファイルの最初のデータ
+        assertEquals("田中太郎", result.get(5).getName());
+    }
+
+    @Test
+    @DisplayName("シートが見つからない場合 - SheetNotFoundExceptionが投げられること")
+    void testSheetNotFound() {
+        assertThrows(SheetNotFoundException.class, () -> {
+            ExcelReader.builder(Person.class, SAMPLE_EXCEL)
+                .sheetIndex(999)
+                .read();
+        });
+    }
+
+    @Test
+    @DisplayName("シート名が見つからない場合 - SheetNotFoundExceptionが投げられること")
+    void testSheetNameNotFound() {
+        assertThrows(SheetNotFoundException.class, () -> {
+            ExcelReader.builder(Person.class, SAMPLE_EXCEL)
+                .sheetName("存在しないシート")
+                .read();
+        });
+    }
+
+    @Test
+    @DisplayName("ヘッダーが見つからない場合 - HeaderNotFoundExceptionが投げられること")
+    void testHeaderNotFound() {
+        assertThrows(HeaderNotFoundException.class, () -> {
+            ExcelReader.builder(Person.class, SAMPLE_EXCEL_NO_HEADER)
+                .headerKey("名前")
+                .headerSearchRows(5)
+                .read();
+        });
+    }
+
+    @Test
+    @DisplayName("キー列が見つからない場合 - HeaderNotFoundExceptionが投げられること")
+    void testKeyColumnNotFound() {
+        // 注意: headerKey()の動作は「キー列名がセルの値と一致する行を探す」ため、
+        // 「存在しない列」という値を持つセルがない場合はHeaderNotFoundExceptionが投げられる。
+        // KeyColumnNotFoundExceptionは、ヘッダー行は見つかったが、そのヘッダー行に
+        // キー列名が列名として存在しない場合に投げられるが、現在の実装では
+        // このケースは発生しない（headerKey()で見つけた行にキー列名が存在するため）。
+        // 
+        // ExcelStreamReaderTest.testKeyColumnNotInHeader()と同様の動作をテストする。
+        HeaderNotFoundException exception = assertThrows(HeaderNotFoundException.class, () -> {
+            ExcelReader.builder(Person.class, SAMPLE_EXCEL)
+                .headerKey("存在しない列")
+                .read();
+        });
+        
+        assertTrue(exception.getMessage().contains("存在しない列"));
+    }
+
+    @Test
+    @DisplayName("ファイルが存在しない場合 - IOExceptionが投げられること")
+    void testFileNotFound() {
+        assertThrows(IOException.class, () -> {
+            ExcelReader.builder(Person.class, Paths.get("存在しないファイル.xlsx"))
+                .read();
+        });
+    }
+
+    @Test
+    @DisplayName("空のファイルリスト - IllegalArgumentExceptionが投げられること")
+    void testEmptyFileList() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            ExcelReader.builder(Person.class, Arrays.asList());
+        });
+    }
+
+    @Test
+    @DisplayName("nullのファイルリスト - IllegalArgumentExceptionが投げられること")
+    void testNullFileList() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            ExcelReader.builder(Person.class, (List<Path>) null);
+        });
+    }
+}
+

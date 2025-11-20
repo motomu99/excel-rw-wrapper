@@ -111,17 +111,12 @@ public class ExcelStreamReaderTest {
 
             Sheet sheet = workbook.createSheet("Sheet1");
 
-            // ヘッダー行（位置マッピング用のダミー）
-            Row headerRow = sheet.createRow(0);
-            headerRow.createCell(0).setCellValue("col0");
-            headerRow.createCell(1).setCellValue("col1");
-
             // データ行を作成（名前と年齢のみ）
-            createSimpleDataRow(sheet, 1, "田中太郎", 25);
-            createSimpleDataRow(sheet, 2, "佐藤花子", 30);
-            createSimpleDataRow(sheet, 3, "山田次郎", 28);
-            createSimpleDataRow(sheet, 4, "高橋健太", 35);
-            createSimpleDataRow(sheet, 5, "伊藤美咲", 27);
+            createSimpleDataRow(sheet, 0, "田中太郎", 25);
+            createSimpleDataRow(sheet, 1, "佐藤花子", 30);
+            createSimpleDataRow(sheet, 2, "山田次郎", 28);
+            createSimpleDataRow(sheet, 3, "高橋健太", 35);
+            createSimpleDataRow(sheet, 4, "伊藤美咲", 27);
 
             workbook.write(fos);
         }
@@ -360,6 +355,7 @@ public class ExcelStreamReaderTest {
     void testStreamWithPositionMapping() throws IOException {
         List<PersonWithoutHeader> result = ExcelStreamReader.builder(PersonWithoutHeader.class, SAMPLE_EXCEL_NO_HEADER)
             .usePositionMapping()
+            .noHeaderRow()
             .process((Function<Stream<PersonWithoutHeader>, List<PersonWithoutHeader>>) stream -> stream.collect(Collectors.toList()));
 
         assertNotNull(result);

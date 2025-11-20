@@ -43,6 +43,12 @@ import lombok.extern.slf4j.Slf4j;
  * // 複数ファイルを順番に処理（メモリ効率維持）
  * List&lt;Person&gt; persons = ExcelStreamReader.builder(Person.class, Arrays.asList(path1, path2))
  *     .process(stream -&gt; stream.collect(Collectors.toList()));
+ *
+ * // 一括読み込み（process()を使わない）
+ * List&lt;Person&gt; persons = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
+ *     .sheetIndex(0)
+ *     .skip(1)
+ *     .read();
  * </pre>
  */
 @Slf4j
@@ -66,6 +72,7 @@ public class ExcelStreamReader<T> {
     boolean usePositionMapping = false;
     String headerKeyColumn = null;
     int headerSearchRows = DEFAULT_HEADER_SEARCH_ROWS;
+    boolean treatFirstRowAsData = false;
 
     private ExcelStreamReader(Class<T> beanClass, Path filePath) {
         this.beanClass = beanClass;
@@ -209,20 +216,8 @@ public class ExcelStreamReader<T> {
         clone.usePositionMapping = this.usePositionMapping;
         clone.headerKeyColumn = this.headerKeyColumn;
         clone.headerSearchRows = this.headerSearchRows;
+        clone.treatFirstRowAsData = this.treatFirstRowAsData;
         return clone;
-    }
-
-    /**
-     * 戻り値不要の処理用ショートカット
-     *
-     * @param consumer Streamを消費する処理
-     * @throws IOException ファイル読み込みエラー
-     */
-    private void process(Consumer<Stream<T>> consumer) throws IOException {
-        process(stream -> {
-            consumer.accept(stream);
-            return null;
-        });
     }
 
     private OpenedResource<T> openResource(Path path) throws IOException {
@@ -278,7 +273,8 @@ public class ExcelStreamReader<T> {
             beanClass, 
             headerKeyColumn, 
             headerSearchRows, 
-            usePositionMapping
+            usePositionMapping,
+            treatFirstRowAsData
         );
     }
 
@@ -457,6 +453,16 @@ public class ExcelStreamReader<T> {
         }
         
         /**
+         * ヘッダー行が存在しないファイルで最初の行をデータとみなす
+         *
+         * @return このBuilderインスタンス
+         */
+        public Builder<T> noHeaderRow() {
+            reader.treatFirstRowAsData = true;
+            return this;
+        }
+        
+        /**
          * ヘッダーベースマッピングを使用（デフォルト）
          *
          * @return このBuilderインスタンス
@@ -541,6 +547,7 @@ public class ExcelStreamReader<T> {
             }
             return this;
         }
+        
     }
 
 }
