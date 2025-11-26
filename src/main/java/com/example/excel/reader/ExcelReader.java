@@ -48,7 +48,6 @@ public class ExcelReader<T> {
     boolean usePositionMapping = false;
     String headerKeyColumn = null;
     int headerSearchRows = 10; // デフォルトのヘッダー探索行数
-    boolean treatFirstRowAsData = false;
 
     private ExcelReader(Class<T> beanClass, Path filePath) {
         this.beanClass = beanClass;
@@ -98,9 +97,6 @@ public class ExcelReader<T> {
                 .sheetIndex(sheetIndex)
                 .skip(skipLines)
                 .headerSearchRows(headerSearchRows);
-            if (treatFirstRowAsData) {
-                builder.noHeaderRow();
-            }
             
             if (sheetName != null) {
                 builder.sheetName(sheetName);
@@ -139,7 +135,6 @@ public class ExcelReader<T> {
         clone.usePositionMapping = this.usePositionMapping;
         clone.headerKeyColumn = this.headerKeyColumn;
         clone.headerSearchRows = this.headerSearchRows;
-        clone.treatFirstRowAsData = this.treatFirstRowAsData;
         return clone;
     }
 
@@ -210,16 +205,6 @@ public class ExcelReader<T> {
          */
         public Builder<T> usePositionMapping() {
             reader.usePositionMapping = true;
-            return this;
-        }
-        
-        /**
-         * ヘッダー行が存在しないファイルで最初の行をデータとみなす
-         *
-         * @return このBuilderインスタンス
-         */
-        public Builder<T> noHeaderRow() {
-            reader.treatFirstRowAsData = true;
             return this;
         }
         

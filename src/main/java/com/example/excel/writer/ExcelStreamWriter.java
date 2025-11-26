@@ -58,6 +58,7 @@ import lombok.extern.slf4j.Slf4j;
  *     .sheetName("データ")
  *     .startCell(2, 0)  // A3セルから書き込み開始
  *     .write(persons.stream());
+ *
  * </pre>
  *
  * @param <T> マッピング先のBeanクラスの型

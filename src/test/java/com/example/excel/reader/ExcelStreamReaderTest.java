@@ -355,7 +355,6 @@ public class ExcelStreamReaderTest {
     void testStreamWithPositionMapping() throws IOException {
         List<PersonWithoutHeader> result = ExcelStreamReader.builder(PersonWithoutHeader.class, SAMPLE_EXCEL_NO_HEADER)
             .usePositionMapping()
-            .noHeaderRow()
             .process((Function<Stream<PersonWithoutHeader>, List<PersonWithoutHeader>>) stream -> stream.collect(Collectors.toList()));
 
         assertNotNull(result);

@@ -254,7 +254,6 @@ public class ExcelReaderTest {
     void testReadWithPositionMapping() throws IOException {
         List<PersonWithoutHeader> result = ExcelReader.builder(PersonWithoutHeader.class, SAMPLE_EXCEL_NO_HEADER)
             .usePositionMapping()
-            .noHeaderRow()
             .read();
 
         assertNotNull(result);

@@ -624,6 +624,88 @@ ExcelStreamReader.builder(Person.class, excelFiles)
 
 ---
 
+### ExcelReader（一括読み込み）
+
+Streamを使わずに、すべてのデータを一度に読み込んでListとして返すリーダー。シンプルな一括処理に最適！
+
+#### 基本的な使い方
+
+```java
+import com.example.excel.reader.ExcelReader;
+import com.example.model.Person;
+import java.nio.file.Paths;
+import java.util.List;
+
+// 基本的な読み込み（process()を使わない）
+List<Person> persons = ExcelReader.builder(Person.class, Paths.get("sample.xlsx"))
+    .read();
+```
+
+#### シート指定
+
+```java
+// シートインデックスで指定（0から始まる）
+List<Person> persons = ExcelReader.builder(Person.class, Paths.get("sample.xlsx"))
+    .sheetIndex(0)
+    .read();
+
+// シート名で指定
+List<Person> persons = ExcelReader.builder(Person.class, Paths.get("sample.xlsx"))
+    .sheetName("データ")
+    .read();
+```
+
+#### ヘッダー行の自動検出
+
+```java
+// ヘッダー行を自動検出（上から10行以内で「名前」列を探す）
+List<Person> persons = ExcelReader.builder(Person.class, Paths.get("sample.xlsx"))
+    .headerKey("名前")
+    .read();
+
+// ヘッダー行の探索範囲を20行に拡張
+List<Person> persons = ExcelReader.builder(Person.class, Paths.get("sample.xlsx"))
+    .headerKey("名前")
+    .headerSearchRows(20)
+    .read();
+```
+
+#### 行のスキップ
+
+```java
+// 最初の2行をスキップ（タイトル行などがある場合）
+List<Person> persons = ExcelReader.builder(Person.class, Paths.get("sample.xlsx"))
+    .skip(2)
+    .read();
+```
+
+#### ヘッダーなしExcelの読み込み
+
+```java
+// 位置ベースのマッピングを使用
+List<PersonWithoutHeader> persons = ExcelReader.builder(PersonWithoutHeader.class, Paths.get("no_header.xlsx"))
+    .usePositionMapping()
+    .read();
+```
+
+#### 複数ファイルの読み込み
+
+```java
+List<Path> excelFiles = Arrays.asList(
+    Paths.get("data1.xlsx"),
+    Paths.get("data2.xlsx")
+);
+
+// 複数ファイルを読み込んで結合
+List<Person> persons = ExcelReader.builder(Person.class, excelFiles)
+    .sheetName("Data")           // 全ファイル共通の設定
+    .read();
+```
+
+**注意**: 大きなファイルの場合は、メモリに全てのデータを保持するため、`ExcelStreamReader`を使用したストリーミング処理を推奨します。
+
+---
+
 ## Excel書き込み機能 📝
 
 Apache POIをラップしたシンプルなExcel書き込みライブラリです。
@@ -710,6 +792,72 @@ ExcelStreamReader.builder(Person.class, Paths.get("input.xlsx"))
             .write(stream.filter(p -> p.getAge() >= 30));
     });
 ```
+
+---
+
+### ExcelWriter（一括書き込み）
+
+Streamを使わずに、Listを直接書き込むライター。シンプルな一括処理に最適！
+
+#### 基本的な使い方
+
+```java
+import com.example.excel.writer.ExcelWriter;
+import com.example.model.Person;
+import java.nio.file.Paths;
+import java.util.List;
+
+List<Person> persons = Arrays.asList(
+    new Person("田中太郎", 25, "エンジニア", "東京"),
+    new Person("佐藤花子", 30, "デザイナー", "大阪")
+);
+
+// 基本的な書き込み（Streamを使わない）
+ExcelWriter.builder(Person.class, Paths.get("output.xlsx"))
+    .write(persons);
+```
+
+#### シート名指定
+
+```java
+ExcelWriter.builder(Person.class, Paths.get("output.xlsx"))
+    .sheetName("社員データ")
+    .write(persons);
+```
+
+#### 位置ベースマッピング
+
+```java
+ExcelWriter.builder(PersonWithoutHeader.class, Paths.get("output.xlsx"))
+    .usePositionMapping()
+    .write(persons);
+```
+
+#### 既存ファイルへの書き込み
+
+```java
+// 既存ファイル（テンプレート）にデータを書き込む
+ExcelWriter.builder(Person.class, Paths.get("template.xlsx"))
+    .loadExisting()
+    .sheetName("データ")
+    .startCell(2, 0)  // A3セルから書き込み開始
+    .write(persons);
+```
+
+#### ExcelReaderと組み合わせて使う
+
+```java
+// ExcelReaderで読み込んだデータをExcelWriterで書き込む
+List<Person> persons = ExcelReader.builder(Person.class, Paths.get("input.xlsx"))
+    .read();
+
+ExcelWriter.builder(Person.class, Paths.get("output.xlsx"))
+    .write(persons);
+```
+
+**注意**: 大きなファイルの場合は、`ExcelStreamWriter`を使用したストリーミング処理を推奨します。
+
+---
 
 #### CSVStreamReaderと組み合わせて使う（CSV → Excel変換）
 

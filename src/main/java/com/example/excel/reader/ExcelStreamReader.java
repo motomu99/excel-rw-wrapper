@@ -72,7 +72,6 @@ public class ExcelStreamReader<T> {
     boolean usePositionMapping = false;
     String headerKeyColumn = null;
     int headerSearchRows = DEFAULT_HEADER_SEARCH_ROWS;
-    boolean treatFirstRowAsData = false;
 
     private ExcelStreamReader(Class<T> beanClass, Path filePath) {
         this.beanClass = beanClass;
@@ -216,8 +215,20 @@ public class ExcelStreamReader<T> {
         clone.usePositionMapping = this.usePositionMapping;
         clone.headerKeyColumn = this.headerKeyColumn;
         clone.headerSearchRows = this.headerSearchRows;
-        clone.treatFirstRowAsData = this.treatFirstRowAsData;
         return clone;
+    }
+
+    /**
+     * 戻り値不要の処理用ショートカット
+     *
+     * @param consumer Streamを消費する処理
+     * @throws IOException ファイル読み込みエラー
+     */
+    private void process(Consumer<Stream<T>> consumer) throws IOException {
+        process(stream -> {
+            consumer.accept(stream);
+            return null;
+        });
     }
 
     private OpenedResource<T> openResource(Path path) throws IOException {
@@ -274,7 +285,7 @@ public class ExcelStreamReader<T> {
             headerKeyColumn, 
             headerSearchRows, 
             usePositionMapping,
-            treatFirstRowAsData
+            usePositionMapping // 位置ベースマッピングの場合は最初の行もデータとして扱う
         );
     }
 
@@ -449,16 +460,6 @@ public class ExcelStreamReader<T> {
          */
         public Builder<T> usePositionMapping() {
             reader.usePositionMapping = true;
-            return this;
-        }
-        
-        /**
-         * ヘッダー行が存在しないファイルで最初の行をデータとみなす
-         *
-         * @return このBuilderインスタンス
-         */
-        public Builder<T> noHeaderRow() {
-            reader.treatFirstRowAsData = true;
             return this;
         }
         
