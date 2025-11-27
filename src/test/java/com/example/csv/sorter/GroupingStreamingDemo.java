@@ -60,13 +60,12 @@ public class GroupingStreamingDemo {
         Map<String, OccupationStats> statsMap = new ConcurrentHashMap<>();
         
         ExcelStreamReader.builder(Person.class, largeExcel)
-            .process(stream -> {
+            .consume(stream -> {
                 stream.forEach(person -> {
                     String occupation = person.getOccupation();
                     statsMap.computeIfAbsent(occupation, k -> new OccupationStats())
                            .add(person.getAge());
                 });
-                return null;
             });
         
         long elapsed = System.currentTimeMillis() - startTime;
@@ -94,7 +93,7 @@ public class GroupingStreamingDemo {
         Map<String, Integer> saveCount = new HashMap<>();
         
         ExcelStreamReader.builder(Person.class, largeExcel)
-            .process(stream -> {
+            .consume(stream -> {
                 stream.forEach(person -> {
                     String occupation = person.getOccupation();
                     
@@ -119,8 +118,6 @@ public class GroupingStreamingDemo {
                         batch.clear();
                     }
                 });
-                
-                return null;
             });
         
         elapsed = System.currentTimeMillis() - startTime;
@@ -147,13 +144,12 @@ public class GroupingStreamingDemo {
         final int TOP_N = 10;
         
         ExcelStreamReader.builder(Person.class, largeExcel)
-            .process(stream -> {
+            .consume(stream -> {
                 stream.forEach(person -> {
                     String city = person.getBirthplace();
                     topNMap.computeIfAbsent(city, k -> new TopNCollector(TOP_N))
                           .add(person);
                 });
-                return null;
             });
         
         elapsed = System.currentTimeMillis() - startTime;
@@ -180,7 +176,7 @@ public class GroupingStreamingDemo {
         Map<String, AtomicInteger> seniorCount = new HashMap<>();
         
         ExcelStreamReader.builder(Person.class, largeExcel)
-            .process(stream -> {
+            .consume(stream -> {
                 stream
                     .filter(person -> person.getAge() >= 50)  // 50歳以上のみ
                     .forEach(person -> {
@@ -189,7 +185,6 @@ public class GroupingStreamingDemo {
                             k -> new AtomicInteger()
                         ).incrementAndGet();
                     });
-                return null;
             });
         
         elapsed = System.currentTimeMillis() - startTime;

@@ -168,14 +168,14 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 List<Person> persons = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.csv"))
-    .process(stream -> stream.collect(Collectors.toList()));
+    .extract(stream -> stream.collect(Collectors.toList()));
 ```
 
 #### フィルタ／マップなどのStream操作
 
 ```java
 List<String> namesOver30 = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.csv"))
-    .process(stream -> stream
+    .extract(stream -> stream
         .filter(p -> p.getAge() >= 30)
         .map(Person::getName)
         .collect(Collectors.toList()));
@@ -186,7 +186,7 @@ List<String> namesOver30 = CsvStreamReader.builder(Person.class, Paths.get("src/
 ```java
 List<Person> skipped = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.csv"))
     .skip(2)
-    .process(stream -> stream.collect(Collectors.toList()));
+    .extract(stream -> stream.collect(Collectors.toList()));
 ```
 
 #### 文字セット・区切り指定（CSV/TSVなど）
@@ -197,11 +197,11 @@ import com.example.common.config.FileType;
 
 List<Person> sjis = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample_sjis.csv"))
     .charset(CharsetType.S_JIS)
-    .process(stream -> stream.collect(Collectors.toList()));
+    .extract(stream -> stream.collect(Collectors.toList()));
 
 List<Person> tsv = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.tsv"))
     .fileType(FileType.TSV)
-    .process(stream -> stream.collect(Collectors.toList()));
+    .extract(stream -> stream.collect(Collectors.toList()));
 ```
 
 #### ヘッダー有無のマッピング
@@ -210,21 +210,21 @@ List<Person> tsv = CsvStreamReader.builder(Person.class, Paths.get("src/test/res
 // ヘッダー付き（デフォルト）
 List<Person> withHeader = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.csv"))
     .useHeaderMapping() // 省略可（デフォルト）
-    .process(stream -> stream.collect(Collectors.toList()));
+    .extract(stream -> stream.collect(Collectors.toList()));
 
 // ヘッダーなし（位置ベース）
 import com.example.model.PersonWithoutHeader;
 
 List<PersonWithoutHeader> noHeader = CsvStreamReader.builder(PersonWithoutHeader.class, Paths.get("src/test/resources/sample_no_header.csv"))
     .usePositionMapping()
-    .process(stream -> stream.collect(Collectors.toList()));
+    .extract(stream -> stream.collect(Collectors.toList()));
 ```
 
 #### 戻り値なし（副作用系）
 
 ```java
 CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.csv"))
-    .process(stream -> {
+    .consume(stream -> {
         stream.forEach(p -> System.out.println(p.getName()));
     });
 ```
@@ -234,7 +234,7 @@ CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.csv")
 ```java
 // 件数だけ欲しい場合
 long count = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.csv"))
-    .process(stream -> stream.count());
+    .extract(stream -> stream.count());
 
 // メソッドチェーンで一気に
 List<String> names = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.csv"))
@@ -242,7 +242,7 @@ List<String> names = CsvStreamReader.builder(Person.class, Paths.get("src/test/r
     .charset(CharsetType.UTF_8)
     .fileType(FileType.CSV)
     .useHeaderMapping()
-    .process(stream -> stream
+    .extract(stream -> stream
         .filter(p -> p.getAge() >= 25)
         .map(Person::getName)
         .collect(Collectors.toList()));
@@ -332,7 +332,7 @@ CsvStreamWriter.builder(Person.class, Paths.get("output.csv"))
 ```java
 // 読み込み → フィルタ → 書き込みの一連の流れ
 CsvStreamReader.builder(Person.class, Paths.get("input.csv"))
-    .process(stream -> {
+    .consume(stream -> {
         CsvStreamWriter.builder(Person.class, Paths.get("output.csv"))
             .write(stream.filter(p -> p.getAge() >= 30));
     });
@@ -345,7 +345,7 @@ import com.example.excel.writer.ExcelStreamWriter;
 
 // CSVから読み込んでExcelに書き込む
 CsvStreamReader.builder(Person.class, Paths.get("input.csv"))
-    .process(stream -> {
+    .consume(stream -> {
         ExcelStreamWriter.builder(Person.class, Paths.get("output.xlsx"))
             .sheetName("社員データ")
             .write(stream);
@@ -524,7 +524,7 @@ import java.util.stream.Collectors;
 
 // 基本的な読み込み（Listに集約）
 List<Person> persons = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
-    .process(stream -> stream.collect(Collectors.toList()));
+    .extract(stream -> stream.collect(Collectors.toList()));
 ```
 
 #### シート指定
@@ -533,12 +533,12 @@ List<Person> persons = ExcelStreamReader.builder(Person.class, Paths.get("sample
 // シートインデックスで指定（0から始まる）
 List<Person> persons = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
     .sheetIndex(0)
-    .process(stream -> stream.collect(Collectors.toList()));
+    .extract(stream -> stream.collect(Collectors.toList()));
 
 // シート名で指定
 List<Person> persons = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
     .sheetName("データ")
-    .process(stream -> stream.collect(Collectors.toList()));
+    .extract(stream -> stream.collect(Collectors.toList()));
 ```
 
 #### ヘッダー行の自動検出
@@ -547,13 +547,13 @@ List<Person> persons = ExcelStreamReader.builder(Person.class, Paths.get("sample
 // ヘッダー行を自動検出（上から10行以内で「名前」列を探す）
 List<Person> persons = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
     .headerKey("名前")
-    .process(stream -> stream.collect(Collectors.toList()));
+    .extract(stream -> stream.collect(Collectors.toList()));
 
 // ヘッダー行の探索範囲を20行に拡張
 List<Person> persons = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
     .headerKey("名前")
     .headerSearchRows(20)
-    .process(stream -> stream.collect(Collectors.toList()));
+    .extract(stream -> stream.collect(Collectors.toList()));
 ```
 
 #### 行のスキップ
@@ -562,7 +562,7 @@ List<Person> persons = ExcelStreamReader.builder(Person.class, Paths.get("sample
 // 最初の2行をスキップ（タイトル行などがある場合）
 List<Person> persons = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
     .skip(2)
-    .process(stream -> stream.collect(Collectors.toList()));
+    .extract(stream -> stream.collect(Collectors.toList()));
 ```
 
 #### ヘッダーなしExcelの読み込み
@@ -571,7 +571,7 @@ List<Person> persons = ExcelStreamReader.builder(Person.class, Paths.get("sample
 // 位置ベースのマッピングを使用
 List<PersonWithoutHeader> persons = ExcelStreamReader.builder(PersonWithoutHeader.class, Paths.get("no_header.xlsx"))
     .usePositionMapping()
-    .process(stream -> stream.collect(Collectors.toList()));
+    .extract(stream -> stream.collect(Collectors.toList()));
 ```
 
 #### フィルタ／マップなどのStream操作
@@ -579,13 +579,13 @@ List<PersonWithoutHeader> persons = ExcelStreamReader.builder(PersonWithoutHeade
 ```java
 // 年齢30歳以上でフィルタ
 List<Person> filtered = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
-    .process(stream -> stream
+    .extract(stream -> stream
         .filter(p -> p.getAge() >= 30)
         .collect(Collectors.toList()));
 
 // 名前だけを抽出
 List<String> names = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
-    .process(stream -> stream
+    .extract(stream -> stream
         .map(Person::getName)
         .collect(Collectors.toList()));
 ```
@@ -598,7 +598,7 @@ List<Person> persons = ExcelStreamReader.builder(Person.class, Paths.get("sample
     .skip(1)
     .headerKey("名前")
     .headerSearchRows(20)
-    .process(stream -> stream
+    .extract(stream -> stream
         .filter(p -> p.getAge() >= 25)
         .collect(Collectors.toList()));
 ```
@@ -616,7 +616,7 @@ List<Path> excelFiles = Arrays.asList(
 // 複数ファイルを連結してストリーム処理
 ExcelStreamReader.builder(Person.class, excelFiles)
     .sheetName("Data")           // 全ファイル共通の設定
-    .process(stream -> stream
+    .extract(stream -> stream
         .filter(p -> p.getAge() >= 20)
         .collect(Collectors.toList())
     );
@@ -636,7 +636,7 @@ import com.example.model.Person;
 import java.nio.file.Paths;
 import java.util.List;
 
-// 基本的な読み込み（process()を使わない）
+// 基本的な読み込み（extract()/consume()を使わない）
 List<Person> persons = ExcelReader.builder(Person.class, Paths.get("sample.xlsx"))
     .read();
 ```
@@ -787,7 +787,7 @@ ExcelStreamWriter.builder(Person.class, Paths.get("output.xlsx"))
 ```java
 // 読み込み → フィルタ → 書き込みの一連の流れ
 ExcelStreamReader.builder(Person.class, Paths.get("input.xlsx"))
-    .process(stream -> {
+    .consume(stream -> {
         ExcelStreamWriter.builder(Person.class, Paths.get("output.xlsx"))
             .write(stream.filter(p -> p.getAge() >= 30));
     });
@@ -867,7 +867,7 @@ import com.example.excel.writer.ExcelStreamWriter;
 
 // CSVから読み込んでExcelに書き込む
 CsvStreamReader.builder(Person.class, Paths.get("input.csv"))
-    .process(stream -> {
+    .consume(stream -> {
         ExcelStreamWriter.builder(Person.class, Paths.get("output.xlsx"))
             .sheetName("社員データ")
             .write(stream);
@@ -876,7 +876,7 @@ CsvStreamReader.builder(Person.class, Paths.get("input.csv"))
 // CSVから読み込んでフィルタしてExcelに書き込む
 CsvStreamReader.builder(Person.class, Paths.get("input.csv"))
     .charset(CharsetType.S_JIS)  // Shift_JISのCSVファイル
-    .process(stream -> {
+    .consume(stream -> {
         ExcelStreamWriter.builder(Person.class, Paths.get("output.xlsx"))
             .sheetName("30歳以上")
             .write(stream.filter(p -> p.getAge() >= 30));
@@ -891,7 +891,7 @@ import com.example.csv.writer.CsvStreamWriter;
 
 // Excelから読み込んでCSVに書き込む
 ExcelStreamReader.builder(Person.class, Paths.get("input.xlsx"))
-    .process(stream -> {
+    .consume(stream -> {
         CsvStreamWriter.builder(Person.class, Paths.get("output.csv"))
             .charset(CharsetType.UTF_8)
             .write(stream);
@@ -901,7 +901,7 @@ ExcelStreamReader.builder(Person.class, Paths.get("input.xlsx"))
 ExcelStreamReader.builder(Person.class, Paths.get("input.xlsx"))
     .sheetName("データ")
     .skip(1)  // タイトル行をスキップ
-    .process(stream -> {
+    .consume(stream -> {
         CsvStreamWriter.builder(Person.class, Paths.get("output.csv"))
             .charset(CharsetType.S_JIS)
             .fileType(FileType.CSV)
@@ -1067,11 +1067,11 @@ Table<Person> table = Table.builder(Person.class)
   - そのため、ラムダ内で `try-catch` は基本的に不要です。
 
 - Excel 読み込み（`ExcelStreamReader`）
-  - `process(...)` は **`IOException`（チェック例外）** をスローします。呼び出し元で `try-catch` するか、メソッドに `throws IOException` を付与してください。
+  - `extract(...)` / `consume(...)` は **`IOException`（チェック例外）** をスローします。呼び出し元で `try-catch` するか、メソッドに `throws IOException` を付与してください。
   - シートやヘッダー関連のドメイン例外（例: `SheetNotFoundException`, `HeaderNotFoundException`, `KeyColumnNotFoundException`）は、状況に応じて非チェック例外としてスローされます。
 
 - CSV 読み込み（`CsvStreamReader` / `CsvReaderWrapper`）
-  - `process(...)` は **`IOException`（チェック例外）** と **`CsvException`（チェック例外）** をスローします。
+  - `extract(...)` / `consume(...)` は **`IOException`（チェック例外）** と **`CsvException`（チェック例外）** をスローします。
   - 列数が不一致の場合、**非チェック例外**の `CsvReadException` がスローされます。
   - エラーメッセージには行番号、期待される列数、実際の列数、該当行の内容（プレビュー）が含まれます。
 

@@ -52,11 +52,11 @@ import java.util.stream.Collectors;
 
 // 基本（Listに集約）
 List<Person> persons = CsvStreamReader.builder(Person.class, Paths.get("sample.csv"))
-    .process(stream -> stream.collect(Collectors.toList()));
+    .extract(stream -> stream.collect(Collectors.toList()));
 
 // フィルタ／マップなどのStream操作
 List<String> namesOver30 = CsvStreamReader.builder(Person.class, Paths.get("sample.csv"))
-    .process(stream -> stream
+    .extract(stream -> stream
         .filter(p -> p.getAge() >= 30)
         .map(Person::getName)
         .collect(Collectors.toList()));
@@ -110,18 +110,18 @@ import java.util.stream.Collectors;
 
 // 基本的な読み込み
 List<Person> persons = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
-    .process(stream -> stream.collect(Collectors.toList()));
+    .extract(stream -> stream.collect(Collectors.toList()));
 
 // シート指定
 List<Person> persons = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
     .sheetName("データ")
-    .process(stream -> stream.collect(Collectors.toList()));
+    .extract(stream -> stream.collect(Collectors.toList()));
 
 // ヘッダー行の自動検出
 List<Person> persons = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
     .headerKey("名前")
     .headerSearchRows(20)
-    .process(stream -> stream.collect(Collectors.toList()));
+    .extract(stream -> stream.collect(Collectors.toList()));
 ```
 
 ### Excel書き込み
@@ -155,7 +155,7 @@ ExcelStreamWriter.builder(Person.class, Paths.get("template.xlsx"))
 ```java
 // ❌ これはNG！全件メモリに載る！
 List<Person> allData = ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> stream.collect(Collectors.toList()));
+    .extract(stream -> stream.collect(Collectors.toList()));
 // ↑ 10万件とかあったらメモリ不足で死ぬ！
 ```
 
@@ -165,12 +165,11 @@ List<Person> allData = ExcelStreamReader.builder(Person.class, path)
 
 ```java
 ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> {
+    .consume(stream -> {
         stream.forEach(person -> {
             // 1件ずつDB保存
             personRepository.save(person);
         });
-        return null;
     });
 
 // 💡 メモリ使用量: 常に100行分程度（数MB）
@@ -184,7 +183,7 @@ List<Person> batch = new ArrayList<>();
 final int BATCH_SIZE = 100;
 
 ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> {
+    .consume(stream -> {
         stream.forEach(person -> {
             batch.add(person);
             
@@ -200,7 +199,6 @@ ExcelStreamReader.builder(Person.class, path)
             personRepository.saveAll(batch);
             batch.clear();
         }
-        return null;
     });
 
 // 💡 メモリ使用量: バッチサイズ分（100件=数MB）
@@ -212,11 +210,11 @@ ExcelStreamReader.builder(Person.class, path)
 ```java
 // 件数カウント
 long totalCount = ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> stream.count());
+    .extract(stream -> stream.count());
 
 // 平均年齢
 double averageAge = ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> stream
+    .extract(stream -> stream
         .mapToInt(Person::getAge)
         .average()
         .orElse(0.0));
@@ -229,7 +227,7 @@ double averageAge = ExcelStreamReader.builder(Person.class, path)
 
 ```java
 ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> {
+    .consume(stream -> {
         stream
             .filter(person -> person.getAge() >= 30)  // 30歳以上
             .filter(person -> "東京".equals(person.getBirthplace()))  // 東京在住
@@ -237,7 +235,6 @@ ExcelStreamReader.builder(Person.class, path)
                 // 条件に合った人だけ処理
                 sendEmail(person);
             });
-        return null;
     });
 
 // 💡 フィルタリングされた分だけ処理されるから超高速！
@@ -247,13 +244,13 @@ ExcelStreamReader.builder(Person.class, path)
 
 ```java
 ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> {
+    .consume(stream -> {
         stream
             .limit(1000)  // 最初の1000件だけ
             .forEach(person -> {
                 // 処理
+                sendEmail(person);
             });
-        return null;
     });
 
 // 💡 残りのデータは読み込まない！超高速！
@@ -265,14 +262,14 @@ ExcelStreamReader.builder(Person.class, path)
 ```java
 // ❌ NG！
 List<Person> all = ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> stream.collect(Collectors.toList()));
+    .extract(stream -> stream.collect(Collectors.toList()));
 ```
 
 2. **全件をMapに格納**
 ```java
 // ❌ NG！
 Map<String, Person> map = ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> stream.collect(
+    .extract(stream -> stream.collect(
         Collectors.toMap(Person::getName, p -> p)
     ));
 ```
@@ -281,10 +278,9 @@ Map<String, Person> map = ExcelStreamReader.builder(Person.class, path)
 ```java
 // ❌ NG！
 ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> {
+    .consume(stream -> {
         List<Person> list = stream.collect(Collectors.toList());  // 全件メモリに！
         list.forEach(p -> save(p));  // これじゃ意味ない
-        return null;
     });
 ```
 
@@ -315,7 +311,7 @@ public class PersonImportService {
         
         ExcelStreamReader.builder(Person.class, excelPath)
             .headerKey("名前")  // ヘッダー自動検出
-            .process(stream -> {
+            .consume(stream -> {
                 stream.forEach(person -> {
                     batch.add(person);
                     
@@ -348,7 +344,7 @@ public class PersonImportService {
 ```java
 // ❌ これは絶対ダメ！10万件全部メモリに載る！
 Map<String, List<Person>> grouped = ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> stream.collect(
+    .extract(stream -> stream.collect(
         Collectors.groupingBy(Person::getOccupation)
     ));
 // ↑ メモリ爆発！OutOfMemoryError確定！
@@ -365,13 +361,12 @@ Map<String, List<Person>> grouped = ExcelStreamReader.builder(Person.class, path
 Map<String, OccupationStats> statsMap = new ConcurrentHashMap<>();
 
 ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> {
+    .consume(stream -> {
         stream.forEach(person -> {
             String occupation = person.getOccupation();
             statsMap.computeIfAbsent(occupation, k -> new OccupationStats())
                    .add(person.getAge());
         });
-        return null;
     });
 
 // 結果
@@ -408,7 +403,7 @@ final int BATCH_SIZE = 100;
 Map<String, List<Person>> batchMap = new HashMap<>();
 
 ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> {
+    .consume(stream -> {
         stream.forEach(person -> {
             String occupation = person.getOccupation();
             
@@ -431,8 +426,6 @@ ExcelStreamReader.builder(Person.class, path)
                 batch.clear();
             }
         });
-        
-        return null;
     });
 
 // 💡 メモリ: グループ数×バッチサイズ
@@ -448,13 +441,12 @@ Map<String, TopNCollector> topNMap = new HashMap<>();
 final int TOP_N = 10;
 
 ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> {
+    .consume(stream -> {
         stream.forEach(person -> {
             String city = person.getBirthplace();
             topNMap.computeIfAbsent(city, k -> new TopNCollector(TOP_N))
                   .add(person);
         });
-        return null;
     });
 
 // 結果

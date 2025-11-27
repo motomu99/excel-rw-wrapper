@@ -109,7 +109,7 @@ BOM (Byte Order Mark) 処理が独立したユーティリティクラスにな�
 ```java
 List<Person> persons = CsvStreamReader.builder(Person.class, Paths.get("sample.csv"))
     .charset(CharsetType.UTF_8)
-    .process(stream -> stream.collect(Collectors.toList()));
+    .extract(stream -> stream.collect(Collectors.toList()));
 ```
 
 #### CsvStreamWriter

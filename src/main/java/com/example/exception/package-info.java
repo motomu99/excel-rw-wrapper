@@ -18,7 +18,7 @@
  * try {
  *     List&lt;Person&gt; persons = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
  *         .headerKey("名前")
- *         .process(stream -&gt; stream.collect(Collectors.toList()));
+ *         .extract(stream -&gt; stream.collect(Collectors.toList()));
  * } catch (HeaderNotFoundException e) {
  *     // ヘッダー行が見つからない場合の処理
  *     System.err.println("ヘッダーエラー: " + e.getMessage());

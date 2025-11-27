@@ -46,7 +46,7 @@ public class LargeExcelStreamDemo {
         
         // 全件数をカウント
         long totalCount = ExcelStreamReader.builder(Person.class, largeExcel)
-            .process((Function<Stream<Person>, Long>) (Stream::count));
+            .extract(Stream::count);
         
         long endTime = System.currentTimeMillis();
         System.out.println("✅ 読み込み完了！ 件数: " + totalCount + "件");
@@ -58,7 +58,7 @@ public class LargeExcelStreamDemo {
         startTime = System.currentTimeMillis();
         
         List<Person> filtered = ExcelStreamReader.builder(Person.class, largeExcel)
-            .process((Function<Stream<Person>, List<Person>>) stream -> stream
+            .extract(stream -> stream
                 .filter(person -> person.getAge() >= 30)
                 .limit(10)  // 最初の10件のみ取得
                 .collect(Collectors.toList()));
@@ -80,7 +80,7 @@ public class LargeExcelStreamDemo {
         startTime = System.currentTimeMillis();
         
         List<String> names = ExcelStreamReader.builder(Person.class, largeExcel)
-            .process((Function<Stream<Person>, List<String>>) stream -> stream
+            .extract(stream -> stream
                 .map(Person::getName)
                 .limit(10)
                 .collect(Collectors.toList()));

@@ -7,7 +7,7 @@
 ```java
 // ❌ これはNG！全件メモリに載る！
 List<Person> allData = ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> stream.collect(Collectors.toList()));
+    .extract(stream -> stream.collect(Collectors.toList()));
 // ↑ 10万件とかあったらメモリ不足で死ぬ！
 ```
 
@@ -17,7 +17,7 @@ List<Person> allData = ExcelStreamReader.builder(Person.class, path)
 
 ```java
 ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> {
+    .consume(stream -> {
         stream.forEach(person -> {
             // 1件ずつDB保存
             personRepository.save(person);
@@ -38,7 +38,7 @@ List<Person> batch = new ArrayList<>();
 final int BATCH_SIZE = 100;
 
 ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> {
+    .consume(stream -> {
         stream.forEach(person -> {
             batch.add(person);
             
@@ -66,18 +66,18 @@ ExcelStreamReader.builder(Person.class, path)
 ```java
 // 件数カウント
 long totalCount = ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> stream.count());
+    .extract(stream -> stream.count());
 
 // 平均年齢
 double averageAge = ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> stream
+    .extract(stream -> stream
         .mapToInt(Person::getAge)
         .average()
         .orElse(0.0));
 
 // 最高年齢
 int maxAge = ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> stream
+    .extract(stream -> stream
         .mapToInt(Person::getAge)
         .max()
         .orElse(0));
@@ -90,7 +90,7 @@ int maxAge = ExcelStreamReader.builder(Person.class, path)
 
 ```java
 ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> {
+    .consume(stream -> {
         stream
             .filter(person -> person.getAge() >= 30)  // 30歳以上
             .filter(person -> "東京".equals(person.getBirthplace()))  // 東京在住
@@ -108,7 +108,7 @@ ExcelStreamReader.builder(Person.class, path)
 
 ```java
 ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> {
+    .consume(stream -> {
         stream
             .limit(1000)  // 最初の1000件だけ
             .forEach(person -> {
@@ -125,7 +125,7 @@ ExcelStreamReader.builder(Person.class, path)
 ```java
 try (BufferedWriter writer = Files.newBufferedWriter(outputPath)) {
     ExcelStreamReader.builder(Person.class, path)
-        .process(stream -> {
+        .consume(stream -> {
             stream.forEach(person -> {
                 try {
                     // CSVに変換して書き出し
@@ -149,7 +149,7 @@ try (BufferedWriter writer = Files.newBufferedWriter(outputPath)) {
 ```java
 // ❌ NG！
 List<Person> all = ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> stream.collect(Collectors.toList()));
+    .extract(stream -> stream.collect(Collectors.toList()));
 ```
 
 ### 2. 全件をMapに格納
@@ -157,7 +157,7 @@ List<Person> all = ExcelStreamReader.builder(Person.class, path)
 ```java
 // ❌ NG！
 Map<String, Person> map = ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> stream.collect(
+    .extract(stream -> stream.collect(
         Collectors.toMap(Person::getName, p -> p)
     ));
 ```
@@ -167,7 +167,7 @@ Map<String, Person> map = ExcelStreamReader.builder(Person.class, path)
 ```java
 // ❌ NG！
 ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> {
+    .consume(stream -> {
         List<Person> list = stream.collect(Collectors.toList());  // 全件メモリに！
         list.forEach(p -> save(p));  // これじゃ意味ない
         return null;
@@ -201,7 +201,7 @@ public class PersonImportService {
         
         ExcelStreamReader.builder(Person.class, excelPath)
             .headerKey("名前")  // ヘッダー自動検出
-            .process(stream -> {
+            .consume(stream -> {
                 stream.forEach(person -> {
                     batch.add(person);
                     
@@ -229,7 +229,7 @@ public class PersonImportService {
 AtomicInteger processedCount = new AtomicInteger(0);
 
 ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> {
+    .consume(stream -> {
         stream.forEach(person -> {
             save(person);
             

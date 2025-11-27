@@ -357,7 +357,7 @@ public class ExcelStreamWriterTest {
         
         // 読み込み
         List<Person> readPersons = ExcelStreamReader.builder(Person.class, outputPath)
-            .process((Function<Stream<Person>, List<Person>>) stream -> stream.toList());
+            .extract(stream -> stream.toList());
         
         assertEquals(3, readPersons.size());
         assertEquals("田中太郎", readPersons.get(0).getName());
@@ -382,7 +382,7 @@ public class ExcelStreamWriterTest {
         
         // 読み込み
         List<PersonWithAllTypes> readPersons = ExcelStreamReader.builder(PersonWithAllTypes.class, outputPath)
-            .process((Function<Stream<PersonWithAllTypes>, List<PersonWithAllTypes>>) stream -> stream.toList());
+            .extract(stream -> stream.toList());
         
         assertEquals(2, readPersons.size());
         assertEquals("田中太郎", readPersons.get(0).getName());
@@ -407,7 +407,7 @@ public class ExcelStreamWriterTest {
         
         // 読み込み
         List<PersonWithDate> readPersons = ExcelStreamReader.builder(PersonWithDate.class, outputPath)
-            .process((Function<Stream<PersonWithDate>, List<PersonWithDate>>) stream -> stream.toList());
+            .extract(stream -> stream.toList());
         
         assertEquals(1, readPersons.size());
         assertEquals("田中太郎", readPersons.get(0).getName());
@@ -516,7 +516,7 @@ public class ExcelStreamWriterTest {
         
         // 読み込んで確認
         List<Person> readPersons = ExcelStreamReader.builder(Person.class, outputPath)
-            .process((Function<Stream<Person>, List<Person>>) stream -> stream.toList());
+            .extract(stream -> stream.toList());
         
         assertEquals(2, readPersons.size());
         assertEquals("田中\"太郎\"", readPersons.get(0).getName());

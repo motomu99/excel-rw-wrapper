@@ -7,7 +7,7 @@
 ```java
 // ❌ これは絶対ダメ！10万件全部メモリに載る！
 Map<String, List<Person>> grouped = ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> stream.collect(
+    .extract(stream -> stream.collect(
         Collectors.groupingBy(Person::getOccupation)
     ));
 // ↑ メモリ爆発！OutOfMemoryError確定！
@@ -24,7 +24,7 @@ Map<String, List<Person>> grouped = ExcelStreamReader.builder(Person.class, path
 Map<String, OccupationStats> statsMap = new ConcurrentHashMap<>();
 
 ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> {
+    .consume(stream -> {
         stream.forEach(person -> {
             String occupation = person.getOccupation();
             statsMap.computeIfAbsent(occupation, k -> new OccupationStats())
@@ -67,7 +67,7 @@ final int BATCH_SIZE = 100;
 Map<String, List<Person>> batchMap = new HashMap<>();
 
 ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> {
+    .consume(stream -> {
         stream.forEach(person -> {
             String occupation = person.getOccupation();
             
@@ -107,7 +107,7 @@ Map<String, TopNCollector> topNMap = new HashMap<>();
 final int TOP_N = 10;
 
 ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> {
+    .consume(stream -> {
         stream.forEach(person -> {
             String city = person.getBirthplace();
             topNMap.computeIfAbsent(city, k -> new TopNCollector(TOP_N))
@@ -160,7 +160,7 @@ class TopNCollector {
 Map<String, AtomicInteger> seniorCount = new HashMap<>();
 
 ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> {
+    .consume(stream -> {
         stream
             .filter(person -> person.getAge() >= 50)  // 50歳以上のみ
             .forEach(person -> {
@@ -191,7 +191,7 @@ final int MAX_PER_GROUP = 1000;  // 各グループ最大1000件まで
 Map<String, List<Person>> limitedGroups = new HashMap<>();
 
 ExcelStreamReader.builder(Person.class, path)
-    .process(stream -> {
+    .consume(stream -> {
         stream.forEach(person -> {
             String occupation = person.getOccupation();
             List<Person> group = limitedGroups.computeIfAbsent(
@@ -238,7 +238,7 @@ public class DepartmentStatsService {
         
         ExcelStreamReader.builder(Employee.class, excelPath)
             .headerKey("社員番号")
-            .process(stream -> {
+            .consume(stream -> {
                 stream.forEach(employee -> {
                     String dept = employee.getDepartment();
                     DepartmentStats stats = statsMap.computeIfAbsent(
@@ -283,7 +283,7 @@ public class MonthlyDataService {
         
         try {
             ExcelStreamReader.builder(Transaction.class, excelPath)
-                .process(stream -> {
+                .consume(stream -> {
                     stream.forEach(transaction -> {
                         try {
                             String month = transaction.getDate().substring(0, 7); // "2024-01"

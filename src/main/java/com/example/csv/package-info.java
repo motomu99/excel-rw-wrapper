@@ -68,7 +68,7 @@
  * // 読み込み時にフィルタリング
  * List&lt;Person&gt; adults = CsvStreamReader.builder(Person.class, Paths.get("data.csv"))
  *     .charset(CharsetType.UTF_8)
- *     .process(stream -&gt; stream
+ *     .extract(stream -&gt; stream
  *         .filter(p -&gt; p.getAge() &gt;= 20)
  *         .collect(Collectors.toList()));
  *

@@ -31,7 +31,7 @@ import lombok.extern.slf4j.Slf4j;
  *     .charset(CharsetType.UTF_8)
  *     .fileType(FileType.CSV)
  *     .skip(1)
- *     .process(stream -> stream.collect(Collectors.toList()));
+ *     .extract(stream -> stream.collect(Collectors.toList()));
  * </pre>
  */
 @Slf4j
@@ -62,7 +62,7 @@ public class CsvStreamReader<T> {
     }
     
     /**
-     * Streamを処理する
+     * Streamを処理して結果を返す
      * 
      * @param <R> 戻り値の型
      * @param processor Streamを処理する関数
@@ -70,7 +70,7 @@ public class CsvStreamReader<T> {
      * @throws IOException ファイル読み込みエラー
      * @throws CsvException CSV解析エラー
      */
-    private <R> R process(Function<Stream<T>, R> processor) throws IOException, CsvException {
+    private <R> R extract(Function<Stream<T>, R> processor) throws IOException, CsvException {
         Charset charset = Charset.forName(charsetType.getCharsetName());
         CsvColumnValidator.validate(filePath, charset, charsetType.isWithBom(), fileType.getDelimiter().charAt(0));
 
@@ -109,8 +109,8 @@ public class CsvStreamReader<T> {
      * @throws IOException ファイル読み込みエラー
      * @throws CsvException CSV解析エラー
      */
-    private void process(Consumer<Stream<T>> consumer) throws IOException, CsvException {
-        process(stream -> {
+    private void consume(Consumer<Stream<T>> consumer) throws IOException, CsvException {
+        extract(stream -> {
             consumer.accept(stream);
             return null;
         });
@@ -120,7 +120,7 @@ public class CsvStreamReader<T> {
      * CsvStreamReaderのBuilderクラス
      * 
      * <p>Builderパターンを使用して、CsvStreamReaderの設定を行います。
-     * メソッドチェーンで設定を積み重ね、最後に{@link #process(Function)}を呼び出すことで
+     * メソッドチェーンで設定を積み重ね、最後に{@link #extract(Function)}または{@link #consume(Consumer)}を呼び出すことで
      * CSVファイルを読み込みます。</p>
      */
     public static class Builder<T> {
@@ -184,7 +184,7 @@ public class CsvStreamReader<T> {
         }
         
         /**
-         * Streamを処理する
+         * Streamを処理して結果を返す
          * 
          * @param <R> 戻り値の型
          * @param processor Streamを処理する関数
@@ -192,8 +192,8 @@ public class CsvStreamReader<T> {
          * @throws IOException ファイル読み込みエラー
          * @throws CsvException CSV解析エラー
          */
-        public <R> R process(Function<Stream<T>, R> processor) throws IOException, CsvException {
-            return reader.process(processor);
+        public <R> R extract(Function<Stream<T>, R> processor) throws IOException, CsvException {
+            return reader.extract(processor);
         }
         
         /**
@@ -203,8 +203,8 @@ public class CsvStreamReader<T> {
          * @throws IOException ファイル読み込みエラー
          * @throws CsvException CSV解析エラー
          */
-        public void process(Consumer<Stream<T>> consumer) throws IOException, CsvException {
-            reader.process(consumer);
+        public void consume(Consumer<Stream<T>> consumer) throws IOException, CsvException {
+            reader.consume(consumer);
         }
     }
 }

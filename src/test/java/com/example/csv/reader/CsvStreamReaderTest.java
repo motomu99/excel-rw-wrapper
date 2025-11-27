@@ -27,7 +27,7 @@ public class CsvStreamReaderTest {
         // 基本的なStream処理のテスト
         
         List<Person> result = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.csv"))
-            .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
+            .extract(stream -> stream.collect(Collectors.toList()));
         
         assertNotNull(result);
         assertEquals(5, result.size()); // ヘッダーを除いた5件のデータ
@@ -46,7 +46,7 @@ public class CsvStreamReaderTest {
         // フィルタリング付きのStream処理のテスト
         
         List<Person> result = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.csv"))
-            .process((Function<Stream<Person>, List<Person>>) stream -> stream
+            .extract(stream -> stream
                 .filter(person -> person.getAge() >= 30)
                 .collect(Collectors.toList()));
         
@@ -63,7 +63,7 @@ public class CsvStreamReaderTest {
         // マッピング付きのStream処理のテスト
         
         List<String> names = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.csv"))
-            .process((Function<Stream<Person>, List<String>>) stream -> stream
+            .extract(stream -> stream
                 .map(Person::getName)
                 .collect(Collectors.toList()));
         
@@ -80,7 +80,7 @@ public class CsvStreamReaderTest {
         
         List<Person> result = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.csv"))
             .skip(2)
-            .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
+            .extract(stream -> stream.collect(Collectors.toList()));
         
         assertNotNull(result);
         assertEquals(3, result.size()); // 2行スキップして3件
@@ -97,7 +97,7 @@ public class CsvStreamReaderTest {
         
         List<Person> result = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample_sjis.csv"))
             .charset(CharsetType.S_JIS)
-            .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
+            .extract(stream -> stream.collect(Collectors.toList()));
         
         assertNotNull(result);
         assertEquals(5, result.size());
@@ -114,7 +114,7 @@ public class CsvStreamReaderTest {
         
         List<Person> result = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.tsv"))
             .fileType(FileType.TSV)
-            .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
+            .extract(stream -> stream.collect(Collectors.toList()));
         
         assertNotNull(result);
         assertEquals(5, result.size());
@@ -131,7 +131,7 @@ public class CsvStreamReaderTest {
         
         List<PersonWithoutHeader> result = CsvStreamReader.builder(PersonWithoutHeader.class, Paths.get("src/test/resources/sample_no_header.csv"))
             .usePositionMapping()
-            .process((Function<Stream<PersonWithoutHeader>, List<PersonWithoutHeader>>) stream -> stream.collect(Collectors.toList()));
+            .extract(stream -> stream.collect(Collectors.toList()));
         
         assertNotNull(result);
         assertEquals(5, result.size());
@@ -149,7 +149,7 @@ public class CsvStreamReaderTest {
         
         List<Person> result = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.csv"))
             .useHeaderMapping()
-            .process((Function<Stream<Person>, List<Person>>) stream -> stream.collect(Collectors.toList()));
+            .extract(stream -> stream.collect(Collectors.toList()));
         
         assertNotNull(result);
         assertEquals(5, result.size());
@@ -169,7 +169,7 @@ public class CsvStreamReaderTest {
             .charset(CharsetType.UTF_8)
             .fileType(FileType.CSV)
             .useHeaderMapping()
-            .process((Function<Stream<Person>, List<String>>) stream -> stream
+            .extract(stream -> stream
                 .filter(person -> person.getAge() >= 25)
                 .map(Person::getName)
                 .collect(Collectors.toList()));
@@ -188,7 +188,7 @@ public class CsvStreamReaderTest {
         // カウント操作のテスト
         
         Long count = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.csv"))
-            .process((Function<Stream<Person>, Long>) (Stream::count));
+            .extract(Stream::count);
         
         assertNotNull(count);
         assertEquals(5L, count);
@@ -202,7 +202,7 @@ public class CsvStreamReaderTest {
         StringBuilder names = new StringBuilder();
         
         CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.csv"))
-            .process(stream -> {
+            .consume(stream -> {
                 stream.forEach(person -> names.append(person.getName()).append(","));
             });
         
@@ -217,7 +217,7 @@ public class CsvStreamReaderTest {
         StringBuilder names = new StringBuilder();
 
         CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.csv"))
-            .process(stream -> {
+            .consume(stream -> {
                 stream.map(Person::getName).forEach(name -> names.append(name).append(","));
             });
 
@@ -234,7 +234,7 @@ public class CsvStreamReaderTest {
 
         CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.csv"))
             .skip(2)
-            .process((Consumer<Stream<Person>>) (stream -> stream.forEach(person -> names.append(person.getName()).append(","))));
+            .consume(stream -> stream.forEach(person -> names.append(person.getName()).append(",")));
 
         String result = names.toString();
         assertFalse(result.contains("田中太郎")); // スキップされているはず

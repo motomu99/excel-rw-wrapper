@@ -33,18 +33,18 @@ import lombok.extern.slf4j.Slf4j;
  * List&lt;Person&gt; persons = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
  *     .sheetIndex(0)
  *     .skip(1)
- *     .process(stream -&gt; stream.collect(Collectors.toList()));
+ *     .extract(stream -&gt; stream.collect(Collectors.toList()));
  *
  * // ヘッダー行を自動検出（上から10行以内で「名前」列を探す）
  * List&lt;Person&gt; persons = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
  *     .headerKey("名前")
- *     .process(stream -&gt; stream.collect(Collectors.toList()));
+ *     .extract(stream -&gt; stream.collect(Collectors.toList()));
  *
  * // 複数ファイルを順番に処理（メモリ効率維持）
  * List&lt;Person&gt; persons = ExcelStreamReader.builder(Person.class, Arrays.asList(path1, path2))
- *     .process(stream -&gt; stream.collect(Collectors.toList()));
+ *     .extract(stream -&gt; stream.collect(Collectors.toList()));
  *
- * // 一括読み込み（process()を使わない）
+ * // 一括読み込み（extract()/consume()を使わない）
  * List&lt;Person&gt; persons = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
  *     .sheetIndex(0)
  *     .skip(1)
@@ -103,14 +103,14 @@ public class ExcelStreamReader<T> {
     }
 
     /**
-     * Streamを処理する（メモリ効率の良いストリーミング処理）
+     * Streamを処理して結果を返す（メモリ効率の良いストリーミング処理）
      *
      * @param <R> 戻り値の型
      * @param processor Streamを処理する関数
      * @return 処理結果
      * @throws IOException ファイル読み込みエラー
      */
-    private <R> R process(Function<Stream<T>, R> processor) throws IOException {
+    private <R> R extract(Function<Stream<T>, R> processor) throws IOException {
         try (OpenedResource<T> resource = openResource(filePath)) {
             Stream<T> stream = StreamSupport.stream(
                 Spliterators.spliteratorUnknownSize(resource.iterator, 0), 
@@ -152,26 +152,6 @@ public class ExcelStreamReader<T> {
                 }
             });
 
-        if (skipLines > 0) {
-            // 各ファイルごとにskipするのではなく、全体からskipする場合の挙動は？
-            // 現状のprocess(single)実装では、ファイル単位でスキップしている。
-            // MultiFileSpliterator内でopenResourceするときにskipLinesが適用されるべきか？
-            // -> openResourceからはIteratorが返る。
-            // -> process(single)では Iterator -> Stream -> skip となっている。
-            // -> ここでも Stream -> skip にすると、「最初のファイルのn行」だけスキップされる。
-            // -> 全ファイルからn行ずつスキップしたいのか、結合後の先頭n行だけか？
-            // -> Builderの設定としては「この読込設定」なので、各ファイルに適用されるのが自然。
-            // -> しかし MultiFileSpliterator で openResource するとき、Iteratorしか返さない。
-            // -> skip処理はStreamで行っている。
-            // -> Spliterator内部でskip処理を入れるのは難しい（Iteratorを回す必要がある）。
-            // -> ここで stream.skip(skipLines) すると、最初のファイルの先頭だけスキップされる。
-            // -> ユーザーの期待値は？ 「同じフォーマットのファイルが複数ある」 -> ヘッダーがあるなら各ファイルでスキップしたいはず！
-            // -> つまり、MultiFileSpliterator 内部で、各ファイルのIteratorを作る際にスキップ処理を入れる必要がある。
-            // -> openResource メソッド内でスキップ処理を行うオプションはない。
-            // -> openResource が返す Iterator をラップしてスキップさせるか、
-            //    Spliterator が openNext した直後に n回 next() を呼ぶか。
-        }
-        
         // 修正: スキップロジックは MultiFileSpliterator 内でハンドルする（各ファイルごとに適用）
         // ただし、this.skipLines は MultiFileSpliterator に渡される templateReader に含まれている。
 
@@ -224,8 +204,8 @@ public class ExcelStreamReader<T> {
      * @param consumer Streamを消費する処理
      * @throws IOException ファイル読み込みエラー
      */
-    private void process(Consumer<Stream<T>> consumer) throws IOException {
-        process(stream -> {
+    private void consume(Consumer<Stream<T>> consumer) throws IOException {
+        extract(stream -> {
             consumer.accept(stream);
             return null;
         });
@@ -399,7 +379,7 @@ public class ExcelStreamReader<T> {
      * ExcelStreamReaderのBuilderクラス
      *
      * <p>Builderパターンを使用して、ExcelStreamReaderの設定を行います。
-     * メソッドチェーンで設定を積み重ね、最後に{@link #process(Function)}を呼び出すことで
+     * メソッドチェーンで設定を積み重ね、最後に{@link #extract(Function)}または{@link #consume(Consumer)}を呼び出すことで
      * Excelファイルを読み込みます。</p>
      */
     public static class Builder<T> {
@@ -478,7 +458,7 @@ public class ExcelStreamReader<T> {
          * 指定された列名を持つ行を、上から指定行数の範囲内で探してヘッダー行とする
          * また、この列の値が空になったらデータ読み込みを終了する
          *
-         * <p>注意: process()メソッド実行時に以下の例外が投げられる可能性があります：
+         * <p>注意: extract()/consume()メソッド実行時に以下の例外が投げられる可能性があります：
          * <ul>
          *   <li>{@link HeaderNotFoundException} - キー列を持つヘッダー行が見つからない場合</li>
          *   <li>{@link KeyColumnNotFoundException} - ヘッダー行にキー列が存在しない場合</li>
@@ -505,18 +485,18 @@ public class ExcelStreamReader<T> {
         }
         
         /**
-         * Streamを処理する（メモリ効率の良いストリーミング処理）
+         * Streamを処理して結果を返す（メモリ効率の良いストリーミング処理）
          *
          * @param <R> 戻り値の型
          * @param processor Streamを処理する関数
          * @return 処理結果
          * @throws IOException ファイル読み込みエラー
          */
-        public <R> R process(Function<Stream<T>, R> processor) throws IOException {
+        public <R> R extract(Function<Stream<T>, R> processor) throws IOException {
             if (filePaths.size() > 1) {
                 return reader.processAll(filePaths, processor);
             }
-            return reader.process(processor);
+            return reader.extract(processor);
         }
         
         /**
@@ -525,8 +505,8 @@ public class ExcelStreamReader<T> {
          * @param consumer Streamを消費する処理
          * @throws IOException ファイル読み込みエラー
          */
-        public void process(Consumer<Stream<T>> consumer) throws IOException {
-            process(stream -> {
+        public void consume(Consumer<Stream<T>> consumer) throws IOException {
+            extract(stream -> {
                 consumer.accept(stream);
                 return null;
             });

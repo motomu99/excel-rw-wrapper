@@ -113,7 +113,7 @@ public class ExcelReader<T> {
             }
             
             Function<Stream<T>, List<T>> collector = stream -> stream.collect(Collectors.toList());
-            return builder.process(collector);
+            return builder.extract(collector);
         } catch (com.example.exception.ExcelReaderException e) {
             // ExcelReaderException（SheetNotFoundException, HeaderNotFoundException, KeyColumnNotFoundExceptionなど）
             // はそのまま再スロー（IOExceptionのサブクラスなので、throws IOExceptionで宣言済み）
