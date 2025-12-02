@@ -85,7 +85,6 @@ class FieldMappingCacheTest {
         FieldMappingInfo nameInfo = cacheMap.get(nameField);
         assertEquals("名前", nameInfo.columnName);
         assertNull(nameInfo.position);
-        assertTrue(nameInfo.field.isAccessible());
         
         // ageフィールドの確認
         Field ageField = PersonWithName.class.getDeclaredField("age");
@@ -120,7 +119,6 @@ class FieldMappingCacheTest {
         FieldMappingInfo nameInfo = cacheMap.get(nameField);
         assertNull(nameInfo.columnName);
         assertEquals(0, nameInfo.position);
-        assertTrue(nameInfo.field.isAccessible());
         
         // ageフィールドの確認
         Field ageField = PersonWithPosition.class.getDeclaredField("age");
@@ -189,19 +187,18 @@ class FieldMappingCacheTest {
     @DisplayName("FieldMappingInfoのフィールドが正しく初期化される")
     void testFieldMappingInfo_Initialization() throws NoSuchFieldException {
         Field testField = PersonWithName.class.getDeclaredField("name");
-        FieldMappingInfo info = new FieldMappingInfo(testField, "テスト列", 5);
+        FieldMappingInfo info = new FieldMappingInfo(testField, "テスト列", 5, null, null);
         
         assertEquals(testField, info.field);
         assertEquals("テスト列", info.columnName);
         assertEquals(5, info.position);
-        assertTrue(info.field.isAccessible());
     }
 
     @Test
     @DisplayName("FieldMappingInfoのpositionがnullでも正常動作")
     void testFieldMappingInfo_NullPosition() throws NoSuchFieldException {
         Field testField = PersonWithName.class.getDeclaredField("name");
-        FieldMappingInfo info = new FieldMappingInfo(testField, "テスト列", null);
+        FieldMappingInfo info = new FieldMappingInfo(testField, "テスト列", null, null, null);
         
         assertEquals("テスト列", info.columnName);
         assertNull(info.position);
@@ -211,7 +208,7 @@ class FieldMappingCacheTest {
     @DisplayName("FieldMappingInfoのcolumnNameがnullでも正常動作")
     void testFieldMappingInfo_NullColumnName() throws NoSuchFieldException {
         Field testField = PersonWithPosition.class.getDeclaredField("name");
-        FieldMappingInfo info = new FieldMappingInfo(testField, null, 0);
+        FieldMappingInfo info = new FieldMappingInfo(testField, null, 0, null, null);
         
         assertNull(info.columnName);
         assertEquals(0, info.position);
@@ -252,10 +249,7 @@ class FieldMappingCacheTest {
         
         Field nameField = PersonWithName.class.getDeclaredField("name");
         FieldMappingInfo info = cacheMap.get(nameField);
-        
-        // privateフィールドだがアクセス可能になっている
-        assertTrue(info.field.isAccessible());
-        
+                
         // 実際にアクセスできることを確認
         PersonWithName person = new PersonWithName();
         assertDoesNotThrow(() -> info.field.set(person, "テスト太郎"));

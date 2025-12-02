@@ -1,6 +1,7 @@
 package com.example.model;
 
 import com.opencsv.bean.CsvBindByName;
+import com.opencsv.bean.CsvBindByPosition;
 import com.opencsv.bean.CsvCustomBindByName;
 import com.opencsv.bean.CsvCustomBindByPosition;
 import com.opencsv.bean.AbstractBeanField;
@@ -18,6 +19,7 @@ import lombok.NoArgsConstructor;
 public class PersonWithCustomConverter {
 
     @CsvBindByName(column = "名前")
+    @CsvBindByPosition(position = 0)
     private String name;
 
     // ヘッダー名ベースのカスタム変換（前処理）

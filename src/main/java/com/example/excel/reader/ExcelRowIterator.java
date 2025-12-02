@@ -196,7 +196,9 @@ public class ExcelRowIterator<T> implements Iterator<T> {
                     // Pre-assignment バリデータが指定されている場合、バリデーションを実行
                     if (mappingInfo.validatorClass != null && stringValue != null && !stringValue.isEmpty()) {
                         try {
-                            Object validator = mappingInfo.validatorClass.getDeclaredConstructor().newInstance();
+                            var validatorCtor = mappingInfo.validatorClass.getDeclaredConstructor();
+                            validatorCtor.setAccessible(true);
+                            Object validator = validatorCtor.newInstance();
                             // バリデータの validate メソッドを呼び出し
                             // メソッドシグネチャは validate(String value) または validate(String value, String fieldName)
                             try {
@@ -241,8 +243,9 @@ public class ExcelRowIterator<T> implements Iterator<T> {
                     Object value;
                     if (mappingInfo.converterClass != null) {
                         try {
-                            AbstractBeanField<?, ?> converter =
-                                    mappingInfo.converterClass.getDeclaredConstructor().newInstance();
+                            var converterCtor = mappingInfo.converterClass.getDeclaredConstructor();
+                            converterCtor.setAccessible(true);
+                            AbstractBeanField<?, ?> converter = converterCtor.newInstance();
                             // AbstractBeanField の protected convert(String) をリフレクションで呼び出す
                             java.lang.reflect.Method convertMethod =
                                     mappingInfo.converterClass.getDeclaredMethod("convert", String.class);
