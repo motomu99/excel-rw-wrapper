@@ -10,6 +10,7 @@ import org.apache.poi.ss.usermodel.Row;
 
 import com.example.common.converter.CellValueConverter;
 import com.example.common.mapping.FieldMappingCache;
+import com.example.exception.HeaderNotFoundException;
 import com.example.exception.UncheckedExcelException;
 import com.opencsv.bean.AbstractBeanField;
 import com.opencsv.exceptions.CsvValidationException;
@@ -151,6 +152,17 @@ public class ExcelRowIterator<T> implements Iterator<T> {
         // フィールドキャッシュを構築
         fieldMappingCache = new FieldMappingCache(beanClass);
 
+        // ヘッダー検証: Beanで定義されたカラムがExcelヘッダーに存在するかチェック（ヘッダーマッピングの場合のみ）
+        if (!usePositionMapping) {
+            Map<String, Integer> columnMap = headerDetector.getColumnMap();
+            for (FieldMappingCache.FieldMappingInfo mappingInfo : fieldMappingCache.getCache().values()) {
+                if (mappingInfo.columnName != null && !columnMap.containsKey(mappingInfo.columnName)) {
+                    log.error("必須ヘッダーカラム '{}' が見つかりません", mappingInfo.columnName);
+                    throw new HeaderNotFoundException("必須ヘッダーカラムが見つかりません: " + mappingInfo.columnName);
+                }
+            }
+        }
+
         if (treatFirstRowAsData && headerKeyColumn == null && usePositionMapping && headerDetector.getHeaderRow() != null) {
             pendingFirstDataRow = headerDetector.getHeaderRow();
         }
@@ -196,27 +208,14 @@ public class ExcelRowIterator<T> implements Iterator<T> {
                     // Pre-assignment バリデータが指定されている場合、バリデーションを実行
                     if (mappingInfo.validatorClass != null && stringValue != null && !stringValue.isEmpty()) {
                         try {
-                            var validatorCtor = mappingInfo.validatorClass.getDeclaredConstructor();
-                            validatorCtor.setAccessible(true);
-                            Object validator = validatorCtor.newInstance();
-                            // バリデータの validate メソッドを呼び出し
-                            // メソッドシグネチャは validate(String value) または validate(String value, String fieldName)
-                            try {
-                                // validate(String) を試す
-                                java.lang.reflect.Method validateMethod = mappingInfo.validatorClass.getMethod("validate", String.class);
+                            // キャッシュされたコンストラクタとメソッドを使用
+                            Object validator = mappingInfo.validatorConstructor.newInstance();
+                            java.lang.reflect.Method validateMethod = mappingInfo.validatorMethod;
+                            
+                            if (validateMethod.getParameterCount() == 1) {
                                 validateMethod.invoke(validator, stringValue);
-                            } catch (NoSuchMethodException e1) {
-                                // validate(String, String) を試す
-                                try {
-                                    java.lang.reflect.Method validateMethod = mappingInfo.validatorClass.getMethod("validate", String.class, String.class);
-                                    validateMethod.invoke(validator, stringValue, columnName);
-                                } catch (NoSuchMethodException e2) {
-                                    log.error("PreAssignmentValidatorにvalidateメソッドが見つかりません: バリデータクラス={}",
-                                            mappingInfo.validatorClass.getName());
-                                    throw new UncheckedExcelException(
-                                            String.format("バリデータのvalidateメソッドが見つかりません: %s", 
-                                                    mappingInfo.validatorClass.getName()), e2);
-                                }
+                            } else {
+                                validateMethod.invoke(validator, stringValue, columnName);
                             }
                         } catch (java.lang.reflect.InvocationTargetException e) {
                             Throwable cause = e.getCause();
@@ -243,13 +242,9 @@ public class ExcelRowIterator<T> implements Iterator<T> {
                     Object value;
                     if (mappingInfo.converterClass != null) {
                         try {
-                            var converterCtor = mappingInfo.converterClass.getDeclaredConstructor();
-                            converterCtor.setAccessible(true);
-                            AbstractBeanField<?, ?> converter = converterCtor.newInstance();
-                            // AbstractBeanField の protected convert(String) をリフレクションで呼び出す
-                            java.lang.reflect.Method convertMethod =
-                                    mappingInfo.converterClass.getDeclaredMethod("convert", String.class);
-                            convertMethod.setAccessible(true);
+                            // キャッシュされたコンストラクタとメソッドを使用
+                            AbstractBeanField<?, ?> converter = mappingInfo.converterConstructor.newInstance();
+                            java.lang.reflect.Method convertMethod = mappingInfo.converterMethod;
 
                             value = convertMethod.invoke(converter, stringValue);
                         } catch (java.lang.reflect.InvocationTargetException e) {

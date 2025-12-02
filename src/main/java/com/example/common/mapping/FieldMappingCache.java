@@ -118,9 +118,17 @@ public class FieldMappingCache {
         
         /** Pre-assignment バリデータクラス（バリデーション用） */
         public final Class<?> validatorClass;
+        /** バリデータのコンストラクタ */
+        public final java.lang.reflect.Constructor<?> validatorConstructor;
+        /** バリデータのvalidateメソッド */
+        public final java.lang.reflect.Method validatorMethod;
 
         /** カスタムコンバータークラス（前処理用） */
         public final Class<? extends AbstractBeanField<?, ?>> converterClass;
+        /** カスタムコンバーターのコンストラクタ */
+        public final java.lang.reflect.Constructor<? extends AbstractBeanField<?, ?>> converterConstructor;
+        /** カスタムコンバーターのconvertメソッド */
+        public final java.lang.reflect.Method converterMethod;
 
         /**
          * フィールドマッピング情報を作成
@@ -140,6 +148,64 @@ public class FieldMappingCache {
             this.position = position;
             this.validatorClass = validatorClass;
             this.converterClass = converterClass;
+
+            // リフレクション情報をキャッシュ
+            try {
+                if (validatorClass != null) {
+                    this.validatorConstructor = validatorClass.getDeclaredConstructor();
+                    this.validatorConstructor.setAccessible(true);
+                    
+                    // validateメソッドの探索
+                    java.lang.reflect.Method method = null;
+                    try {
+                        method = validatorClass.getMethod("validate", String.class, String.class);
+                    } catch (NoSuchMethodException e) {
+                        try {
+                            method = validatorClass.getMethod("validate", String.class);
+                        } catch (NoSuchMethodException ex) {
+                            throw new RuntimeException("バリデータクラスに適切なvalidateメソッドが見つかりません: " + validatorClass.getName());
+                        }
+                    }
+                    this.validatorMethod = method;
+                } else {
+                    this.validatorConstructor = null;
+                    this.validatorMethod = null;
+                }
+
+                if (converterClass != null) {
+                    this.converterConstructor = converterClass.getDeclaredConstructor();
+                    this.converterConstructor.setAccessible(true);
+                    
+                    // AbstractBeanFieldのconvert(String)メソッド（protectedの可能性があるためgetDeclaredMethod）
+                    // 親クラスを遡って探す必要があるかもしれないが、AbstractBeanField直下にあるはず
+                    // 実際には AbstractBeanField を継承したクラスが convert をオーバーライドしているか、
+                    // AbstractBeanField 自体が convert(String) を持っている。
+                    // convert(String) は AbstractBeanField で protected abstract ではないが、
+                    // 実装クラスでオーバーライドされていることを期待して探す。
+                    // AbstractBeanField には convert(String) が定義されている。
+                    
+                    java.lang.reflect.Method method = null;
+                    Class<?> currentClass = converterClass;
+                    while (currentClass != null) {
+                        try {
+                            method = currentClass.getDeclaredMethod("convert", String.class);
+                            method.setAccessible(true);
+                            break;
+                        } catch (NoSuchMethodException e) {
+                            currentClass = currentClass.getSuperclass();
+                        }
+                    }
+                    if (method == null) {
+                         throw new RuntimeException("コンバータークラスにconvert(String)メソッドが見つかりません: " + converterClass.getName());
+                    }
+                    this.converterMethod = method;
+                } else {
+                    this.converterConstructor = null;
+                    this.converterMethod = null;
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("フィールドマッピング情報の初期化に失敗しました: " + field.getName(), e);
+            }
         }
     }
 }

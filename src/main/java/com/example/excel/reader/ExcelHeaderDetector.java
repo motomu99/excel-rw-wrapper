@@ -115,10 +115,14 @@ public class ExcelHeaderDetector {
                 Cell cell = row.getCell(cellIndex);
                 if (cell != null) {
                     String cellValue = CellValueConverter.getCellValueAsString(cell);
-                    if (headerKeyColumn.equals(cellValue)) {
-                        log.debug("ヘッダー行を検出: 行={}, キー列={}", row.getRowNum(), headerKeyColumn);
-                        headerRow = row;
-                        return row.getRowNum();
+                    // nullチェックと空文字チェック（念のため）
+                    if (cellValue != null && !cellValue.isEmpty()) {
+                        // 空白を除去して比較
+                        if (headerKeyColumn.trim().equals(cellValue.trim())) {
+                            log.debug("ヘッダー行を検出: 行={}, キー列={}", row.getRowNum(), headerKeyColumn);
+                            headerRow = row;
+                            return row.getRowNum();
+                        }
                     }
                 }
             }
@@ -141,14 +145,21 @@ public class ExcelHeaderDetector {
             Cell cell = headerRow.getCell(i);
             if (cell != null) {
                 String headerValue = CellValueConverter.getCellValueAsString(cell);
-                headerMap.put(i, headerValue);
-                columnMap.put(headerValue, i);
+                if (headerValue != null) {
+                    // カラム名の空白を除去してマップに格納
+                    String trimmedHeader = headerValue.trim();
+                    if (!trimmedHeader.isEmpty()) {
+                        headerMap.put(i, trimmedHeader);
+                        columnMap.put(trimmedHeader, i);
+                    }
+                }
             }
         }
 
         // キー列のインデックスを取得（終了判定用）
         if (headerKeyColumn != null) {
-            keyColumnIndex = columnMap.get(headerKeyColumn);
+            // 比較時もトリムされた値を使用
+            keyColumnIndex = columnMap.get(headerKeyColumn.trim());
             if (keyColumnIndex == null) {
                 log.error("キー列 '{}' がヘッダー行に見つかりませんでした", headerKeyColumn);
                 throw new KeyColumnNotFoundException(headerKeyColumn);
