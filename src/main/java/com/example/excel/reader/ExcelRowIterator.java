@@ -11,6 +11,8 @@ import org.apache.poi.ss.usermodel.Row;
 import com.example.common.converter.CellValueConverter;
 import com.example.common.mapping.FieldMappingCache;
 import com.example.exception.UncheckedExcelException;
+import com.opencsv.bean.AbstractBeanField;
+import com.opencsv.exceptions.CsvValidationException;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -187,7 +189,90 @@ public class ExcelRowIterator<T> implements Iterator<T> {
                     if (columnName == null) {
                         columnName = "列" + columnIndex;
                     }
-                    Object value = CellValueConverter.convertCellValue(cell, mappingInfo.field.getType(), row.getRowNum(), columnName);
+                    
+                    // セルから文字列を取得
+                    String stringValue = CellValueConverter.getCellValueAsString(cell);
+                    
+                    // Pre-assignment バリデータが指定されている場合、バリデーションを実行
+                    if (mappingInfo.validatorClass != null && stringValue != null && !stringValue.isEmpty()) {
+                        try {
+                            Object validator = mappingInfo.validatorClass.getDeclaredConstructor().newInstance();
+                            // バリデータの validate メソッドを呼び出し
+                            // メソッドシグネチャは validate(String value) または validate(String value, String fieldName)
+                            try {
+                                // validate(String) を試す
+                                java.lang.reflect.Method validateMethod = mappingInfo.validatorClass.getMethod("validate", String.class);
+                                validateMethod.invoke(validator, stringValue);
+                            } catch (NoSuchMethodException e1) {
+                                // validate(String, String) を試す
+                                try {
+                                    java.lang.reflect.Method validateMethod = mappingInfo.validatorClass.getMethod("validate", String.class, String.class);
+                                    validateMethod.invoke(validator, stringValue, columnName);
+                                } catch (NoSuchMethodException e2) {
+                                    log.error("PreAssignmentValidatorにvalidateメソッドが見つかりません: バリデータクラス={}",
+                                            mappingInfo.validatorClass.getName());
+                                    throw new UncheckedExcelException(
+                                            String.format("バリデータのvalidateメソッドが見つかりません: %s", 
+                                                    mappingInfo.validatorClass.getName()), e2);
+                                }
+                            }
+                        } catch (java.lang.reflect.InvocationTargetException e) {
+                            Throwable cause = e.getCause();
+                            if (cause instanceof CsvValidationException) {
+                                log.error("バリデーションエラー: 行={}, 列='{}', 値='{}', エラー={}",
+                                        row.getRowNum() + 1, columnName, stringValue, cause.getMessage());
+                                throw new UncheckedExcelException(
+                                        String.format("バリデーションエラー: 行=%d, 列='%s', 値='%s'", 
+                                                row.getRowNum() + 1, columnName, stringValue), cause);
+                            }
+                            throw new UncheckedExcelException(
+                                    String.format("バリデータの実行に失敗: 行=%d, 列='%s'", 
+                                            row.getRowNum() + 1, columnName), e);
+                        } catch (Exception e) {
+                            log.error("バリデータのインスタンス化または実行に失敗: 行={}, 列='{}', バリデータクラス={}",
+                                    row.getRowNum() + 1, columnName, mappingInfo.validatorClass.getName(), e);
+                            throw new UncheckedExcelException(
+                                    String.format("バリデータの実行に失敗: 行=%d, 列='%s'", 
+                                            row.getRowNum() + 1, columnName), e);
+                        }
+                    }
+                    
+                    // カスタムコンバーターが指定されている場合は、事前変換を実行
+                    Object value;
+                    if (mappingInfo.converterClass != null) {
+                        try {
+                            AbstractBeanField<?, ?> converter =
+                                    mappingInfo.converterClass.getDeclaredConstructor().newInstance();
+                            // AbstractBeanField の protected convert(String) をリフレクションで呼び出す
+                            java.lang.reflect.Method convertMethod =
+                                    mappingInfo.converterClass.getDeclaredMethod("convert", String.class);
+                            convertMethod.setAccessible(true);
+
+                            value = convertMethod.invoke(converter, stringValue);
+                        } catch (java.lang.reflect.InvocationTargetException e) {
+                            Throwable cause = e.getCause();
+                            log.error("カスタムコンバーター実行エラー: 行={}, 列='{}', 値='{}', エラー={}",
+                                    row.getRowNum() + 1, columnName, stringValue,
+                                    cause != null ? cause.getMessage() : e.getMessage());
+                            throw new UncheckedExcelException(
+                                    String.format("カスタムコンバーター実行エラー: 行=%d, 列='%s', 値='%s'",
+                                            row.getRowNum() + 1, columnName, stringValue),
+                                    cause != null ? cause : e);
+                        } catch (Exception e) {
+                            log.error("カスタムコンバーターのインスタンス化または実行に失敗: 行={}, 列='{}', コンバータークラス={}",
+                                    row.getRowNum() + 1, columnName, mappingInfo.converterClass.getName(), e);
+                            throw new UncheckedExcelException(
+                                    String.format("カスタムコンバーターの実行に失敗: 行=%d, 列='%s'",
+                                            row.getRowNum() + 1, columnName),
+                                    e);
+                        }
+                    } else {
+                        // カスタムコンバーターが無い場合は従来の型変換ロジックを使用
+                        value = CellValueConverter.convertCellValue(
+                                cell, mappingInfo.field.getType(), row.getRowNum(), columnName);
+                    }
+
+                    // フィールドに設定
                     mappingInfo.field.set(bean, value);
                 }
             }

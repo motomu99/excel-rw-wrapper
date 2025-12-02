@@ -3,6 +3,7 @@ package com.example.excel.reader;
 import com.example.exception.HeaderNotFoundException;
 import com.example.exception.SheetNotFoundException;
 import com.example.model.Person;
+import com.example.model.PersonWithCustomConverter;
 import com.example.model.PersonWithoutHeader;
 
 import org.apache.poi.ss.usermodel.Row;
@@ -31,6 +32,8 @@ public class ExcelReaderTest {
     private static final Path SAMPLE_EXCEL_MULTI_SHEET = TEST_RESOURCES_DIR.resolve("sample_multi_sheet.xlsx");
     private static final Path SAMPLE_EXCEL_WITH_TITLE = TEST_RESOURCES_DIR.resolve("sample_with_title.xlsx");
     private static final Path SAMPLE_EXCEL_WITH_EMPTY_KEY = TEST_RESOURCES_DIR.resolve("sample_with_empty_key.xlsx");
+    private static final Path SAMPLE_EXCEL_HEADER_AT_A1 = TEST_RESOURCES_DIR.resolve("sample_header_at_a1.xlsx");
+    private static final Path SAMPLE_EXCEL_CUSTOM_CONVERTER = TEST_RESOURCES_DIR.resolve("sample_custom_converter.xlsx");
 
     @BeforeAll
     static void setUp() throws IOException {
@@ -51,6 +54,12 @@ public class ExcelReaderTest {
 
         // キー列が途中で空になるサンプルExcelファイルを作成
         createSampleExcelWithEmptyKey();
+
+        // A1にヘッダー行があるサンプルExcelファイルを作成
+        createSampleExcelHeaderAtA1();
+
+        // カスタムコンバーター検証用のサンプルExcelファイルを作成（ヘッダーベース）
+        createSampleExcelWithCustomConverter();
     }
 
     private static void createSampleExcel() throws IOException {
@@ -183,6 +192,56 @@ public class ExcelReaderTest {
         }
     }
 
+    private static void createSampleExcelHeaderAtA1() throws IOException {
+        try (Workbook workbook = new XSSFWorkbook();
+             FileOutputStream fos = new FileOutputStream(SAMPLE_EXCEL_HEADER_AT_A1.toFile())) {
+
+            Sheet sheet = workbook.createSheet("Sheet1");
+
+            // ヘッダー行（1行目、A1にキー項目「名前」がある）
+            Row headerRow = sheet.createRow(0);
+            headerRow.createCell(0).setCellValue("名前");
+            headerRow.createCell(1).setCellValue("年齢");
+            headerRow.createCell(2).setCellValue("職業");
+            headerRow.createCell(3).setCellValue("出身地");
+
+            // データ行（2行目以降）
+            createDataRow(sheet, 1, "田中太郎", 25, "エンジニア", "東京");
+            createDataRow(sheet, 2, "佐藤花子", 30, "デザイナー", "大阪");
+            createDataRow(sheet, 3, "山田次郎", 28, "営業", "福岡");
+
+            workbook.write(fos);
+        }
+    }
+
+    private static void createSampleExcelWithCustomConverter() throws IOException {
+        try (Workbook workbook = new XSSFWorkbook();
+             FileOutputStream fos = new FileOutputStream(SAMPLE_EXCEL_CUSTOM_CONVERTER.toFile())) {
+
+            Sheet sheet = workbook.createSheet("Sheet1");
+
+            // ヘッダー行
+            Row headerRow = sheet.createRow(0);
+            headerRow.createCell(0).setCellValue("名前");
+            headerRow.createCell(1).setCellValue("年齢");
+            headerRow.createCell(2).setCellValue("職業");
+
+            // データ行1（年齢に前後空白、職業は小文字）
+            Row dataRow1 = sheet.createRow(1);
+            dataRow1.createCell(0).setCellValue("田中太郎");
+            dataRow1.createCell(1).setCellValue(" 25 ");
+            dataRow1.createCell(2).setCellValue("engineer");
+
+            // データ行2（年齢が文字列、職業は小文字＋前後空白）
+            Row dataRow2 = sheet.createRow(2);
+            dataRow2.createCell(0).setCellValue("佐藤花子");
+            dataRow2.createCell(1).setCellValue("30");
+            dataRow2.createCell(2).setCellValue(" designer ");
+
+            workbook.write(fos);
+        }
+    }
+
     @Test
     @DisplayName("基本的な読み込み - Excelファイルを一括で読み込めること")
     void testBasicRead() throws IOException {
@@ -281,7 +340,7 @@ public class ExcelReaderTest {
     }
 
     @Test
-    @DisplayName("ヘッダー自動検出 - headerKey()でヘッダー行を自動検出できること")
+    @DisplayName("ヘッダー自動検出 - headerKey()でヘッダー行を自動検出できること（A1にキー項目がない場合）")
     void testReadWithHeaderKey() throws IOException {
         List<Person> result = ExcelReader.builder(Person.class, SAMPLE_EXCEL_WITH_TITLE)
             .headerKey("名前")
@@ -294,6 +353,32 @@ public class ExcelReaderTest {
         // 最初のPersonの確認
         Person firstPerson = result.get(0);
         assertEquals("田中太郎", firstPerson.getName());
+    }
+
+    @Test
+    @DisplayName("ヘッダー自動検出 - headerKey()でヘッダー行を自動検出できること（A1にキー項目がある場合）")
+    void testReadWithHeaderKeyAtA1() throws IOException {
+        List<Person> result = ExcelReader.builder(Person.class, SAMPLE_EXCEL_HEADER_AT_A1)
+            .headerKey("名前")
+            .headerSearchRows(5)
+            .read();
+
+        assertNotNull(result);
+        assertEquals(3, result.size());
+
+        // 最初のPersonの確認
+        Person firstPerson = result.get(0);
+        assertEquals("田中太郎", firstPerson.getName());
+        assertEquals(25, firstPerson.getAge());
+        assertEquals("エンジニア", firstPerson.getOccupation());
+        assertEquals("東京", firstPerson.getBirthplace());
+
+        // 2番目のPersonの確認
+        Person secondPerson = result.get(1);
+        assertEquals("佐藤花子", secondPerson.getName());
+        assertEquals(30, secondPerson.getAge());
+        assertEquals("デザイナー", secondPerson.getOccupation());
+        assertEquals("大阪", secondPerson.getBirthplace());
     }
 
     @Test
@@ -413,6 +498,92 @@ public class ExcelReaderTest {
         assertThrows(IllegalArgumentException.class, () -> {
             ExcelReader.builder(Person.class, (List<Path>) null);
         });
+    }
+
+    @Test
+    @DisplayName("一部のセルが存在しない - キー項目以外のセルが存在しない場合、nullのままになること")
+    void testMissingCellsBecomeNull() throws IOException {
+        // キー項目（名前）のセルしか作成されていないExcelファイルを作成
+        Path missingCellsExcel = TEST_RESOURCES_DIR.resolve("sample_missing_cells.xlsx");
+        try (Workbook workbook = new XSSFWorkbook();
+             FileOutputStream fos = new FileOutputStream(missingCellsExcel.toFile())) {
+
+            Sheet sheet = workbook.createSheet("Sheet1");
+
+            // ヘッダー行（全ての列を定義）
+            Row headerRow = sheet.createRow(0);
+            headerRow.createCell(0).setCellValue("名前");
+            headerRow.createCell(1).setCellValue("年齢");
+            headerRow.createCell(2).setCellValue("職業");
+            headerRow.createCell(3).setCellValue("出身地");
+
+            // データ行1（名前のセルしか作成しない）
+            Row dataRow1 = sheet.createRow(1);
+            dataRow1.createCell(0).setCellValue("田中太郎");
+            // 年齢、職業、出身地のセルは作成しない（null）
+
+            // データ行2（名前と年齢のセルのみ）
+            Row dataRow2 = sheet.createRow(2);
+            dataRow2.createCell(0).setCellValue("佐藤花子");
+            dataRow2.createCell(1).setCellValue(30);
+            // 職業、出身地のセルは作成しない（null）
+
+            // データ行3（全てのセルに値がある）
+            createDataRow(sheet, 3, "山田次郎", 28, "営業", "福岡");
+
+            workbook.write(fos);
+        }
+
+        List<Person> result = ExcelReader.builder(Person.class, missingCellsExcel)
+            .read();
+
+        assertNotNull(result);
+        assertEquals(3, result.size());
+
+        // 1行目: 名前のみ設定、他はnull
+        Person person1 = result.get(0);
+        assertEquals("田中太郎", person1.getName());
+        assertNull(person1.getAge(), "年齢のセルが存在しないためnullになる");
+        assertNull(person1.getOccupation(), "職業のセルが存在しないためnullになる");
+        assertNull(person1.getBirthplace(), "出身地のセルが存在しないためnullになる");
+
+        // 2行目: 名前と年齢のみ設定、他はnull
+        Person person2 = result.get(1);
+        assertEquals("佐藤花子", person2.getName());
+        assertEquals(30, person2.getAge());
+        assertNull(person2.getOccupation(), "職業のセルが存在しないためnullになる");
+        assertNull(person2.getBirthplace(), "出身地のセルが存在しないためnullになる");
+
+        // 3行目: 全てのフィールドに値がある
+        Person person3 = result.get(2);
+        assertEquals("山田次郎", person3.getName());
+        assertEquals(28, person3.getAge());
+        assertEquals("営業", person3.getOccupation());
+        assertEquals("福岡", person3.getBirthplace());
+    }
+
+    @Test
+    @DisplayName("カスタムコンバーター - @CsvCustomBindByName が ExcelReader でも適用されること")
+    void testCustomConverterWithHeaderMapping() throws IOException {
+        List<PersonWithCustomConverter> result = ExcelReader
+            .builder(PersonWithCustomConverter.class, SAMPLE_EXCEL_CUSTOM_CONVERTER)
+            .useHeaderMapping()
+            .read();
+
+        assertNotNull(result);
+        assertEquals(2, result.size());
+
+        PersonWithCustomConverter p1 = result.get(0);
+        assertEquals("田中太郎", p1.getName());
+        // " 25 " -> 25 に変換されていること
+        assertEquals(25, p1.getAge());
+        // occupation は @CsvCustomBindByPosition 用なので、このテストでは null のまま
+        assertNull(p1.getOccupation());
+
+        PersonWithCustomConverter p2 = result.get(1);
+        assertEquals("佐藤花子", p2.getName());
+        assertEquals(30, p2.getAge());
+        assertNull(p2.getOccupation());
     }
 }
 

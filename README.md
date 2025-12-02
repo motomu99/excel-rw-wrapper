@@ -1115,6 +1115,93 @@ public class Person {
 }
 ```
 
+### CSV / Excel 共通で使えるOpenCSVアノテーション対応一覧
+
+このライブラリでは、**同じBeanクラスをCSV/Excelの両方で再利用できる**ように、OpenCSVのアノテーションを可能な限り共通サポートしています。
+
+| アノテーション                         | 役割                             | CSV (`CsvStreamReader` / `CsvReaderWrapper`) | Excel (`ExcelStreamReader` / `ExcelReader`) |
+| -------------------------------------- | -------------------------------- | ------------------------------------------- | ------------------------------------------- |
+| `@CsvBindByName`                       | ヘッダー名でフィールドをバインド | ✅ 対応                                      | ✅ 対応                                      |
+| `@CsvBindByPosition`                   | 列位置でフィールドをバインド     | ✅ 対応                                      | ✅ 対応                                      |
+| `@PreAssignmentValidator`              | 代入前バリデーション             | ✅ 対応（OpenCSV標準）                       | ✅ 対応（セル値→フィールド代入前に実行）    |
+| `@CsvCustomBindByName`                 | 名前ベースのカスタム変換         | ✅ 対応（OpenCSV標準）                       | ✅ 対応（事前変換として実行）               |
+| `@CsvCustomBindByPosition`             | 位置ベースのカスタム変換         | ✅ 対応（OpenCSV標準）                       | ✅ 対応（事前変換として実行）               |
+| `@CsvDate`                             | 日付フォーマット指定             | ✅ 対応（CSV側のOpenCSV機能）               | ❌ 直接サポートなし（Excel側はセル型＋`CellValueConverter`で処理） |
+| `@CsvNumber`                           | 数値フォーマット指定             | ✅ 対応（CSV側のOpenCSV機能）               | ❌ 直接サポートなし                          |
+
+> ✅: このライブラリとして明示的にサポート / 統合しているもの  
+> ❌: Excel側では直接は解釈せず、セル型や独自ロジックで処理するもの
+
+### 事前バリデーション (@PreAssignmentValidator)
+
+`@PreAssignmentValidator` で指定したバリデータは、**文字列がフィールドに代入される前**に実行されます。
+
+```java
+import com.opencsv.bean.CsvBindByName;
+import com.opencsv.bean.validators.PreAssignmentValidator;
+
+public class Person {
+
+    @CsvBindByName(column = "年齢")
+    @PreAssignmentValidator(validator = AgeValidator.class)
+    private Integer age;
+}
+```
+
+Excel 読み込みでも、各セルから文字列を取得したあと、型変換やフィールド代入の前に同じバリデーションが適用されます。
+
+### 事前変換（前処理）: @CsvCustomBindByName / @CsvCustomBindByPosition
+
+OpenCSVのカスタムバインドアノテーション：
+
+- `@CsvCustomBindByName`
+- `@CsvCustomBindByPosition`
+
+で指定した `AbstractBeanField` ベースのコンバーターも、**CSV と同じ感覚で Excel 読み込み時に実行**されます。
+
+```java
+import com.opencsv.bean.CsvCustomBindByName;
+import com.opencsv.bean.CsvCustomBindByPosition;
+import com.opencsv.bean.AbstractBeanField;
+
+public class Person {
+
+    // 名前列をトリム＋大文字化
+    @CsvCustomBindByName(column = "名前", converter = TrimUpperNameConverter.class)
+    private String name;
+
+    // 位置ベースで文字列→Integerに変換
+    @CsvCustomBindByPosition(position = 1, converter = TrimToIntConverter.class)
+    private Integer age;
+}
+
+public class TrimUpperNameConverter extends AbstractBeanField<String, String> {
+    @Override
+    protected String convert(String value) {
+        return value == null ? null : value.trim().toUpperCase();
+    }
+}
+
+public class TrimToIntConverter extends AbstractBeanField<Integer, String> {
+    @Override
+    protected Integer convert(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return Integer.parseInt(value.trim());
+    }
+}
+```
+
+これらのコンバーターは、
+
+1. セルから文字列を取得
+2. `@PreAssignmentValidator` による事前バリデーション（あれば）
+3. `convert(...)` による前処理（カスタム変換）
+4. フィールドへの代入
+
+という順序で適用されます（CSV / Excel 共通）。
+
 ### その他のOpenCSVアノテーション
 
 ```java

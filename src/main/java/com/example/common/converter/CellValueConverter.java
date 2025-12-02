@@ -48,7 +48,10 @@ public class CellValueConverter {
         }
 
         return switch (cell.getCellType()) {
-            case STRING -> cell.getStringCellValue();
+            case STRING -> {
+                var rich = cell.getRichStringCellValue();
+                yield rich != null ? rich.getString() : "";
+            }
             case NUMERIC -> {
                 if (DateUtil.isCellDateFormatted(cell)) {
                     yield formatDateCell(cell);
