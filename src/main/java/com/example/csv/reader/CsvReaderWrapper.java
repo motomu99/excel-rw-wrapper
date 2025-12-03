@@ -14,6 +14,7 @@ import java.util.function.Function;
 import com.opencsv.exceptions.CsvException;
 import com.example.common.config.CharsetType;
 import com.example.common.config.FileType;
+import com.example.common.mapping.MappingStrategyDetector;
 import com.example.common.mapping.MappingStrategyFactory;
 import com.example.common.util.BomHandler;
 import com.example.exception.CsvReadException;
@@ -56,7 +57,7 @@ public class CsvReaderWrapper {
     private Class<?> beanClass;
     private Charset charset = StandardCharsets.UTF_8;
     private FileType fileType = FileType.CSV;
-    private boolean usePositionMapping = false;
+    private Boolean usePositionMapping = null;
     private boolean withBom = false;
 
     private CsvReaderWrapper(Class<?> beanClass, Path filePath) {
@@ -136,6 +137,12 @@ public class CsvReaderWrapper {
      * @throws CsvReadException CSV読み込みエラー
      */
     public <T> List<T> read() {
+        // マッピング戦略が未設定の場合、アノテーションから自動判定
+        if (usePositionMapping == null) {
+            usePositionMapping = MappingStrategyDetector.detectUsePositionMapping(beanClass)
+                    .orElse(false); // デフォルトはヘッダーベース
+        }
+
         CsvColumnValidator.validate(filePath, charset, withBom, fileType.getDelimiter().charAt(0));
 
         try (FileInputStream fis = new FileInputStream(filePath.toFile());

@@ -7,8 +7,10 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.example.common.mapping.MappingStrategyDetector;
 import com.example.exception.HeaderNotFoundException;
 import com.example.exception.KeyColumnNotFoundException;
+import com.example.exception.SheetNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -45,7 +47,7 @@ public class ExcelReader<T> {
     int sheetIndex = 0;
     String sheetName = null;
     int skipLines = 0;
-    boolean usePositionMapping = false;
+    Boolean usePositionMapping = null;
     String headerKeyColumn = null;
     int headerSearchRows = 10; // デフォルトのヘッダー探索行数
 
@@ -91,6 +93,12 @@ public class ExcelReader<T> {
      * @throws KeyColumnNotFoundException キー列が見つからない場合
      */
     public List<T> read() throws IOException {
+        // マッピング戦略が未設定の場合、アノテーションから自動判定
+        if (usePositionMapping == null) {
+            usePositionMapping = MappingStrategyDetector.detectUsePositionMapping(beanClass)
+                    .orElse(false); // デフォルトはヘッダーベース
+        }
+
         try {
             // ExcelStreamReaderの内部実装を再利用
             ExcelStreamReader.Builder<T> builder = ExcelStreamReader.builder(beanClass, filePath)
@@ -304,4 +312,3 @@ public class ExcelReader<T> {
         }
     }
 }
-

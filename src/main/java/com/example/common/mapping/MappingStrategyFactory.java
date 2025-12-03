@@ -41,7 +41,8 @@ public class MappingStrategyFactory {
      * @return ヘッダーベースマッピング戦略
      */
     public static <T> MappingStrategy<T> createHeaderMappingStrategy(Class<T> beanClass) {
-        HeaderColumnNameMappingStrategy<T> strategy = new HeaderColumnNameMappingStrategy<>();
+        // フィールド定義順を維持するカスタム戦略を使用
+        HeaderColumnNameMappingStrategy<T> strategy = new FieldOrderedHeaderMappingStrategy<>();
         strategy.setType((Class<? extends T>) beanClass);
         return strategy;
     }

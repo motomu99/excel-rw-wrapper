@@ -13,6 +13,7 @@ import java.util.stream.Stream;
 import com.opencsv.exceptions.CsvException;
 import com.example.common.config.CharsetType;
 import com.example.common.config.FileType;
+import com.example.common.mapping.MappingStrategyDetector;
 import com.example.common.mapping.MappingStrategyFactory;
 import com.example.common.util.BomHandler;
 import com.example.exception.CsvReadException;
@@ -42,7 +43,7 @@ public class CsvStreamReader<T> {
     CharsetType charsetType = CharsetType.UTF_8;
     FileType fileType = FileType.CSV;
     int skipLines = 0;
-    boolean usePositionMapping = false;
+    Boolean usePositionMapping = null;
     
     private CsvStreamReader(Class<T> beanClass, Path filePath) {
         this.beanClass = beanClass;
@@ -71,6 +72,12 @@ public class CsvStreamReader<T> {
      * @throws CsvException CSV解析エラー
      */
     private <R> R extract(Function<Stream<T>, R> processor) throws IOException, CsvException {
+        // マッピング戦略が未設定の場合、アノテーションから自動判定
+        if (usePositionMapping == null) {
+            usePositionMapping = MappingStrategyDetector.detectUsePositionMapping(beanClass)
+                    .orElse(false); // デフォルトはヘッダーベース
+        }
+
         Charset charset = Charset.forName(charsetType.getCharsetName());
         CsvColumnValidator.validate(filePath, charset, charsetType.isWithBom(), fileType.getDelimiter().charAt(0));
 

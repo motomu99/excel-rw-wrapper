@@ -14,6 +14,7 @@ import java.util.stream.StreamSupport;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 
+import com.example.common.mapping.MappingStrategyDetector;
 import com.example.exception.HeaderNotFoundException;
 import com.example.exception.KeyColumnNotFoundException;
 import com.example.exception.SheetNotFoundException;
@@ -69,7 +70,7 @@ public class ExcelStreamReader<T> {
     int sheetIndex = 0;
     String sheetName = null;
     int skipLines = 0;
-    boolean usePositionMapping = false;
+    Boolean usePositionMapping = null;
     String headerKeyColumn = null;
     int headerSearchRows = DEFAULT_HEADER_SEARCH_ROWS;
 
@@ -103,6 +104,16 @@ public class ExcelStreamReader<T> {
     }
 
     /**
+     * マッピング戦略を決定する
+     */
+    private void resolveMappingStrategy() {
+        if (usePositionMapping == null) {
+            usePositionMapping = MappingStrategyDetector.detectUsePositionMapping(beanClass)
+                    .orElse(false); // デフォルトはヘッダーベース
+        }
+    }
+
+    /**
      * Streamを処理して結果を返す（メモリ効率の良いストリーミング処理）
      *
      * @param <R> 戻り値の型
@@ -111,6 +122,7 @@ public class ExcelStreamReader<T> {
      * @throws IOException ファイル読み込みエラー
      */
     private <R> R extract(Function<Stream<T>, R> processor) throws IOException {
+        resolveMappingStrategy();
         try (OpenedResource<T> resource = openResource(filePath)) {
             Stream<T> stream = StreamSupport.stream(
                 Spliterators.spliteratorUnknownSize(resource.iterator, 0), 
@@ -139,6 +151,7 @@ public class ExcelStreamReader<T> {
      * 複数ファイルを順次処理する
      */
     private <R> R processAll(List<Path> paths, Function<Stream<T>, R> processor) throws IOException {
+        resolveMappingStrategy();
         // カスタムSpliteratorで遅延読み込みStreamを作成
         MultiFileSpliterator<T> spliterator = new MultiFileSpliterator<>(paths, this);
         
@@ -198,18 +211,6 @@ public class ExcelStreamReader<T> {
         return clone;
     }
 
-    /**
-     * 戻り値不要の処理用ショートカット
-     *
-     * @param consumer Streamを消費する処理
-     * @throws IOException ファイル読み込みエラー
-     */
-    private void consume(Consumer<Stream<T>> consumer) throws IOException {
-        extract(stream -> {
-            consumer.accept(stream);
-            return null;
-        });
-    }
 
     private OpenedResource<T> openResource(Path path) throws IOException {
         if (!Files.exists(path)) {
