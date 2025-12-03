@@ -48,7 +48,7 @@ public class CsvStreamWriter<T> {
     LineSeparatorType lineSeparatorType = LineSeparatorType.CRLF;
     boolean usePositionMapping = false;
     boolean writeHeader = true;
-    QuoteStrategy quoteStrategy = QuoteStrategy.ALL;
+    QuoteStrategy quoteStrategy = QuoteStrategy.MINIMAL;
     
     private CsvStreamWriter(Class<T> beanClass, Path filePath) {
         this.beanClass = beanClass;

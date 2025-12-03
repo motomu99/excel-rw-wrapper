@@ -29,7 +29,7 @@ public class CsvWriterWrapper {
     private LineSeparatorType lineSeparatorType = LineSeparatorType.CRLF;
     private boolean usePositionMapping = false;
     private boolean writeHeader = true;
-    private QuoteStrategy quoteStrategy = QuoteStrategy.ALL;
+    private QuoteStrategy quoteStrategy = QuoteStrategy.MINIMAL;
 
     private CsvWriterWrapper(Class<?> beanClass, Path filePath) {
         this.beanClass = beanClass;

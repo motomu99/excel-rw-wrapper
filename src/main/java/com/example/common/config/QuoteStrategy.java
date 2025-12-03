@@ -7,13 +7,13 @@ package com.example.common.config;
  */
 public enum QuoteStrategy {
     /**
-     * 全てのフィールドをクオートする（デフォルト）
+     * 全てのフィールドをクオートする
      * <p>OpenCSVのデフォルトの挙動です。</p>
      */
     ALL,
     
     /**
-     * 必要なフィールドのみクオートする
+     * 必要なフィールドのみクオートする（デフォルト）
      * <p>区切り文字や改行文字を含むフィールドのみクオートします。</p>
      */
     MINIMAL,
