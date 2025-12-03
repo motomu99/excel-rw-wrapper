@@ -3,6 +3,7 @@ package com.example.csv.writer;
 import com.example.common.config.CharsetType;
 import com.example.common.config.FileType;
 import com.example.common.config.LineSeparatorType;
+import com.example.common.config.QuoteStrategy;
 import com.example.csv.reader.CsvReaderWrapper;
 import com.example.model.Person;
 import com.example.model.PersonWithoutHeader;
@@ -249,6 +250,112 @@ public class CsvStreamWriterTest {
         assertEquals(3, readPersons.size()); // 25歳以上かつ学生でない3人
         assertTrue(readPersons.stream().allMatch(person -> person.getAge() >= 25));
         assertTrue(readPersons.stream().noneMatch(person -> person.getOccupation().equals("学生")));
+    }
+
+    @Test
+    @DisplayName("ヘッダーなし書き込み - noHeader()でヘッダーなしで書き込めること")
+    void testStreamWritingNoHeader() throws IOException, CsvException {
+        Path outputPath = Paths.get("src/test/resources/output_stream_no_header_opt_test.csv");
+        filesToDelete.add(outputPath);
+
+        List<Person> persons = new ArrayList<>();
+        persons.add(new Person("山田太郎", 28, "プログラマー", "神奈川"));
+        persons.add(new Person("鈴木花子", 32, "デザイナー", "京都"));
+
+        CsvStreamWriter.builder(Person.class, outputPath)
+            .noHeader()
+            .write(persons.stream());
+
+        // ファイルが作成されたことを確認
+        assertTrue(Files.exists(outputPath));
+
+        // ファイルの内容を確認（ヘッダーがないか）
+        String content = Files.readString(outputPath);
+        assertFalse(content.contains("名前,年齢,職業,出身地")); // ヘッダー行がない
+        
+        // OpenCSV 5.x のデフォルトは QuoteStrategy.ALL なので、基本はクオートされる
+        // ただし、環境や設定によって微妙に変わる可能性があるので、
+        // 「ヘッダーがないこと」と「データが含まれていること」を確認できればOKとする
+        // 念のため、クオートあり／なしどちらのケースでもデータが含まれていることを確認
+        assertTrue(
+            content.contains("\"山田太郎\",\"28\",\"プログラマー\",\"神奈川\"") ||
+            content.contains("山田太郎,28,プログラマー,神奈川")
+        );
+    }
+
+    @Test
+    @DisplayName("クオート最小化 - QuoteStrategy.MINIMALで必要な場合のみクオートされること")
+    void testStreamWritingQuoteMinimal() throws IOException, CsvException {
+        Path outputPath = Paths.get("src/test/resources/output_stream_quote_minimal_test.csv");
+        filesToDelete.add(outputPath);
+
+        List<Person> persons = new ArrayList<>();
+        persons.add(new Person("山田太郎", 28, "プログラマー", "神奈川"));
+        persons.add(new Person("高橋,次郎", 45, "マネージャー", "福岡")); // カンマを含む
+
+        CsvStreamWriter.builder(Person.class, outputPath)
+            .quoteStrategy(QuoteStrategy.MINIMAL)
+            .write(persons.stream());
+
+        // ファイルが作成されたことを確認
+        assertTrue(Files.exists(outputPath));
+
+        // ファイルの内容を確認
+        String content = Files.readString(outputPath);
+        // 通常のデータはクオートなし
+        assertTrue(content.contains("山田太郎,28,プログラマー,神奈川"));
+        // カンマを含むデータはクオートあり
+        assertTrue(content.contains("\"高橋,次郎\",45,マネージャー,福岡"));
+    }
+
+    @Test
+    @DisplayName("クオートなし - QuoteStrategy.NONEで全くクオートされないこと")
+    void testStreamWritingQuoteNone() throws IOException, CsvException {
+        Path outputPath = Paths.get("src/test/resources/output_stream_quote_none_test.csv");
+        filesToDelete.add(outputPath);
+
+        List<Person> persons = new ArrayList<>();
+        persons.add(new Person("山田太郎", 28, "プログラマー", "神奈川"));
+        // OpenCSV の仕様上、区切り文字が含まれているのにクオートをOFFにすると、
+        // 単純に区切り文字がエスケープされずにそのまま出力されるか、エスケープされる可能性がある
+        // ここでは、シンプルなデータでまず確認
+        
+        CsvStreamWriter.builder(Person.class, outputPath)
+            .quoteStrategy(QuoteStrategy.NONE)
+            .write(persons.stream());
+
+        // ファイルが作成されたことを確認
+        assertTrue(Files.exists(outputPath));
+
+        // ファイルの内容を確認
+        String content = Files.readString(outputPath);
+        // 全くクオートされない
+        assertTrue(content.contains("山田太郎,28,プログラマー,神奈川"));
+    }
+
+    @Test
+    @DisplayName("ヘッダーなし＆クオート最小化 - 組み合わせで動作すること")
+    void testStreamWritingNoHeaderAndQuoteMinimal() throws IOException, CsvException {
+        Path outputPath = Paths.get("src/test/resources/output_stream_no_header_minimal_test.csv");
+        filesToDelete.add(outputPath);
+
+        List<Person> persons = new ArrayList<>();
+        persons.add(new Person("山田太郎", 28, "プログラマー", "神奈川"));
+
+        CsvStreamWriter.builder(Person.class, outputPath)
+            .noHeader()
+            .quoteStrategy(QuoteStrategy.MINIMAL)
+            .write(persons.stream());
+
+        // ファイルが作成されたことを確認
+        assertTrue(Files.exists(outputPath));
+
+        // ファイルの内容を確認
+        String content = Files.readString(outputPath);
+        System.out.println("Debug Content (No Header & Minimal): [" + content + "]"); // デバッグ出力
+        assertFalse(content.contains("名前,年齢,職業,出身地"));
+        // クオートなしでデータが出力されていることを確認
+        assertTrue(content.contains("山田太郎,28,プログラマー,神奈川"));
     }
 
     @Test

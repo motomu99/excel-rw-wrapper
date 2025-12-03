@@ -341,6 +341,71 @@ public class ExcelStreamWriterTest {
     }
     
     @Test
+    @DisplayName("ヘッダーなし書き込み - noHeader()でヘッダーなしで書き込めること")
+    void testWriteNoHeader() throws IOException {
+        Path outputPath = TEST_OUTPUT_DIR.resolve("no_header_write.xlsx");
+        
+        List<Person> persons = List.of(
+            new Person("田中太郎", 25, "エンジニア", "東京")
+        );
+        
+        ExcelStreamWriter.builder(Person.class, outputPath)
+            .noHeader()
+            .write(persons.stream());
+        
+        assertTrue(Files.exists(outputPath));
+        
+        try (FileInputStream fis = new FileInputStream(outputPath.toFile());
+             Workbook workbook = WorkbookFactory.create(fis)) {
+            
+            Sheet sheet = workbook.getSheetAt(0);
+            
+            // 行数がデータ数（1）と一致することを確認（ヘッダー行がない）
+            assertEquals(1, sheet.getPhysicalNumberOfRows());
+            
+            // 1行目がデータであることを確認
+            Row row = sheet.getRow(0);
+            assertEquals("田中太郎", getCellValueAsString(row.getCell(0)));
+            // ヘッダーの"名前"ではない
+            assertNotEquals("名前", getCellValueAsString(row.getCell(0)));
+        }
+    }
+
+    @Test
+    @DisplayName("ヘッダーなし＆開始位置指定 - 組み合わせで動作すること")
+    void testWriteNoHeaderWithStartCell() throws IOException {
+        Path outputPath = TEST_OUTPUT_DIR.resolve("no_header_start_cell.xlsx");
+        
+        List<Person> persons = List.of(
+            new Person("田中太郎", 25, "エンジニア", "東京")
+        );
+        
+        // C3セル（行2、列2）から開始、ヘッダーなし
+        ExcelStreamWriter.builder(Person.class, outputPath)
+            .noHeader()
+            .startCell(2, 2)
+            .write(persons.stream());
+        
+        assertTrue(Files.exists(outputPath));
+        
+        try (FileInputStream fis = new FileInputStream(outputPath.toFile());
+             Workbook workbook = WorkbookFactory.create(fis)) {
+            
+            Sheet sheet = workbook.getSheetAt(0);
+            
+            // 1行目（行2）がデータであることを確認
+            Row row = sheet.getRow(2);
+            assertNotNull(row);
+            assertEquals("田中太郎", getCellValueAsString(row.getCell(2)));
+            
+            // ヘッダー行がないので、startCellで指定した行に直接データが入る
+            // もしヘッダーありなら、行2はヘッダーで、データは行3に入るはず
+            Row nextRow = sheet.getRow(3);
+            assertNull(nextRow);
+        }
+    }
+
+    @Test
     @DisplayName("Reader/Writerの往復 - 書き込んだファイルをReaderで読み込めること")
     void testRoundTrip() throws IOException {
         Path outputPath = TEST_OUTPUT_DIR.resolve("round_trip.xlsx");

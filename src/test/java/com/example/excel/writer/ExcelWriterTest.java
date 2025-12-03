@@ -184,6 +184,35 @@ public class ExcelWriterTest {
     }
 
     @Test
+    @DisplayName("ヘッダーなし書き込み - noHeader()でヘッダーなしで書き込めること")
+    void testWriteNoHeader() throws IOException {
+        Path outputPath = TEST_OUTPUT_DIR.resolve("no_header_writer.xlsx");
+        
+        List<Person> persons = List.of(
+            new Person("田中太郎", 25, "エンジニア", "東京")
+        );
+        
+        ExcelWriter.builder(Person.class, outputPath)
+            .noHeader()
+            .write(persons);
+        
+        assertTrue(Files.exists(outputPath));
+        
+        try (FileInputStream fis = new FileInputStream(outputPath.toFile());
+             Workbook workbook = WorkbookFactory.create(fis)) {
+            
+            Sheet sheet = workbook.getSheetAt(0);
+            
+            // 行数がデータ数（1）と一致することを確認
+            assertEquals(1, sheet.getPhysicalNumberOfRows());
+            
+            // 1行目がデータであることを確認
+            Row row = sheet.getRow(0);
+            assertEquals("田中太郎", getCellValueAsString(row.getCell(0)));
+        }
+    }
+
+    @Test
     @DisplayName("既存ファイルへの書き込み - loadExisting()で既存ファイルに追記できること")
     void testWriteToExistingFile() throws IOException {
         Path outputPath = TEST_OUTPUT_DIR.resolve("existing_file.xlsx");

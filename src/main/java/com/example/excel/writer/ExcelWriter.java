@@ -46,6 +46,7 @@ public class ExcelWriter<T> {
     int sheetIndex = 0;
     boolean usePositionMapping = false;
     boolean loadExisting = false;
+    boolean writeHeader = true;
     int startRow = 0;
     int startColumn = 0;
 
@@ -88,6 +89,10 @@ public class ExcelWriter<T> {
         
         if (loadExisting) {
             builder.loadExisting();
+        }
+        
+        if (!writeHeader) {
+            builder.noHeader();
         }
         
         builder.write(list.stream());
@@ -146,6 +151,16 @@ public class ExcelWriter<T> {
          */
         public Builder<T> useHeaderMapping() {
             writer.usePositionMapping = false;
+            return this;
+        }
+        
+        /**
+         * ヘッダーを出力しない
+         * 
+         * @return このBuilderインスタンス
+         */
+        public Builder<T> noHeader() {
+            writer.writeHeader = false;
             return this;
         }
         

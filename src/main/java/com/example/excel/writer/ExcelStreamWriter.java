@@ -76,6 +76,7 @@ public class ExcelStreamWriter<T> {
     
     boolean usePositionMapping = false;
     boolean loadExisting = false;
+    boolean writeHeader = true;
     int startRow = 0;
     int startColumn = 0;
     
@@ -132,10 +133,12 @@ public class ExcelStreamWriter<T> {
                 fieldMappingCache = new FieldMappingCache(beanClass);
                 
                 // ヘッダー行を作成
-                createHeaderRow(sheet);
+                if (writeHeader) {
+                    createHeaderRow(sheet);
+                }
                 
                 // データ行を作成
-                int rowIndex = startRow + 1;
+                int rowIndex = writeHeader ? startRow + 1 : startRow;
                 for (T bean : dataList) {
                     Row row = sheet.getRow(rowIndex);
                     if (row == null) {
@@ -350,6 +353,16 @@ public class ExcelStreamWriter<T> {
          */
         public Builder<T> useHeaderMapping() {
             writer.usePositionMapping = false;
+            return this;
+        }
+        
+        /**
+         * ヘッダーを出力しない
+         * 
+         * @return このBuilderインスタンス
+         */
+        public Builder<T> noHeader() {
+            writer.writeHeader = false;
             return this;
         }
         
