@@ -425,6 +425,22 @@ CsvWriterWrapper.builder(Person.class, Paths.get("no_header.csv"))
     .write(persons);
 ```
 
+#### ヘッダー出力制御とクオート戦略
+
+```java
+import com.example.common.config.QuoteStrategy;
+
+// ヘッダーを出力しない
+CsvWriterWrapper.builder(Person.class, Paths.get("no_header.csv"))
+    .noHeader()
+    .write(persons);
+
+// クオートを必要な時だけに
+CsvWriterWrapper.builder(Person.class, Paths.get("minimal_quote.csv"))
+    .quoteStrategy(QuoteStrategy.MINIMAL)
+    .write(persons);
+```
+
 #### 従来のAPI（互換性維持）
 
 既存コードとの互換性のため、従来の`execute()`メソッドも引き続き使用できます。

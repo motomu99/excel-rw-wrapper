@@ -359,6 +359,122 @@ public class CsvStreamWriterTest {
     }
 
     @Test
+    @DisplayName("デフォルト設定（MINIMAL）- 通常の値はクオートなしで出力されること")
+    void testDefaultQuoteStrategyNormalValues() throws IOException {
+        Path outputPath = Paths.get("src/test/resources/output_default_normal_test.csv");
+        filesToDelete.add(outputPath);
+
+        List<Person> persons = new ArrayList<>();
+        persons.add(new Person("山田太郎", 28, "プログラマー", "神奈川"));
+        persons.add(new Person("鈴木花子", 32, "デザイナー", "京都"));
+
+        // デフォルト設定（QuoteStrategy.MINIMAL）で書き込み
+        CsvStreamWriter.builder(Person.class, outputPath)
+            .write(persons.stream());
+
+        assertTrue(Files.exists(outputPath));
+
+        // ファイルの内容を確認：通常の値はクオートなし
+        String content = Files.readString(outputPath);
+        assertTrue(content.contains("名前,年齢,職業,出身地")); // ヘッダー
+        assertTrue(content.contains("山田太郎,28,プログラマー,神奈川")); // クオートなし
+        assertTrue(content.contains("鈴木花子,32,デザイナー,京都")); // クオートなし
+        assertFalse(content.contains("\"山田太郎\"")); // クオートされていないことを確認
+    }
+
+    @Test
+    @DisplayName("デフォルト設定（MINIMAL）- 区切り文字を含む値はその列だけクオートされること")
+    void testDefaultQuoteStrategyWithDelimiter() throws IOException {
+        Path outputPath = Paths.get("src/test/resources/output_default_delimiter_test.csv");
+        filesToDelete.add(outputPath);
+
+        List<Person> persons = new ArrayList<>();
+        persons.add(new Person("山田太郎", 28, "プログラマー", "神奈川"));
+        persons.add(new Person("高橋,次郎", 45, "マネージャー", "福岡")); // カンマを含む
+        persons.add(new Person("佐藤三郎", 35, "営業,企画", "東京")); // 職業にカンマ
+
+        // デフォルト設定（QuoteStrategy.MINIMAL）で書き込み
+        CsvStreamWriter.builder(Person.class, outputPath)
+            .write(persons.stream());
+
+        assertTrue(Files.exists(outputPath));
+
+        // ファイルの内容を確認：区切り文字を含む列だけクオートあり
+        String content = Files.readString(outputPath);
+        assertTrue(content.contains("山田太郎,28,プログラマー,神奈川")); // クオートなし
+        assertTrue(content.contains("\"高橋,次郎\",45,マネージャー,福岡")); // 名前だけクオート
+        assertTrue(content.contains("佐藤三郎,35,\"営業,企画\",東京")); // 職業だけクオート
+    }
+
+    @Test
+    @DisplayName("デフォルト設定（MINIMAL）- 改行文字を含む値はクオートされること")
+    void testDefaultQuoteStrategyWithNewline() throws IOException {
+        Path outputPath = Paths.get("src/test/resources/output_default_newline_test.csv");
+        filesToDelete.add(outputPath);
+
+        List<Person> persons = new ArrayList<>();
+        persons.add(new Person("山田太郎", 28, "プログラマー", "神奈川"));
+        persons.add(new Person("田中花子", 30, "マネージャー\n兼務", "大阪")); // 改行を含む
+
+        // デフォルト設定（QuoteStrategy.MINIMAL）で書き込み
+        CsvStreamWriter.builder(Person.class, outputPath)
+            .write(persons.stream());
+
+        assertTrue(Files.exists(outputPath));
+
+        // ファイルの内容を確認：改行を含む列はクオートあり
+        String content = Files.readString(outputPath);
+        assertTrue(content.contains("山田太郎,28,プログラマー,神奈川")); // クオートなし
+        assertTrue(content.contains("田中花子,30,\"マネージャー")); // 改行を含む職業はクオート
+    }
+
+    @Test
+    @DisplayName("QuoteStrategy.ALL - すべての値がクオートされること")
+    void testQuoteStrategyAll() throws IOException {
+        Path outputPath = Paths.get("src/test/resources/output_quote_all_test.csv");
+        filesToDelete.add(outputPath);
+
+        List<Person> persons = new ArrayList<>();
+        persons.add(new Person("山田太郎", 28, "プログラマー", "神奈川"));
+        persons.add(new Person("高橋,次郎", 45, "マネージャー", "福岡")); // カンマを含む
+
+        CsvStreamWriter.builder(Person.class, outputPath)
+            .quoteStrategy(QuoteStrategy.ALL)
+            .write(persons.stream());
+
+        assertTrue(Files.exists(outputPath));
+
+        // ファイルの内容を確認：すべての値がクオートされる
+        String content = Files.readString(outputPath);
+        assertTrue(content.contains("\"名前\",\"年齢\",\"職業\",\"出身地\"")); // ヘッダーもすべてクオート
+        assertTrue(content.contains("\"山田太郎\",\"28\",\"プログラマー\",\"神奈川\"")); // すべてクオート
+        assertTrue(content.contains("\"高橋,次郎\",\"45\",\"マネージャー\",\"福岡\"")); // すべてクオート
+    }
+
+    @Test
+    @DisplayName("QuoteStrategy.NONE - 区切り文字があってもクオートされないこと")
+    void testQuoteStrategyNoneWithDelimiter() throws IOException {
+        Path outputPath = Paths.get("src/test/resources/output_quote_none_delimiter_test.csv");
+        filesToDelete.add(outputPath);
+
+        List<Person> persons = new ArrayList<>();
+        persons.add(new Person("山田太郎", 28, "プログラマー", "神奈川"));
+        // NONE戦略では区切り文字があってもクオートされない（CSVが壊れる可能性あり）
+
+        CsvStreamWriter.builder(Person.class, outputPath)
+            .quoteStrategy(QuoteStrategy.NONE)
+            .write(persons.stream());
+
+        assertTrue(Files.exists(outputPath));
+
+        // ファイルの内容を確認：クオートが一切ない
+        String content = Files.readString(outputPath);
+        assertTrue(content.contains("名前,年齢,職業,出身地")); // ヘッダーもクオートなし
+        assertTrue(content.contains("山田太郎,28,プログラマー,神奈川")); // クオートなし
+        assertFalse(content.contains("\"")); // ダブルクォートが一切含まれない
+    }
+
+    @Test
     @DisplayName("空Stream書き込み - 空のStreamを書き込んでもエラーにならないこと")
     void testStreamWritingEmpty() throws IOException, CsvException {
         // 空のStreamを書き込むテスト
