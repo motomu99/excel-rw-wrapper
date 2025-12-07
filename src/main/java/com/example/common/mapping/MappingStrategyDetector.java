@@ -8,6 +8,7 @@ import com.opencsv.bean.CsvBindByPosition;
 import com.opencsv.bean.CsvCustomBindByName;
 import com.opencsv.bean.CsvCustomBindByPosition;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -16,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class MappingStrategyDetector {
 
+    @SuppressFBWarnings("CT_CONSTRUCTOR_THROW")
     private MappingStrategyDetector() {
         throw new UnsupportedOperationException("Utility class");
     }

@@ -32,6 +32,7 @@ class FieldMappingCacheTest {
         private String email;
         
         // アノテーションなしフィールド（キャッシュされない）
+        @SuppressWarnings("unused")
         private String ignored;
     }
 
@@ -66,7 +67,9 @@ class FieldMappingCacheTest {
      * テスト用Bean: アノテーションなし
      */
     static class PersonWithoutAnnotations {
+        @SuppressWarnings("unused")
         private String name;
+        @SuppressWarnings("unused")
         private Integer age;
     }
 
@@ -83,22 +86,22 @@ class FieldMappingCacheTest {
         Field nameField = PersonWithName.class.getDeclaredField("name");
         assertTrue(cacheMap.containsKey(nameField));
         FieldMappingInfo nameInfo = cacheMap.get(nameField);
-        assertEquals("名前", nameInfo.columnName);
-        assertNull(nameInfo.position);
+        assertEquals("名前", nameInfo.getColumnName());
+        assertNull(nameInfo.getPosition());
         
         // ageフィールドの確認
         Field ageField = PersonWithName.class.getDeclaredField("age");
         assertTrue(cacheMap.containsKey(ageField));
         FieldMappingInfo ageInfo = cacheMap.get(ageField);
-        assertEquals("年齢", ageInfo.columnName);
-        assertNull(ageInfo.position);
+        assertEquals("年齢", ageInfo.getColumnName());
+        assertNull(ageInfo.getPosition());
         
         // emailフィールドの確認
         Field emailField = PersonWithName.class.getDeclaredField("email");
         assertTrue(cacheMap.containsKey(emailField));
         FieldMappingInfo emailInfo = cacheMap.get(emailField);
-        assertEquals("メールアドレス", emailInfo.columnName);
-        assertNull(emailInfo.position);
+        assertEquals("メールアドレス", emailInfo.getColumnName());
+        assertNull(emailInfo.getPosition());
         
         // ignoredフィールドはキャッシュされない
         Field ignoredField = PersonWithName.class.getDeclaredField("ignored");
@@ -117,22 +120,22 @@ class FieldMappingCacheTest {
         Field nameField = PersonWithPosition.class.getDeclaredField("name");
         assertTrue(cacheMap.containsKey(nameField));
         FieldMappingInfo nameInfo = cacheMap.get(nameField);
-        assertNull(nameInfo.columnName);
-        assertEquals(0, nameInfo.position);
+        assertNull(nameInfo.getColumnName());
+        assertEquals(0, nameInfo.getPosition());
         
         // ageフィールドの確認
         Field ageField = PersonWithPosition.class.getDeclaredField("age");
         assertTrue(cacheMap.containsKey(ageField));
         FieldMappingInfo ageInfo = cacheMap.get(ageField);
-        assertNull(ageInfo.columnName);
-        assertEquals(1, ageInfo.position);
+        assertNull(ageInfo.getColumnName());
+        assertEquals(1, ageInfo.getPosition());
         
         // emailフィールドの確認
         Field emailField = PersonWithPosition.class.getDeclaredField("email");
         assertTrue(cacheMap.containsKey(emailField));
         FieldMappingInfo emailInfo = cacheMap.get(emailField);
-        assertNull(emailInfo.columnName);
-        assertEquals(2, emailInfo.position);
+        assertNull(emailInfo.getColumnName());
+        assertEquals(2, emailInfo.getPosition());
     }
 
     @Test
@@ -147,15 +150,15 @@ class FieldMappingCacheTest {
         Field nameField = PersonWithBoth.class.getDeclaredField("name");
         assertTrue(cacheMap.containsKey(nameField));
         FieldMappingInfo nameInfo = cacheMap.get(nameField);
-        assertEquals("名前", nameInfo.columnName);
-        assertEquals(0, nameInfo.position);
+        assertEquals("名前", nameInfo.getColumnName());
+        assertEquals(0, nameInfo.getPosition());
         
         // ageフィールドの確認
         Field ageField = PersonWithBoth.class.getDeclaredField("age");
         assertTrue(cacheMap.containsKey(ageField));
         FieldMappingInfo ageInfo = cacheMap.get(ageField);
-        assertEquals("年齢", ageInfo.columnName);
-        assertEquals(1, ageInfo.position);
+        assertEquals("年齢", ageInfo.getColumnName());
+        assertEquals(1, ageInfo.getPosition());
     }
 
     @Test
@@ -189,9 +192,9 @@ class FieldMappingCacheTest {
         Field testField = PersonWithName.class.getDeclaredField("name");
         FieldMappingInfo info = new FieldMappingInfo(testField, "テスト列", 5, null, null);
         
-        assertEquals(testField, info.field);
-        assertEquals("テスト列", info.columnName);
-        assertEquals(5, info.position);
+        assertEquals(testField, info.getField());
+        assertEquals("テスト列", info.getColumnName());
+        assertEquals(5, info.getPosition());
     }
 
     @Test
@@ -200,8 +203,8 @@ class FieldMappingCacheTest {
         Field testField = PersonWithName.class.getDeclaredField("name");
         FieldMappingInfo info = new FieldMappingInfo(testField, "テスト列", null, null, null);
         
-        assertEquals("テスト列", info.columnName);
-        assertNull(info.position);
+        assertEquals("テスト列", info.getColumnName());
+        assertNull(info.getPosition());
     }
 
     @Test
@@ -210,8 +213,8 @@ class FieldMappingCacheTest {
         Field testField = PersonWithPosition.class.getDeclaredField("name");
         FieldMappingInfo info = new FieldMappingInfo(testField, null, 0, null, null);
         
-        assertNull(info.columnName);
-        assertEquals(0, info.position);
+        assertNull(info.getColumnName());
+        assertEquals(0, info.getPosition());
     }
 
     @Test
@@ -234,11 +237,11 @@ class FieldMappingCacheTest {
         FieldMappingInfo info1 = cacheMap1.values().iterator().next();
         FieldMappingInfo info2 = cacheMap2.values().iterator().next();
         
-        assertNotNull(info1.columnName);
-        assertNull(info1.position);
+        assertNotNull(info1.getColumnName());
+        assertNull(info1.getPosition());
         
-        assertNull(info2.columnName);
-        assertNotNull(info2.position);
+        assertNull(info2.getColumnName());
+        assertNotNull(info2.getPosition());
     }
 
     @Test
@@ -252,8 +255,8 @@ class FieldMappingCacheTest {
                 
         // 実際にアクセスできることを確認
         PersonWithName person = new PersonWithName();
-        assertDoesNotThrow(() -> info.field.set(person, "テスト太郎"));
-        assertEquals("テスト太郎", info.field.get(person));
+        assertDoesNotThrow(() -> info.getField().set(person, "テスト太郎"));
+        assertEquals("テスト太郎", info.getField().get(person));
     }
 }
 

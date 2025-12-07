@@ -27,11 +27,13 @@ public class ParallelReadExecutor {
      * @param parallelism 並列度（1以下の場合は逐次処理）
      * @return 結合された結果リスト
      */
+    @SuppressWarnings("PMD.AvoidLiteralsInIfCondition")
     public static <T> List<T> readAll(List<Path> filePaths, Function<Path, List<T>> reader, int parallelism) {
         if (filePaths == null || filePaths.isEmpty()) {
             return new ArrayList<>();
         }
 
+        // 並列度が1以下の場合は逐次処理（意図が明確なリテラル使用）
         if (parallelism <= 1) {
             log.debug("逐次処理で{}ファイルを読み込みます", filePaths.size());
             return filePaths.stream()
@@ -42,6 +44,8 @@ public class ParallelReadExecutor {
 
         int threadCount = Math.min(parallelism, filePaths.size());
         log.debug("並列度{} -> 実スレッド{}で{}ファイルを読み込みます", parallelism, threadCount, filePaths.size());
+        // ExecutorServiceはJava 19以降でAutoCloseableを実装しているが、このプロジェクトでは明示的にshutdown()を呼ぶ
+        @SuppressWarnings("PMD.CloseResource")
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
         try {
             List<CompletableFuture<List<T>>> futures = filePaths.stream()

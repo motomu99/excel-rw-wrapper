@@ -4,6 +4,8 @@ import com.opencsv.bean.ColumnPositionMappingStrategy;
 import com.opencsv.bean.HeaderColumnNameMappingStrategy;
 import com.opencsv.bean.MappingStrategy;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 /**
  * OpenCSVのマッピング戦略を生成するファクトリークラス
  * 
@@ -12,6 +14,7 @@ import com.opencsv.bean.MappingStrategy;
  */
 public class MappingStrategyFactory {
 
+    @SuppressFBWarnings("CT_CONSTRUCTOR_THROW")
     private MappingStrategyFactory() {
         // ユーティリティクラスのためインスタンス化を禁止
         throw new UnsupportedOperationException("Utility class");

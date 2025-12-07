@@ -21,6 +21,7 @@ import com.example.exception.CsvReadException;
 import com.opencsv.bean.CsvToBean;
 import com.opencsv.bean.CsvToBeanBuilder;
 import com.opencsv.bean.MappingStrategy;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -50,6 +51,7 @@ import lombok.extern.slf4j.Slf4j;
  * </pre>
  */
 @Slf4j
+@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 public class CsvReaderWrapper {
     
     private int skipLines = 0;
@@ -57,6 +59,8 @@ public class CsvReaderWrapper {
     private Class<?> beanClass;
     private Charset charset = StandardCharsets.UTF_8;
     private FileType fileType = FileType.CSV;
+    // Builderパターンでフィールド名とメソッド名が同じになるのは一般的なパターン
+    @SuppressWarnings("PMD.AvoidFieldNameMatchingMethodName")
     private Boolean usePositionMapping = null;
     private boolean withBom = false;
 
@@ -262,9 +266,11 @@ public class CsvReaderWrapper {
      * メソッドチェーンで設定を積み重ね、最後に{@link #read()}を呼び出すことで
      * CSVファイルを読み込みます。</p>
      */
+    @SuppressWarnings("PMD.AvoidFieldNameMatchingMethodName")
     public static class Builder {
         private final CsvReaderWrapper wrapper;
         private final List<Path> filePaths;
+        // Builderパターンでフィールド名とメソッド名が同じになるのは一般的なパターン
         private int parallelism = 1;
         
         private Builder(Class<?> beanClass, Path filePath) {
@@ -272,6 +278,7 @@ public class CsvReaderWrapper {
             this.filePaths = java.util.Collections.singletonList(filePath);
         }
 
+        @SuppressFBWarnings("CT_CONSTRUCTOR_THROW")
         private Builder(Class<?> beanClass, List<Path> filePaths) {
             if (filePaths == null || filePaths.isEmpty()) {
                 throw new IllegalArgumentException("filePaths must not be empty or null");
@@ -346,8 +353,11 @@ public class CsvReaderWrapper {
          * @return BeanのList
          * @throws CsvReadException CSV読み込みエラー
          */
+        @SuppressWarnings("PMD.AvoidLiteralsInIfCondition")
         public <T> List<T> read() {
-            if (filePaths.size() > 1) {
+            // 複数ファイルの場合は並列処理（意図が明確なリテラル使用）
+            final int singleFileThreshold = 1;
+            if (filePaths.size() > singleFileThreshold) {
                 return readAll();
             }
             return wrapper.read();

@@ -92,7 +92,7 @@ public class CsvStreamWriter<T> {
                 if (!writeHeader) {
                     @SuppressWarnings("unchecked")
                     MappingStrategy<T> wrappedStrategy = (MappingStrategy<T>) Proxy.newProxyInstance(
-                        MappingStrategy.class.getClassLoader(),
+                        Thread.currentThread().getContextClassLoader(),
                         new Class<?>[]{MappingStrategy.class},
                         (proxy, method, args) -> {
                             if (method.getName().equals("generateHeader")) {

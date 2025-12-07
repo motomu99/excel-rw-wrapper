@@ -142,7 +142,8 @@ public class CsvExternalSorter {
             String line;
             int lineCount = 0;
             
-            while ((line = reader.readLine()) != null) {
+            line = reader.readLine();
+            while (line != null) {
                 lineCount++;
                 long lineSize = line.getBytes(charsetType.getCharsetName()).length;
                 
@@ -159,6 +160,7 @@ public class CsvExternalSorter {
                 
                 currentChunk.add(line);
                 currentSize += lineSize;
+                line = reader.readLine();
             }
             
             // 最後のチャンクを保存
@@ -217,6 +219,8 @@ public class CsvExternalSorter {
         try {
             // 各チャンクファイルから最初の行を読み込む
             for (int i = 0; i < chunkFiles.size(); i++) {
+                // 複数のBufferedReaderを管理するため、リストに追加してfinallyブロックでクローズする
+                @SuppressWarnings("PMD.CloseResource")
                 BufferedReader reader = new BufferedReader(
                     new FileReader(chunkFiles.get(i).toFile(),
                                  java.nio.charset.Charset.forName(charsetType.getCharsetName())));
@@ -270,8 +274,8 @@ public class CsvExternalSorter {
             }
             
         } finally {
-            // すべてのReaderをクローズ
-            for (BufferedReader reader : readers) {
+            // すべてのReaderをクローズ（複数のリソースを管理するため、リストに追加してfinallyでクローズする）
+            for (@SuppressWarnings("PMD.CloseResource") BufferedReader reader : readers) {
                 try {
                     reader.close();
                 } catch (IOException e) {

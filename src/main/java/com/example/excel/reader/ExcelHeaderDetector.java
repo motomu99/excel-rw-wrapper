@@ -1,8 +1,11 @@
 package com.example.excel.reader;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
@@ -172,6 +175,7 @@ public class ExcelHeaderDetector {
      * 
      * @return ヘッダー行
      */
+    @SuppressFBWarnings("EI_EXPOSE_REP")
     public Row getHeaderRow() {
         return headerRow;
     }
@@ -182,7 +186,7 @@ public class ExcelHeaderDetector {
      * @return ヘッダーマップ
      */
     public Map<Integer, String> getHeaderMap() {
-        return headerMap;
+        return headerMap != null ? Collections.unmodifiableMap(headerMap) : null;
     }
 
     /**
@@ -191,7 +195,7 @@ public class ExcelHeaderDetector {
      * @return カラムマップ
      */
     public Map<String, Integer> getColumnMap() {
-        return columnMap;
+        return columnMap != null ? Collections.unmodifiableMap(columnMap) : null;
     }
 
     /**

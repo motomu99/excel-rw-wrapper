@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PushbackInputStream;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -15,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class BomSkipper {
     
+    @SuppressFBWarnings("CT_CONSTRUCTOR_THROW")
     private BomSkipper() {
         // ユーティリティクラスのためインスタンス化を禁止
         throw new UnsupportedOperationException("Utility class");

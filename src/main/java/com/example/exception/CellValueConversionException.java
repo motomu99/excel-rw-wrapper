@@ -4,6 +4,7 @@ package com.example.exception;
  * セルの値を指定された型に変換できない場合にスローされる例外
  */
 public class CellValueConversionException extends ExcelReaderException {
+    private static final long serialVersionUID = 1L;
 
     private final int rowIndex;
     private final String columnName;

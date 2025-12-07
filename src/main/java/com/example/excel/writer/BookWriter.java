@@ -19,6 +19,8 @@ import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import com.example.common.mapping.FieldMappingCache;
 import com.example.common.mapping.FieldMappingCache.FieldMappingInfo;
 import com.example.excel.domain.Anchor;
@@ -55,6 +57,12 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class BookWriter {
     
+    /**
+     * ユーティリティクラスのためインスタンス化を禁止
+     * 
+     * <p>ユーティリティクラスの設計パターンとして、コンストラクタで例外を投げる。</p>
+     */
+    @SuppressFBWarnings("CT_CONSTRUCTOR_THROW")
     private BookWriter() {
         // ユーティリティクラスのためインスタンス化を禁止
         throw new UnsupportedOperationException("Utility class");
@@ -210,9 +218,9 @@ public class BookWriter {
         if (table.isUsePositionMapping()) {
             // 位置ベースマッピングの場合は、position順にヘッダーを作成
             for (FieldMappingInfo mappingInfo : fieldMappingCache.getCache().values()) {
-                if (mappingInfo.position != null) {
-                    Cell cell = headerRow.createCell(startColumn + mappingInfo.position);
-                    cell.setCellValue(mappingInfo.columnName != null ? mappingInfo.columnName : mappingInfo.field.getName());
+                if (mappingInfo.getPosition() != null) {
+                    Cell cell = headerRow.createCell(startColumn + mappingInfo.getPosition());
+                    cell.setCellValue(mappingInfo.getColumnName() != null ? mappingInfo.getColumnName() : mappingInfo.getField().getName());
                 }
             }
         } else {
@@ -220,9 +228,9 @@ public class BookWriter {
             // @CsvBindByNameアノテーションからcolumn名を取得
             int columnIndex = startColumn;
             for (FieldMappingInfo mappingInfo : fieldMappingCache.getCache().values()) {
-                if (mappingInfo.columnName != null) {
+                if (mappingInfo.getColumnName() != null) {
                     Cell cell = headerRow.createCell(columnIndex++);
-                    cell.setCellValue(mappingInfo.columnName);
+                    cell.setCellValue(mappingInfo.getColumnName());
                 }
             }
         }
@@ -236,20 +244,20 @@ public class BookWriter {
         try {
             if (usePositionMapping) {
                 // 位置ベースマッピング
-                for (FieldMappingInfo mappingInfo : fieldMappingCache.getCache().values()) {
-                    if (mappingInfo.position != null) {
-                        Object value = mappingInfo.field.get(bean);
-                        Cell cell = row.createCell(startColumn + mappingInfo.position);
+            for (FieldMappingInfo mappingInfo : fieldMappingCache.getCache().values()) {
+                if (mappingInfo.getPosition() != null) {
+                    Object value = mappingInfo.getField().get(bean);
+                    Cell cell = row.createCell(startColumn + mappingInfo.getPosition());
                         setCellValue(cell, value, dateStyle, dateTimeStyle);
                     }
                 }
             } else {
                 // ヘッダーベースマッピング
                 int columnIndex = startColumn;
-                for (FieldMappingInfo mappingInfo : fieldMappingCache.getCache().values()) {
-                    if (mappingInfo.columnName != null) {
-                        Object value = mappingInfo.field.get(bean);
-                        Cell cell = row.createCell(columnIndex++);
+            for (FieldMappingInfo mappingInfo : fieldMappingCache.getCache().values()) {
+                if (mappingInfo.getColumnName() != null) {
+                    Object value = mappingInfo.getField().get(bean);
+                    Cell cell = row.createCell(columnIndex++);
                         setCellValue(cell, value, dateStyle, dateTimeStyle);
                     }
                 }

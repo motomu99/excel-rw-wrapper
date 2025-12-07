@@ -7,6 +7,7 @@ import java.io.IOException;
  * IOExceptionを継承し、Excel読み込み特有のエラー情報を提供する
  */
 public class ExcelReaderException extends IOException {
+    private static final long serialVersionUID = 1L;
 
     /**
      * 指定されたメッセージで例外を構築

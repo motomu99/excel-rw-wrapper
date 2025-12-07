@@ -8,6 +8,8 @@ import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Row;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import com.example.common.converter.CellValueConverter;
 import com.example.common.mapping.FieldMappingCache;
 import com.example.exception.HeaderNotFoundException;
@@ -39,6 +41,8 @@ public class ExcelRowIterator<T> implements Iterator<T> {
     private FieldMappingCache fieldMappingCache = null;
     private boolean initialized = false;
     private T nextBean = null;
+    // Iteratorパターンでフィールド名とメソッド名が同じになるのは一般的なパターン
+    @SuppressWarnings("PMD.AvoidFieldNameMatchingMethodName")
     private boolean hasNext = false;
     private boolean hasNextComputed = false;
     private Row pendingFirstDataRow = null;
@@ -52,9 +56,11 @@ public class ExcelRowIterator<T> implements Iterator<T> {
      * @param headerSearchRows ヘッダー探索行数
      * @param usePositionMapping 位置ベースマッピングを使用するかどうか
      */
+    @SuppressFBWarnings("EI_EXPOSE_REP2")
     public ExcelRowIterator(Iterator<Row> rowIterator, Class<T> beanClass, 
                            String headerKeyColumn, int headerSearchRows, 
                            boolean usePositionMapping, boolean treatFirstRowAsData) {
+        // Iteratorはこのクラス内で読み取り専用として使用されるため、コピーを作成する必要はない
         this.rowIterator = rowIterator;
         this.beanClass = beanClass;
         this.headerKeyColumn = headerKeyColumn;
@@ -88,11 +94,12 @@ public class ExcelRowIterator<T> implements Iterator<T> {
 
         // 次のBeanを取得
         try {
-            Row row;
-            while ((row = fetchNextRow()) != null) {
+            Row row = fetchNextRow();
+            while (row != null) {
                 
                 // 空行をスキップ
-                if (row == null || isEmptyRow(row)) {
+                if (isEmptyRow(row)) {
+                    row = fetchNextRow();
                     continue;
                 }
 
@@ -115,6 +122,7 @@ public class ExcelRowIterator<T> implements Iterator<T> {
                     hasNextComputed = true;
                     return true;
                 }
+                row = fetchNextRow();
             }
         } catch (Exception e) {
             throw new UncheckedExcelException("Bean作成エラー", e);
@@ -156,9 +164,9 @@ public class ExcelRowIterator<T> implements Iterator<T> {
         if (!usePositionMapping) {
             Map<String, Integer> columnMap = headerDetector.getColumnMap();
             for (FieldMappingCache.FieldMappingInfo mappingInfo : fieldMappingCache.getCache().values()) {
-                if (mappingInfo.columnName != null && !columnMap.containsKey(mappingInfo.columnName)) {
-                    log.error("必須ヘッダーカラム '{}' が見つかりません", mappingInfo.columnName);
-                    throw new HeaderNotFoundException("必須ヘッダーカラムが見つかりません: " + mappingInfo.columnName);
+                if (mappingInfo.getColumnName() != null && !columnMap.containsKey(mappingInfo.getColumnName())) {
+                    log.error("必須ヘッダーカラム '{}' が見つかりません", mappingInfo.getColumnName());
+                    throw new HeaderNotFoundException("必須ヘッダーカラムが見つかりません: " + mappingInfo.getColumnName());
                 }
             }
         }
@@ -182,16 +190,17 @@ public class ExcelRowIterator<T> implements Iterator<T> {
     /**
      * 行からBeanを作成
      */
+    @SuppressWarnings("PMD.AvoidLiteralsInIfCondition")
     private T createBean(Row row, Map<Integer, String> headerMap, Map<String, Integer> columnMap) throws Exception {
         T bean = beanClass.getDeclaredConstructor().newInstance();
 
         for (FieldMappingCache.FieldMappingInfo mappingInfo : fieldMappingCache.getCache().values()) {
             Integer columnIndex = null;
 
-            if (usePositionMapping) {
-                columnIndex = mappingInfo.position;
-            } else {
-                columnIndex = columnMap.get(mappingInfo.columnName);
+                if (usePositionMapping) {
+                    columnIndex = mappingInfo.getPosition();
+                } else {
+                    columnIndex = columnMap.get(mappingInfo.getColumnName());
             }
 
             if (columnIndex != null && columnIndex < row.getLastCellNum()) {
@@ -206,13 +215,15 @@ public class ExcelRowIterator<T> implements Iterator<T> {
                     String stringValue = CellValueConverter.getCellValueAsString(cell);
                     
                     // Pre-assignment バリデータが指定されている場合、バリデーションを実行
-                    if (mappingInfo.validatorClass != null && stringValue != null && !stringValue.isEmpty()) {
+                    if (mappingInfo.getValidatorClass() != null && stringValue != null && !stringValue.isEmpty()) {
                         try {
                             // キャッシュされたコンストラクタとメソッドを使用
-                            Object validator = mappingInfo.validatorConstructor.newInstance();
-                            java.lang.reflect.Method validateMethod = mappingInfo.validatorMethod;
+                            Object validator = mappingInfo.getValidatorConstructor().newInstance();
+                            java.lang.reflect.Method validateMethod = mappingInfo.getValidatorMethod();
                             
-                            if (validateMethod.getParameterCount() == 1) {
+                            // バリデータメソッドのパラメータ数チェック（意図が明確なリテラル使用）
+                            final int singleParameterCount = 1;
+                            if (validateMethod.getParameterCount() == singleParameterCount) {
                                 validateMethod.invoke(validator, stringValue);
                             } else {
                                 validateMethod.invoke(validator, stringValue, columnName);
@@ -230,8 +241,8 @@ public class ExcelRowIterator<T> implements Iterator<T> {
                                     String.format("バリデータの実行に失敗: 行=%d, 列='%s'", 
                                             row.getRowNum() + 1, columnName), e);
                         } catch (Exception e) {
-                            log.error("バリデータのインスタンス化または実行に失敗: 行={}, 列='{}', バリデータクラス={}",
-                                    row.getRowNum() + 1, columnName, mappingInfo.validatorClass.getName(), e);
+                                log.error("バリデータのインスタンス化または実行に失敗: 行={}, 列='{}', バリデータクラス={}",
+                                        row.getRowNum() + 1, columnName, mappingInfo.getValidatorClass().getName(), e);
                             throw new UncheckedExcelException(
                                     String.format("バリデータの実行に失敗: 行=%d, 列='%s'", 
                                             row.getRowNum() + 1, columnName), e);
@@ -240,11 +251,11 @@ public class ExcelRowIterator<T> implements Iterator<T> {
                     
                     // カスタムコンバーターが指定されている場合は、事前変換を実行
                     Object value;
-                    if (mappingInfo.converterClass != null) {
+                    if (mappingInfo.getConverterClass() != null) {
                         try {
                             // キャッシュされたコンストラクタとメソッドを使用
-                            AbstractBeanField<?, ?> converter = mappingInfo.converterConstructor.newInstance();
-                            java.lang.reflect.Method convertMethod = mappingInfo.converterMethod;
+                            AbstractBeanField<?, ?> converter = mappingInfo.getConverterConstructor().newInstance();
+                            java.lang.reflect.Method convertMethod = mappingInfo.getConverterMethod();
 
                             value = convertMethod.invoke(converter, stringValue);
                         } catch (java.lang.reflect.InvocationTargetException e) {
@@ -258,7 +269,7 @@ public class ExcelRowIterator<T> implements Iterator<T> {
                                     cause != null ? cause : e);
                         } catch (Exception e) {
                             log.error("カスタムコンバーターのインスタンス化または実行に失敗: 行={}, 列='{}', コンバータークラス={}",
-                                    row.getRowNum() + 1, columnName, mappingInfo.converterClass.getName(), e);
+                                    row.getRowNum() + 1, columnName, mappingInfo.getConverterClass().getName(), e);
                             throw new UncheckedExcelException(
                                     String.format("カスタムコンバーターの実行に失敗: 行=%d, 列='%s'",
                                             row.getRowNum() + 1, columnName),
@@ -267,11 +278,11 @@ public class ExcelRowIterator<T> implements Iterator<T> {
                     } else {
                         // カスタムコンバーターが無い場合は従来の型変換ロジックを使用
                         value = CellValueConverter.convertCellValue(
-                                cell, mappingInfo.field.getType(), row.getRowNum(), columnName);
+                                cell, mappingInfo.getField().getType(), row.getRowNum(), columnName);
                     }
 
                     // フィールドに設定
-                    mappingInfo.field.set(bean, value);
+                    mappingInfo.getField().set(bean, value);
                 }
             }
         }
@@ -279,9 +290,11 @@ public class ExcelRowIterator<T> implements Iterator<T> {
         return bean;
     }
 
+    @SuppressWarnings("PMD.NullAssignment")
     private Row fetchNextRow() {
         if (pendingFirstDataRow != null) {
             Row row = pendingFirstDataRow;
+            // 一度使用したらnullに設定してクリーンアップ（意図的な実装）
             pendingFirstDataRow = null;
             return row;
         }

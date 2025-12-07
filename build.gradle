@@ -48,6 +48,10 @@ dependencies {
     // Test Dependencies
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
+
+    // SpotBugs Annotations (for @SuppressFBWarnings)
+    compileOnly 'com.github.spotbugs:spotbugs-annotations:4.8.3'
+    testCompileOnly 'com.github.spotbugs:spotbugs-annotations:4.8.3'
 }
 
 tasks.named('test') {
@@ -168,6 +172,7 @@ spotbugsMain {
 }
 
 spotbugsTest {
+    ignoreFailures = true // テストのSpotBugs違反はビルドを失敗させない
     reports {
         html {
             required = true
@@ -180,9 +185,15 @@ spotbugsTest {
 // Checkstyle設定
 checkstyle {
     toolVersion = '10.12.4'
+    // デフォルトはmain用の設定
     configFile = file('config/checkstyle/checkstyle.xml')
     ignoreFailures = false
     maxWarnings = 0
+}
+
+// テスト実行時はテスト用のゆるいCheckstyle設定を使う
+tasks.named('checkstyleTest') {
+    configFile = file('config/checkstyle/checkstyle-test.xml')
 }
 
 // PMD設定

@@ -4,6 +4,8 @@ import java.lang.reflect.Field;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import com.opencsv.bean.CsvBindByName;
 import com.opencsv.bean.CsvBindByPosition;
 import com.opencsv.bean.CsvCustomBindByName;
@@ -17,7 +19,7 @@ import com.opencsv.bean.AbstractBeanField;
  * {@link CsvBindByName} および {@link CsvBindByPosition} アノテーションから
  * マッピング情報を抽出します。</p>
  */
-public class FieldMappingCache {
+public final class FieldMappingCache {
 
     private final Map<Field, FieldMappingInfo> cache;
 
@@ -36,7 +38,7 @@ public class FieldMappingCache {
      * @return フィールドとマッピング情報のMap
      */
     public Map<Field, FieldMappingInfo> getCache() {
-        return cache;
+        return new LinkedHashMap<>(cache);
     }
 
     /**
@@ -106,29 +108,30 @@ public class FieldMappingCache {
     /**
      * フィールドマッピング情報を保持する内部クラス
      */
-    public static class FieldMappingInfo {
+    @SuppressWarnings("PMD.AvoidDuplicateLiterals")
+    public static final class FieldMappingInfo {
         /** マッピング対象のフィールド */
-        public final Field field;
+        private final Field field;
         
         /** カラム名（ヘッダーベースマッピング用） */
-        public final String columnName;
+        private final String columnName;
         
         /** カラム位置（位置ベースマッピング用） */
-        public final Integer position;
+        private final Integer position;
         
         /** Pre-assignment バリデータクラス（バリデーション用） */
-        public final Class<?> validatorClass;
+        private final Class<?> validatorClass;
         /** バリデータのコンストラクタ */
-        public final java.lang.reflect.Constructor<?> validatorConstructor;
+        private final java.lang.reflect.Constructor<?> validatorConstructor;
         /** バリデータのvalidateメソッド */
-        public final java.lang.reflect.Method validatorMethod;
+        private final java.lang.reflect.Method validatorMethod;
 
         /** カスタムコンバータークラス（前処理用） */
-        public final Class<? extends AbstractBeanField<?, ?>> converterClass;
+        private final Class<? extends AbstractBeanField<?, ?>> converterClass;
         /** カスタムコンバーターのコンストラクタ */
-        public final java.lang.reflect.Constructor<? extends AbstractBeanField<?, ?>> converterConstructor;
+        private final java.lang.reflect.Constructor<? extends AbstractBeanField<?, ?>> converterConstructor;
         /** カスタムコンバーターのconvertメソッド */
-        public final java.lang.reflect.Method converterMethod;
+        private final java.lang.reflect.Method converterMethod;
 
         /**
          * フィールドマッピング情報を作成
@@ -139,9 +142,13 @@ public class FieldMappingCache {
          * @param validatorClass Pre-assignment バリデータクラス
          * @param converterClass カスタムコンバータークラス
          */
+        @SuppressFBWarnings("EI_EXPOSE_REP2")
+        @SuppressWarnings("PMD.AvoidAccessibilityAlteration")
         public FieldMappingInfo(Field field, String columnName, Integer position,
                                Class<?> validatorClass,
                                Class<? extends AbstractBeanField<?, ?>> converterClass) {
+            // Fieldは実質的にimmutableなため、コピーを作成する必要はない
+            // リフレクションでprivateフィールドにアクセスするため、setAccessible(true)が必要（意図的な実装）
             this.field = field;
             this.field.setAccessible(true);
             this.columnName = columnName;
@@ -153,6 +160,7 @@ public class FieldMappingCache {
             try {
                 if (validatorClass != null) {
                     this.validatorConstructor = validatorClass.getDeclaredConstructor();
+                    // リフレクションでprivateコンストラクタにアクセスするため、setAccessible(true)が必要（意図的な実装）
                     this.validatorConstructor.setAccessible(true);
                     
                     // validateメソッドの探索
@@ -174,6 +182,7 @@ public class FieldMappingCache {
 
                 if (converterClass != null) {
                     this.converterConstructor = converterClass.getDeclaredConstructor();
+                    // リフレクションでprivateコンストラクタにアクセスするため、setAccessible(true)が必要（意図的な実装）
                     this.converterConstructor.setAccessible(true);
                     
                     // AbstractBeanFieldのconvert(String)メソッド（protectedの可能性があるためgetDeclaredMethod）
@@ -189,6 +198,7 @@ public class FieldMappingCache {
                     while (currentClass != null) {
                         try {
                             method = currentClass.getDeclaredMethod("convert", String.class);
+                            // リフレクションでprotectedメソッドにアクセスするため、setAccessible(true)が必要（意図的な実装）
                             method.setAccessible(true);
                             break;
                         } catch (NoSuchMethodException e) {
@@ -206,6 +216,72 @@ public class FieldMappingCache {
             } catch (Exception e) {
                 throw new RuntimeException("フィールドマッピング情報の初期化に失敗しました: " + field.getName(), e);
             }
+        }
+
+        /**
+         * フィールドを取得
+         * 
+         * <p>Field, Constructor, Methodは実質的にimmutableなため、コピーを返す必要はない。</p>
+         */
+        @SuppressFBWarnings("EI_EXPOSE_REP")
+        public Field getField() {
+            return field;
+        }
+
+        public String getColumnName() {
+            return columnName;
+        }
+
+        public Integer getPosition() {
+            return position;
+        }
+
+        public Class<?> getValidatorClass() {
+            return validatorClass;
+        }
+
+        /**
+         * バリデータのコンストラクタを取得
+         * 
+         * <p>Constructorは実質的にimmutableなため、コピーを返す必要はない。</p>
+         */
+        @SuppressFBWarnings("EI_EXPOSE_REP")
+        public java.lang.reflect.Constructor<?> getValidatorConstructor() {
+            return validatorConstructor;
+        }
+
+        /**
+         * バリデータのメソッドを取得
+         * 
+         * <p>Methodは実質的にimmutableなため、コピーを返す必要はない。</p>
+         */
+        @SuppressFBWarnings("EI_EXPOSE_REP")
+        public java.lang.reflect.Method getValidatorMethod() {
+            return validatorMethod;
+        }
+
+        public Class<? extends AbstractBeanField<?, ?>> getConverterClass() {
+            return converterClass;
+        }
+
+        /**
+         * コンバーターのコンストラクタを取得
+         * 
+         * <p>Constructorは実質的にimmutableなため、コピーを返す必要はない。</p>
+         */
+        @SuppressFBWarnings("EI_EXPOSE_REP")
+        public java.lang.reflect.Constructor<? extends AbstractBeanField<?, ?>> getConverterConstructor() {
+            return converterConstructor;
+        }
+
+        /**
+         * コンバーターのメソッドを取得
+         * 
+         * <p>Methodは実質的にimmutableなため、コピーを返す必要はない。</p>
+         */
+        @SuppressFBWarnings("EI_EXPOSE_REP")
+        public java.lang.reflect.Method getConverterMethod() {
+            return converterMethod;
         }
     }
 }

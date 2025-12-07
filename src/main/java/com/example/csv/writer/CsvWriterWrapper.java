@@ -20,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
  * Builderパターンを使用して、柔軟な設定が可能です。</p>
  */
 @Slf4j
+@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 public class CsvWriterWrapper {
 
     private Path filePath;
@@ -27,6 +28,8 @@ public class CsvWriterWrapper {
     private CharsetType charsetType = CharsetType.UTF_8;
     private FileType fileType = FileType.CSV;
     private LineSeparatorType lineSeparatorType = LineSeparatorType.CRLF;
+    // Builderパターンでフィールド名とメソッド名が同じになるのは一般的なパターン
+    @SuppressWarnings("PMD.AvoidFieldNameMatchingMethodName")
     private boolean usePositionMapping = false;
     private boolean writeHeader = true;
     private QuoteStrategy quoteStrategy = QuoteStrategy.MINIMAL;

@@ -7,6 +7,7 @@ package com.example.exception;
  * より明確に表現するために使用します。</p>
  */
 public class CsvWriteException extends RuntimeException {
+    private static final long serialVersionUID = 1L;
     
     /**
      * メッセージと原因を持つ例外を生成

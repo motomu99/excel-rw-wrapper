@@ -12,6 +12,7 @@ import org.apache.poi.ss.usermodel.DateUtil;
 
 import com.example.exception.CellValueConversionException;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -31,6 +32,7 @@ public class CellValueConverter {
         Double.class, double.class
     );
 
+    @SuppressFBWarnings("CT_CONSTRUCTOR_THROW")
     private CellValueConverter() {
         // ユーティリティクラスのためインスタンス化を禁止
         throw new UnsupportedOperationException("Utility class");

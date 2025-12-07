@@ -5,6 +5,7 @@ package com.example.exception;
  * ストリーミング処理（Stream API）で使用するため、RuntimeExceptionを継承
  */
 public class UncheckedExcelException extends RuntimeException {
+    private static final long serialVersionUID = 1L;
     
     public UncheckedExcelException(String message, Throwable cause) {
         super(message, cause);

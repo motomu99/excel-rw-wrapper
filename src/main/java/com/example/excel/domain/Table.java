@@ -128,8 +128,10 @@ public class Table<T> {
     /**
      * TableのBuilderクラス
      */
+    @SuppressWarnings("PMD.AvoidFieldNameMatchingMethodName")
     public static class Builder<T> {
         private final Class<T> beanClass;
+        // Builderパターンでフィールド名とメソッド名が同じになるのは一般的なパターン
         private Anchor anchor = Anchor.of("A1");
         private List<T> data = List.of();
         private boolean usePositionMapping = false;
@@ -167,7 +169,7 @@ public class Table<T> {
          * @return このBuilderインスタンス
          */
         public Builder<T> data(List<T> data) {
-            this.data = data;
+            this.data = data != null ? List.copyOf(data) : List.of();
             return this;
         }
         

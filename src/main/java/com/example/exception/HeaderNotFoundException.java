@@ -4,6 +4,7 @@ package com.example.exception;
  * ヘッダー行が見つからない場合にスローされる例外
  */
 public class HeaderNotFoundException extends ExcelReaderException {
+    private static final long serialVersionUID = 1L;
 
     /**
      * 指定されたメッセージで例外を構築

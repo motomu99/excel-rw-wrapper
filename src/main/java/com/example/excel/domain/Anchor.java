@@ -1,5 +1,7 @@
 package com.example.excel.domain;
 
+import java.util.Locale;
+
 /**
  * Excelセルの位置を表す値オブジェクト
  * 
@@ -84,6 +86,7 @@ public class Anchor {
      * @param anchor アンカーセル（例: "A1", "B25"）
      * @return [行インデックス, 列インデックス]（0始まり）
      */
+    @SuppressWarnings("PMD.EmptyCatchBlock")
     private int[] parseAnchor(String anchor) {
         if (anchor == null || anchor.isEmpty()) {
             return new int[] {0, 0};
@@ -95,7 +98,7 @@ public class Anchor {
             columnEnd++;
         }
         
-        String columnName = anchor.substring(0, columnEnd).toUpperCase();
+        String columnName = anchor.substring(0, columnEnd).toUpperCase(Locale.ROOT);
         String rowName = anchor.substring(columnEnd);
         
         // 列名を数値に変換（A=0, B=1, ..., Z=25, AA=26, ...）
@@ -111,7 +114,7 @@ public class Anchor {
             try {
                 row = Integer.parseInt(rowName) - 1; // 1始まり→0始まり
             } catch (NumberFormatException e) {
-                // デフォルト値0を使用
+                // 行名が数値として解析できない場合はデフォルト値0を使用（意図的な実装）
             }
         }
         

@@ -3,6 +3,7 @@ package com.example.common.util;
 import java.io.IOException;
 import java.io.OutputStream;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -13,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class BomWriter {
     
+    @SuppressFBWarnings("CT_CONSTRUCTOR_THROW")
     private BomWriter() {
         // ユーティリティクラスのためインスタンス化を禁止
         throw new UnsupportedOperationException("Utility class");

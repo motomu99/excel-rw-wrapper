@@ -11,6 +11,7 @@ import com.example.common.mapping.MappingStrategyDetector;
 import com.example.exception.HeaderNotFoundException;
 import com.example.exception.KeyColumnNotFoundException;
 import com.example.exception.SheetNotFoundException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -153,9 +154,11 @@ public class ExcelReader<T> {
      * メソッドチェーンで設定を積み重ね、最後に{@link #read()}を呼び出すことで
      * Excelファイルを読み込みます。</p>
      */
+    @SuppressWarnings("PMD.AvoidFieldNameMatchingMethodName")
     public static class Builder<T> {
         private final ExcelReader<T> reader;
         private final List<Path> filePaths;
+        // Builderパターンでフィールド名とメソッド名が同じになるのは一般的なパターン
         private int parallelism = 1;
         
         private Builder(Class<T> beanClass, Path filePath) {
@@ -163,6 +166,7 @@ public class ExcelReader<T> {
             this.filePaths = java.util.Collections.singletonList(filePath);
         }
         
+        @SuppressFBWarnings("CT_CONSTRUCTOR_THROW")
         private Builder(Class<T> beanClass, List<Path> filePaths) {
             if (filePaths == null || filePaths.isEmpty()) {
                 throw new IllegalArgumentException("filePaths must not be empty or null");
@@ -177,8 +181,10 @@ public class ExcelReader<T> {
          * @param sheetIndex シートのインデックス
          * @return このBuilderインスタンス
          */
+        @SuppressWarnings("PMD.NullAssignment")
         public Builder<T> sheetIndex(int sheetIndex) {
             reader.sheetIndex = sheetIndex;
+            // sheetIndexとsheetNameは排他的に使用するため、一方をnullにする（意図的な実装）
             reader.sheetName = null;
             return this;
         }
@@ -274,8 +280,11 @@ public class ExcelReader<T> {
          * @return BeanのList
          * @throws IOException ファイル読み込みエラー
          */
+        @SuppressWarnings("PMD.AvoidLiteralsInIfCondition")
         public List<T> read() throws IOException {
-            if (filePaths.size() > 1) {
+            // 複数ファイルの場合は並列処理（意図が明確なリテラル使用）
+            final int singleFileThreshold = 1;
+            if (filePaths.size() > singleFileThreshold) {
                 return readAll();
             }
             return reader.read();

@@ -32,8 +32,8 @@ public class FieldOrderedHeaderMappingStrategy<T> extends HeaderColumnNameMappin
         AtomicInteger index = new AtomicInteger(0);
         
         mappingCache.getCache().values().stream()
-                .filter(info -> info.columnName != null)
-                .forEach(info -> orderMap.put(info.columnName, index.getAndIncrement()));
+                .filter(info -> info.getColumnName() != null)
+                .forEach(info -> orderMap.put(info.getColumnName(), index.getAndIncrement()));
 
         // コンパレータを作成してセット
         // 書き込み時のカラム順序を制御する

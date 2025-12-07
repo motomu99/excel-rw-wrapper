@@ -223,18 +223,18 @@ public class ExcelStreamWriter<T> {
         if (usePositionMapping) {
             // 位置ベースマッピングの場合は、position順にヘッダーを作成
             for (FieldMappingCache.FieldMappingInfo mappingInfo : fieldMappingCache.getCache().values()) {
-                if (mappingInfo.position != null) {
-                    Cell cell = headerRow.createCell(startColumn + mappingInfo.position);
-                    cell.setCellValue(mappingInfo.columnName != null ? mappingInfo.columnName : mappingInfo.field.getName());
+                if (mappingInfo.getPosition() != null) {
+                    Cell cell = headerRow.createCell(startColumn + mappingInfo.getPosition());
+                    cell.setCellValue(mappingInfo.getColumnName() != null ? mappingInfo.getColumnName() : mappingInfo.getField().getName());
                 }
             }
         } else {
             // ヘッダーベースマッピングの場合は、フィールド定義順にヘッダーを作成
             int columnIndex = startColumn;
             for (FieldMappingCache.FieldMappingInfo mappingInfo : fieldMappingCache.getCache().values()) {
-                if (mappingInfo.columnName != null) {
+                if (mappingInfo.getColumnName() != null) {
                     Cell cell = headerRow.createCell(columnIndex++);
-                    cell.setCellValue(mappingInfo.columnName);
+                    cell.setCellValue(mappingInfo.getColumnName());
                 }
             }
         }
@@ -247,9 +247,9 @@ public class ExcelStreamWriter<T> {
         if (usePositionMapping) {
             // 位置ベースマッピング
             for (FieldMappingCache.FieldMappingInfo mappingInfo : fieldMappingCache.getCache().values()) {
-                if (mappingInfo.position != null) {
-                    Object value = mappingInfo.field.get(bean);
-                    Cell cell = row.createCell(startColumn + mappingInfo.position);
+                if (mappingInfo.getPosition() != null) {
+                    Object value = mappingInfo.getField().get(bean);
+                    Cell cell = row.createCell(startColumn + mappingInfo.getPosition());
                     setCellValue(cell, value);
                 }
             }
@@ -257,8 +257,8 @@ public class ExcelStreamWriter<T> {
             // ヘッダーベースマッピング
             int columnIndex = startColumn;
             for (FieldMappingCache.FieldMappingInfo mappingInfo : fieldMappingCache.getCache().values()) {
-                if (mappingInfo.columnName != null) {
-                    Object value = mappingInfo.field.get(bean);
+                if (mappingInfo.getColumnName() != null) {
+                    Object value = mappingInfo.getField().get(bean);
                     Cell cell = row.createCell(columnIndex++);
                     setCellValue(cell, value);
                 }

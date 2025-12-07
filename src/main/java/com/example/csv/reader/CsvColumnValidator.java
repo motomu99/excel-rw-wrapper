@@ -45,7 +45,8 @@ final class CsvColumnValidator {
             int expectedColumns = -1;
             int lineNumber = 0;
 
-            while ((row = reader.readNext()) != null) {
+            row = reader.readNext();
+            while (row != null) {
                 if (isRowEmpty(row)) {
                     continue;
                 }
@@ -59,6 +60,7 @@ final class CsvColumnValidator {
                 if (row.length != expectedColumns) {
                     throw new CsvReadException(buildMismatchMessage(filePath, lineNumber, expectedColumns, row.length, row));
                 }
+                row = reader.readNext();
             }
         } catch (IOException | CsvValidationException e) {
             throw new CsvReadException("CSV列数の検証に失敗しました: " + filePath, e);
@@ -69,10 +71,14 @@ final class CsvColumnValidator {
         return row.length == 1 && row[0].isEmpty();
     }
 
+    @SuppressWarnings("PMD.AvoidLiteralsInIfCondition")
     private static String buildMismatchMessage(Path filePath, int lineNumber, int expected, int actual, String[] row) {
         String preview = String.join(",", row);
-        if (preview.length() > 120) {
-            preview = preview.substring(0, 117) + "...";
+        // プレビュー文字列の最大長（意図が明確なリテラル使用）
+        final int maxPreviewLength = 120;
+        final int truncateLength = 117;
+        if (preview.length() > maxPreviewLength) {
+            preview = preview.substring(0, truncateLength) + "...";
         }
         return String.format("列数が不一致です (ファイル=%s, 行番号=%d, 期待値=%d, 実際=%d, 行内容=%s)",
                 filePath, lineNumber, expected, actual, preview);

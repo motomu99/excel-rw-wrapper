@@ -8,16 +8,15 @@
     <property name="severity" value="warning"/>
     <property name="fileExtensions" value="java, properties, xml"/>
     
-    <!-- ファイルの長さ制限 -->
+    <!-- ファイルの長さ制限（テストは長くても許す） -->
     <module name="FileLength">
-        <property name="max" value="2000"/>
+        <property name="max" value="3000"/>
     </module>
     
-    <!-- 行の長さ制限 -->
+    <!-- 行の長さ制限（テストデータとか長くなりがちなので緩和） -->
     <module name="LineLength">
-        <property name="max" value="120"/>
+        <property name="max" value="160"/>
         <property name="ignorePattern" value="^package.*|^import.*|a href|href|http://|https://|ftp://"/>
-        <property name="severity" value="ignore"/>
     </module>
     
     <!-- タブ文字の使用禁止 -->
@@ -29,37 +28,38 @@
     <module name="TreeWalker">
         <!-- インポート文のチェック -->
         <module name="AvoidStarImport">
+            <property name="allowStaticMemberImports" value="true"/>
             <property name="severity" value="ignore"/>
         </module>
         <module name="IllegalImport"/>
-        <module name="RedundantImport"/>
-        <module name="UnusedImports"/>
-        <module name="ImportOrder">
-            <property name="groups" value="/^java\./,javax,org,com"/>
-            <property name="ordered" value="true"/>
-            <property name="separated" value="true"/>
-            <property name="option" value="bottom"/>
-            <property name="sortStaticImportsAlphabetically" value="true"/>
-            <property name="severity" value="ignore"/>
+        <module name="RedundantImport">
+             <property name="severity" value="ignore"/>
+        </module>
+        <module name="UnusedImports">
+             <property name="severity" value="ignore"/>
         </module>
         
-        <!-- 命名規則 -->
+        <!-- 命名規則（テストメソッドはアンダースコア許容） -->
         <module name="ConstantName"/>
-        <module name="LocalFinalVariableName"/>
+        <module name="LocalFinalVariableName">
+            <property name="severity" value="ignore"/>
+        </module>
         <module name="LocalVariableName"/>
         <module name="MemberName"/>
-        <module name="MethodName"/>
+        <module name="MethodName">
+            <property name="format" value="^[a-z][a-zA-Z0-9_]*$"/>
+        </module>
         <module name="PackageName"/>
         <module name="ParameterName"/>
         <module name="StaticVariableName"/>
         <module name="TypeName"/>
         
-        <!-- 長さ制限 -->
+        <!-- 長さ制限（テストメソッドは長くてもOK） -->
         <module name="MethodLength">
-            <property name="max" value="150"/>
+            <property name="max" value="300"/>
         </module>
         <module name="ParameterNumber">
-            <property name="max" value="7"/>
+            <property name="max" value="10"/>
         </module>
         
         <!-- 空白文字のチェック -->
@@ -68,30 +68,32 @@
         <module name="MethodParamPad"/>
         <module name="NoWhitespaceAfter"/>
         <module name="NoWhitespaceBefore"/>
-        <module name="OperatorWrap">
-            <property name="severity" value="ignore"/>
-        </module>
+        <!-- OperatorWrapはテストのassertなどで改行したい場合もあるので除外 -->
         <module name="ParenPad"/>
         <module name="TypecastParenPad"/>
         <module name="WhitespaceAfter"/>
-        <module name="WhitespaceAround">
-            <property name="severity" value="ignore"/>
-        </module>
+        <!-- WhitespaceAroundはテストコード記述の妨げになりやすいので除外 -->
         
         <!-- 修飾子のチェック -->
         <module name="ModifierOrder"/>
-        <module name="RedundantModifier"/>
+        <module name="RedundantModifier">
+            <property name="severity" value="info"/>
+        </module>
         
         <!-- ブロックのチェック -->
         <module name="AvoidNestedBlocks"/>
         <module name="EmptyBlock"/>
+        <!-- LeftCurly/RightCurly/NeedBracesはテストの記述スタイルに合わせて緩和 -->
         <module name="LeftCurly">
+            <property name="ignoreEnums" value="false"/>
             <property name="severity" value="ignore"/>
         </module>
         <module name="NeedBraces">
             <property name="severity" value="ignore"/>
         </module>
-        <module name="RightCurly"/>
+        <module name="RightCurly">
+            <property name="severity" value="ignore"/>
+        </module>
         
         <!-- 共通のチェック -->
         <module name="EmptyStatement"/>
@@ -99,25 +101,16 @@
         <module name="HiddenField">
             <property name="ignoreConstructorParameter" value="true"/>
             <property name="ignoreSetter" value="true"/>
-            <!-- BuilderパターンやLombokでフィールド名と同じパラメータを使うのは一般的なので警告レベルを下げる -->
-            <property name="severity" value="ignore"/>
         </module>
         <module name="IllegalInstantiation"/>
-        <module name="InnerTypeLast"/>
-        <module name="MagicNumber">
-            <property name="severity" value="ignore"/>
-        </module>
-        <module name="MissingSwitchDefault">
-            <property name="severity" value="ignore"/>
-        </module>
+        <!-- InnerTypeLastはテストでは自由度を高くするため除外 -->
+        <!-- MagicNumberはテストでは無効化 -->
+        <module name="MissingSwitchDefault"/>
         <module name="MultipleVariableDeclarations"/>
         <module name="SimplifyBooleanExpression"/>
         <module name="SimplifyBooleanReturn"/>
         
-        <!-- クラス設計のチェック -->
-        <module name="DesignForExtension">
-            <property name="severity" value="ignore"/>
-        </module>
+        <!-- クラス設計のチェック（テストでは厳密すぎなくてOK） -->
         <module name="FinalClass">
             <property name="severity" value="ignore"/>
         </module>
@@ -125,19 +118,12 @@
             <property name="severity" value="ignore"/>
         </module>
         <module name="InterfaceIsType"/>
-        <module name="VisibilityModifier">
-            <property name="severity" value="ignore"/>
-        </module>
+        <!-- VisibilityModifierはテストで見えやすくすることもあるので除外 -->
         
         <!-- その他のチェック -->
-        <module name="ArrayTypeStyle">
-            <property name="severity" value="ignore"/>
-        </module>
-        <!-- FinalParametersはLombokやBuilderパターンと相性が悪くノイズになるため除外 -->
-        <!-- <module name="FinalParameters"/> -->
+        <module name="ArrayTypeStyle"/>
+        <!-- FinalParametersはテストではノイズになるので除外 -->
         <module name="TodoComment"/>
-        <module name="TrailingComment">
-            <property name="severity" value="ignore"/>
-        </module>
+        <!-- TrailingCommentはテストデータの注釈などで使いたいので除外 -->
     </module>
 </module>

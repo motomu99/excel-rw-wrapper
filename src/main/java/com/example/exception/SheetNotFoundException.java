@@ -4,6 +4,7 @@ package com.example.exception;
  * 指定されたシートが見つからない場合にスローされる例外
  */
 public class SheetNotFoundException extends ExcelReaderException {
+    private static final long serialVersionUID = 1L;
 
     /**
      * シート名を指定して例外を構築

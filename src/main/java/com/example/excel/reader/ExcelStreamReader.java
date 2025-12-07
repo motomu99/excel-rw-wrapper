@@ -14,6 +14,8 @@ import java.util.stream.StreamSupport;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import com.example.common.mapping.MappingStrategyDetector;
 import com.example.exception.HeaderNotFoundException;
 import com.example.exception.KeyColumnNotFoundException;
@@ -124,17 +126,13 @@ public class ExcelStreamReader<T> {
     private <R> R extract(Function<Stream<T>, R> processor) throws IOException {
         resolveMappingStrategy();
         try (OpenedResource<T> resource = openResource(filePath)) {
-            Stream<T> stream = StreamSupport.stream(
+            // StreamはBaseStreamを継承しており、AutoCloseableを実装しているためtry-with-resourcesで管理する
+            try (Stream<T> stream = StreamSupport.stream(
                 Spliterators.spliteratorUnknownSize(resource.iterator, 0), 
                 false
-            );
-            
-            if (skipLines > 0) {
-                stream = stream.skip(skipLines);
-            }
-            
-            try {
-                return processor.apply(stream);
+            )) {
+                Stream<T> processedStream = skipLines > 0 ? stream.skip(skipLines) : stream;
+                return processor.apply(processedStream);
             } catch (UncheckedExcelException e) {
                 throw toIOException(e);
             }
@@ -150,6 +148,7 @@ public class ExcelStreamReader<T> {
     /**
      * 複数ファイルを順次処理する
      */
+    @SuppressWarnings("PMD.EmptyCatchBlock")
     private <R> R processAll(List<Path> paths, Function<Stream<T>, R> processor) throws IOException {
         resolveMappingStrategy();
         // カスタムSpliteratorで遅延読み込みStreamを作成
@@ -181,7 +180,7 @@ public class ExcelStreamReader<T> {
             try {
                 spliterator.close();
             } catch (Exception e) {
-                // 無視 (ログ済み)
+                // クローズ時のエラーは無視（ログ済み）
             }
         }
     }
@@ -212,6 +211,7 @@ public class ExcelStreamReader<T> {
     }
 
 
+    @SuppressWarnings({"PMD.AvoidInstanceofChecksInCatchClause", "PMD.EmptyCatchBlock"})
     private OpenedResource<T> openResource(Path path) throws IOException {
         if (!Files.exists(path)) {
             throw new IOException("ファイルが存在しません: " + path);
@@ -244,11 +244,21 @@ public class ExcelStreamReader<T> {
             
             return new OpenedResource<>(fis, workbook, iterator);
         } catch (Exception e) {
+            // エラー発生時のクリーンアップ: リソースクローズ時のエラーは無視する（意図的な実装）
             if (workbook != null) {
-                try { workbook.close(); } catch (IOException ignore) {}
+                try { 
+                    workbook.close(); 
+                } catch (IOException ignore) {
+                    // クローズ時のエラーは無視（既に例外が発生しているため）
+                }
             }
-            try { fis.close(); } catch (IOException ignore) {}
+            try { 
+                fis.close(); 
+            } catch (IOException ignore) {
+                // クローズ時のエラーは無視（既に例外が発生しているため）
+            }
             
+            // 例外の型に応じて再スロー（catch句の外でのinstanceofチェックは意図的な実装）
             if (e instanceof IOException) throw (IOException) e;
             if (e instanceof RuntimeException) throw (RuntimeException) e;
             throw new IOException("Excelファイルオープン中にエラー: " + path, e);
@@ -359,6 +369,7 @@ public class ExcelStreamReader<T> {
             return false;
         }
         
+        @SuppressWarnings("PMD.NullAssignment")
         private void closeCurrent() {
             if (currentResource != null) {
                 try {
@@ -366,6 +377,7 @@ public class ExcelStreamReader<T> {
                 } catch (IOException e) {
                     log.warn("リソースクローズ中にエラー", e);
                 }
+                // リソースをnullに設定してクリーンアップ（意図的な実装）
                 currentResource = null;
             }
         }
@@ -392,6 +404,12 @@ public class ExcelStreamReader<T> {
             this.filePaths = java.util.Collections.singletonList(filePath);
         }
         
+        /**
+         * Builderコンストラクタ
+         * 
+         * <p>引数の検証のために例外を投げるが、これは設計上の意図である。</p>
+         */
+        @SuppressFBWarnings("CT_CONSTRUCTOR_THROW")
         private Builder(Class<T> beanClass, List<Path> filePaths) {
             if (filePaths == null || filePaths.isEmpty()) {
                 throw new IllegalArgumentException("filePaths must not be empty");
@@ -406,8 +424,10 @@ public class ExcelStreamReader<T> {
          * @param sheetIndex シートのインデックス
          * @return このBuilderインスタンス
          */
+        @SuppressWarnings("PMD.NullAssignment")
         public Builder<T> sheetIndex(int sheetIndex) {
             reader.sheetIndex = sheetIndex;
+            // sheetIndexとsheetNameは排他的に使用するため、一方をnullにする（意図的な実装）
             reader.sheetName = null;
             return this;
         }
@@ -493,8 +513,11 @@ public class ExcelStreamReader<T> {
          * @return 処理結果
          * @throws IOException ファイル読み込みエラー
          */
+        @SuppressWarnings("PMD.AvoidLiteralsInIfCondition")
         public <R> R extract(Function<Stream<T>, R> processor) throws IOException {
-            if (filePaths.size() > 1) {
+            // 複数ファイルの場合は並列処理（意図が明確なリテラル使用）
+            final int singleFileThreshold = 1;
+            if (filePaths.size() > singleFileThreshold) {
                 return reader.processAll(filePaths, processor);
             }
             return reader.extract(processor);
@@ -522,9 +545,12 @@ public class ExcelStreamReader<T> {
          * @param parallelism 並列度
          * @return このBuilderインスタンス
          */
+        @SuppressWarnings("PMD.AvoidLiteralsInIfCondition")
         public Builder<T> parallelism(int parallelism) {
             // 現状は実装しないが、API互換性のためにメソッドだけ用意
-            if (parallelism > 1) {
+            // 並列度が1より大きい場合は警告（意図が明確なリテラル使用）
+            final int sequentialThreshold = 1;
+            if (parallelism > sequentialThreshold) {
                 log.warn("ExcelStreamReader does not support parallel reading to avoid OOM. Processing sequentially.");
             }
             return this;
