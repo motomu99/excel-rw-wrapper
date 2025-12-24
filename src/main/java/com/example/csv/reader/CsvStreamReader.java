@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.function.Function;
 import java.util.function.Consumer;
@@ -16,6 +17,7 @@ import com.example.common.config.FileType;
 import com.example.common.mapping.MappingStrategyDetector;
 import com.example.common.mapping.MappingStrategyFactory;
 import com.example.common.util.BomHandler;
+import com.example.common.util.CharsetDetector;
 import com.example.exception.CsvReadException;
 import com.opencsv.bean.CsvToBean;
 import com.opencsv.bean.CsvToBeanBuilder;
@@ -40,7 +42,8 @@ public class CsvStreamReader<T> {
     
     private final Class<T> beanClass;
     private final Path filePath;
-    CharsetType charsetType = CharsetType.UTF_8;
+    /** 文字コードが明示的に指定されたかどうか（nullの場合は自動判別） */
+    CharsetType charsetType = null;
     FileType fileType = FileType.CSV;
     int skipLines = 0;
     Boolean usePositionMapping = null;
@@ -78,11 +81,33 @@ public class CsvStreamReader<T> {
                     .orElse(false); // デフォルトはヘッダーベース
         }
 
-        Charset charset = Charset.forName(charsetType.getCharsetName());
-        CsvColumnValidator.validate(filePath, charset, charsetType.isWithBom(), fileType.getDelimiter().charAt(0));
+        // 文字コードが明示的に指定されていない場合は自動判別
+        Charset charset;
+        boolean withBom;
+        if (charsetType == null) {
+            try {
+                charset = CharsetDetector.detect(filePath);
+                // UTF-8の場合はBOMの有無を確認
+                if (StandardCharsets.UTF_8.equals(charset)) {
+                    withBom = BomHandler.hasBom(filePath);
+                } else {
+                    withBom = false;
+                }
+                log.debug("文字コードを自動判別しました: charset={}, withBom={}", charset, withBom);
+            } catch (IOException e) {
+                log.warn("文字コードの自動判別に失敗しました。UTF-8を使用します: {}", e.getMessage());
+                charset = StandardCharsets.UTF_8;
+                withBom = false;
+            }
+        } else {
+            charset = Charset.forName(charsetType.getCharsetName());
+            withBom = charsetType.isWithBom();
+        }
+        
+        CsvColumnValidator.validate(filePath, charset, withBom, fileType.getDelimiter().charAt(0));
 
         try (FileInputStream fis = new FileInputStream(filePath.toFile());
-             InputStream is = charsetType.isWithBom() ? BomHandler.skipBom(fis) : fis;
+             InputStream is = withBom ? BomHandler.skipBom(fis) : fis;
              InputStreamReader isr = new InputStreamReader(is, charset)) {
             
             MappingStrategy<T> strategy = MappingStrategyFactory.createStrategy(beanClass, usePositionMapping);
@@ -139,6 +164,9 @@ public class CsvStreamReader<T> {
         
         /**
          * 文字エンコーディングを設定
+         * 
+         * <p>明示的に文字コードを指定した場合、自動判別は行われません。
+         * 指定しない場合は、ファイルの文字コードを自動判別します。</p>
          * 
          * @param charsetType 文字エンコーディングタイプ
          * @return このBuilderインスタンス
