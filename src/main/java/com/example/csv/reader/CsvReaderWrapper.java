@@ -17,6 +17,7 @@ import com.example.common.config.FileType;
 import com.example.common.mapping.MappingStrategyDetector;
 import com.example.common.mapping.MappingStrategyFactory;
 import com.example.common.util.BomHandler;
+import com.example.common.util.CharsetDetector;
 import com.example.exception.CsvReadException;
 import com.opencsv.bean.CsvToBean;
 import com.opencsv.bean.CsvToBeanBuilder;
@@ -63,6 +64,8 @@ public class CsvReaderWrapper {
     @SuppressWarnings("PMD.AvoidFieldNameMatchingMethodName")
     private Boolean usePositionMapping = null;
     private boolean withBom = false;
+    /** 文字コードが明示的に指定されたかどうか（nullの場合は自動判別） */
+    private CharsetType charsetType = null;
 
     private CsvReaderWrapper(Class<?> beanClass, Path filePath) {
         this.beanClass = beanClass;
@@ -82,6 +85,7 @@ public class CsvReaderWrapper {
         clone.fileType = this.fileType;
         clone.usePositionMapping = this.usePositionMapping;
         clone.withBom = this.withBom;
+        clone.charsetType = this.charsetType;
         return clone;
     }
 
@@ -145,6 +149,25 @@ public class CsvReaderWrapper {
         if (usePositionMapping == null) {
             usePositionMapping = MappingStrategyDetector.detectUsePositionMapping(beanClass)
                     .orElse(false); // デフォルトはヘッダーベース
+        }
+
+        // 文字コードが明示的に指定されていない場合は自動判別
+        if (charsetType == null) {
+            try {
+                Charset detectedCharset = CharsetDetector.detect(filePath);
+                charset = detectedCharset;
+                // UTF-8の場合はBOMの有無を確認
+                if (StandardCharsets.UTF_8.equals(detectedCharset)) {
+                    withBom = BomHandler.hasBom(filePath);
+                } else {
+                    withBom = false;
+                }
+                log.debug("文字コードを自動判別しました: charset={}, withBom={}", charset, withBom);
+            } catch (IOException e) {
+                log.warn("文字コードの自動判別に失敗しました。UTF-8を使用します: {}", e.getMessage());
+                charset = StandardCharsets.UTF_8;
+                withBom = false;
+            }
         }
 
         CsvColumnValidator.validate(filePath, charset, withBom, fileType.getDelimiter().charAt(0));
@@ -221,6 +244,7 @@ public class CsvReaderWrapper {
      */
     @Deprecated(since = "2.0.0")
     public CsvReaderWrapper setCharset(CharsetType charsetType) {
+        this.charsetType = charsetType;
         this.charset = Charset.forName(charsetType.getCharsetName());
         this.withBom = charsetType.isWithBom();
         return this;
@@ -301,10 +325,14 @@ public class CsvReaderWrapper {
         /**
          * 文字セットを設定
          * 
+         * <p>明示的に文字コードを指定した場合、自動判別は行われません。
+         * 指定しない場合は、ファイルの文字コードを自動判別します。</p>
+         * 
          * @param charsetType 文字セットタイプ
          * @return このBuilderインスタンス
          */
         public Builder charset(CharsetType charsetType) {
+            wrapper.charsetType = charsetType;
             wrapper.charset = Charset.forName(charsetType.getCharsetName());
             wrapper.withBom = charsetType.isWithBom();
             return this;
