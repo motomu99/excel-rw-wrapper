@@ -11,6 +11,7 @@ import com.opencsv.bean.CsvBindByPosition;
 import com.opencsv.bean.CsvCustomBindByName;
 import com.opencsv.bean.CsvCustomBindByPosition;
 import com.opencsv.bean.AbstractBeanField;
+import com.example.common.annotation.LineNumber;
 
 /**
  * Beanクラスのフィールドマッピング情報をキャッシュするクラス
@@ -22,23 +23,44 @@ import com.opencsv.bean.AbstractBeanField;
 public final class FieldMappingCache {
 
     private final Map<Field, FieldMappingInfo> cache;
+    private final Field lineNumberField;
 
     /**
      * 指定されたBeanクラスのフィールドマッピングキャッシュを構築
-     * 
+     *
      * @param beanClass マッピング対象のBeanクラス
      */
     public FieldMappingCache(Class<?> beanClass) {
         this.cache = buildCache(beanClass);
+        this.lineNumberField = findLineNumberField(beanClass);
     }
 
     /**
      * キャッシュされたフィールドマッピング情報を取得
-     * 
+     *
      * @return フィールドとマッピング情報のMap
      */
     public Map<Field, FieldMappingInfo> getCache() {
         return new LinkedHashMap<>(cache);
+    }
+
+    /**
+     * 行番号フィールドを取得
+     *
+     * @return 行番号フィールド、存在しない場合は {@code null}
+     */
+    @SuppressFBWarnings("EI_EXPOSE_REP")
+    public Field getLineNumberField() {
+        return lineNumberField;
+    }
+
+    /**
+     * 行番号フィールドが存在するかチェック
+     *
+     * @return 行番号フィールドが存在する場合は {@code true}
+     */
+    public boolean hasLineNumberField() {
+        return lineNumberField != null;
     }
 
     /**
@@ -103,6 +125,46 @@ public final class FieldMappingCache {
         }
         
         return fieldCache;
+    }
+
+    /**
+     * @LineNumber アノテーションが付与されたフィールドを検出
+     *
+     * <p>親クラスのフィールドも再帰的に検索します。</p>
+     *
+     * @param beanClass マッピング対象のBeanクラス
+     * @return 行番号フィールド、存在しない場合は {@code null}
+     */
+    @SuppressWarnings("PMD.AvoidAccessibilityAlteration")
+    private Field findLineNumberField(Class<?> beanClass) {
+        Class<?> currentClass = beanClass;
+
+        // 親クラスを遡って検索
+        while (currentClass != null && currentClass != Object.class) {
+            Field[] fields = currentClass.getDeclaredFields();
+
+            for (Field field : fields) {
+                if (field.isAnnotationPresent(LineNumber.class)) {
+                    // 行番号フィールドの型チェック
+                    Class<?> fieldType = field.getType();
+                    if (fieldType != Integer.class && fieldType != int.class
+                            && fieldType != Long.class && fieldType != long.class) {
+                        throw new IllegalArgumentException(
+                            "@LineNumber アノテーションは Integer, Long, int, long 型のフィールドにのみ使用できます。"
+                            + "フィールド: " + field.getName()
+                            + ", 実際の型: " + fieldType.getName());
+                    }
+
+                    // リフレクションでアクセスするため setAccessible を有効化
+                    field.setAccessible(true);
+                    return field;
+                }
+            }
+
+            currentClass = currentClass.getSuperclass();
+        }
+
+        return null;
     }
 
     /**

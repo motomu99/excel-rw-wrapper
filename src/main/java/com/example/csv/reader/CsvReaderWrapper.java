@@ -21,6 +21,7 @@ import com.example.common.util.CharsetDetector;
 import com.example.exception.CsvReadException;
 import com.opencsv.bean.CsvToBean;
 import com.opencsv.bean.CsvToBeanBuilder;
+import com.example.common.mapping.FieldMappingCache;
 import com.opencsv.bean.MappingStrategy;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import lombok.extern.slf4j.Slf4j;
@@ -184,9 +185,12 @@ public class CsvReaderWrapper {
                     .withIgnoreLeadingWhiteSpace(true)
                     .withIgnoreEmptyLine(true)
                     .build();
-            
+
             List<T> result = csvToBean.parse();
-            
+
+            // 行番号フィールドが存在する場合は行番号を設定
+            setLineNumbers(result);
+
             return applySkipLines(result);
         } catch (IOException e) {
             log.error("CSVファイル読み込み中にエラーが発生: ファイルパス={}, エラー={}", filePath, e.getMessage(), e);
@@ -206,8 +210,48 @@ public class CsvReaderWrapper {
     }
 
     /**
+     * 行番号を設定
+     *
+     * <p>@LineNumberアノテーションが付与されたフィールドがある場合、行番号を設定します。</p>
+     *
+     * @param <T> Beanの型
+     * @param result Beanのリスト
+     */
+    private <T> void setLineNumbers(List<T> result) {
+        if (result.isEmpty()) {
+            return;
+        }
+
+        // FieldMappingCacheから行番号フィールドを取得
+        FieldMappingCache fieldMappingCache = new FieldMappingCache(result.get(0).getClass());
+        if (!fieldMappingCache.hasLineNumberField()) {
+            return;
+        }
+
+        java.lang.reflect.Field lineNumberField = fieldMappingCache.getLineNumberField();
+        Class<?> fieldType = lineNumberField.getType();
+
+        // CSVファイルの場合、ヘッダー行を考慮して2行目からデータが始まる(1ベースで行番号2)
+        int lineNumber = 2;
+
+        for (T bean : result) {
+            try {
+                if (fieldType == Integer.class || fieldType == int.class) {
+                    lineNumberField.set(bean, lineNumber);
+                } else if (fieldType == Long.class || fieldType == long.class) {
+                    lineNumberField.set(bean, (long) lineNumber);
+                }
+                lineNumber++;
+            } catch (IllegalAccessException e) {
+                log.error("行番号の設定に失敗しました: lineNumber={}, bean={}", lineNumber, bean, e);
+                throw new CsvReadException("行番号の設定に失敗しました", e);
+            }
+        }
+    }
+
+    /**
      * スキップ行数を適用
-     * 
+     *
      * @param <T> Beanの型
      * @param result 元のリスト
      * @return スキップ処理後のリスト
