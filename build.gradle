@@ -28,6 +28,9 @@ dependencies {
     // OpenCSV
     api 'com.opencsv:opencsv:5.9'
 
+    // 文字コード自動判別
+    api 'com.github.albfernandez:juniversalchardet:2.4.0'
+
     // Apache POI for Excel
     api 'org.apache.poi:poi:5.2.5'
     api 'org.apache.poi:poi-ooxml:5.2.5'

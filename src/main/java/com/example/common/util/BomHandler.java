@@ -1,9 +1,11 @@
 package com.example.common.util;
 
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PushbackInputStream;
+import java.nio.file.Path;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import lombok.extern.slf4j.Slf4j;
@@ -63,6 +65,23 @@ public class BomHandler {
     public static void writeBom(OutputStream outputStream) throws IOException {
         outputStream.write(UTF8_BOM);
         log.debug("BOMを書き込みました");
+    }
+    
+    /**
+     * ファイルにBOMが存在するかどうかを確認する
+     * 
+     * <p>ファイルの先頭3バイトを読み込んで、UTF-8 BOMの有無を確認します。</p>
+     * 
+     * @param filePath ファイルパス
+     * @return BOMが存在する場合true
+     * @throws IOException ファイル読み込みエラー
+     */
+    public static boolean hasBom(Path filePath) throws IOException {
+        try (FileInputStream fis = new FileInputStream(filePath.toFile())) {
+            byte[] bom = new byte[UTF8_BOM.length];
+            int bytesRead = fis.read(bom);
+            return isUtf8Bom(bom, bytesRead);
+        }
     }
     
     /**
