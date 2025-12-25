@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
 
@@ -20,11 +21,9 @@ class ExcelLineNumberTest {
     private static final Path EXCEL_FILE = Paths.get("src/test/resources/linenumber/person_with_line_number.xlsx");
 
     @Test
-    void testExcelLineNumberWithAbstractClass() {
+    void testExcelLineNumberWithAbstractClass() throws Exception {
         // LineNumberAware抽象クラスを継承したモデルのテスト
-        List<PersonWithLineNumber> results = ExcelReader.builder(PersonWithLineNumber.class)
-                .file(EXCEL_FILE)
-                .build()
+        List<PersonWithLineNumber> results = ExcelReader.builder(PersonWithLineNumber.class, EXCEL_FILE)
                 .read();
 
         assertTrue(results.size() >= 3, "少なくとも3行のデータが必要です");
@@ -44,11 +43,9 @@ class ExcelLineNumberTest {
     }
 
     @Test
-    void testExcelLineNumberWithInterface() {
+    void testExcelLineNumberWithInterface() throws Exception {
         // ILineNumberAwareインターフェースを実装したモデルのテスト
-        List<PersonWithLineNumberInterface> results = ExcelReader.builder(PersonWithLineNumberInterface.class)
-                .file(EXCEL_FILE)
-                .build()
+        List<PersonWithLineNumberInterface> results = ExcelReader.builder(PersonWithLineNumberInterface.class, EXCEL_FILE)
                 .read();
 
         assertTrue(results.size() >= 3);
@@ -66,11 +63,9 @@ class ExcelLineNumberTest {
     }
 
     @Test
-    void testExcelLineNumberWithAnnotationOnly() {
+    void testExcelLineNumberWithAnnotationOnly() throws Exception {
         // @LineNumberアノテーションのみを使用したモデルのテスト
-        List<PersonWithLineNumberAnnotation> results = ExcelReader.builder(PersonWithLineNumberAnnotation.class)
-                .file(EXCEL_FILE)
-                .build()
+        List<PersonWithLineNumberAnnotation> results = ExcelReader.builder(PersonWithLineNumberAnnotation.class, EXCEL_FILE)
                 .read();
 
         assertTrue(results.size() >= 3);
@@ -88,12 +83,10 @@ class ExcelLineNumberTest {
     }
 
     @Test
-    void testExcelLineNumberWithStream() {
+    void testExcelLineNumberWithStream() throws Exception {
         // ExcelStreamReaderでの行番号テスト
-        List<PersonWithLineNumber> results = ExcelStreamReader.builder(PersonWithLineNumber.class)
-                .file(EXCEL_FILE)
-                .build()
-                .collect();
+        List<PersonWithLineNumber> results = ExcelStreamReader.builder(PersonWithLineNumber.class, EXCEL_FILE)
+                .extract(stream -> stream.collect(Collectors.toList()));
 
         assertTrue(results.size() >= 3);
 

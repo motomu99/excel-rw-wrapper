@@ -2,12 +2,14 @@ package com.example.excel.reader;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import com.example.common.mapping.MappingStrategyDetector;
+import com.example.common.model.RowData;
 import com.example.exception.HeaderNotFoundException;
 import com.example.exception.KeyColumnNotFoundException;
 import com.example.exception.SheetNotFoundException;
@@ -128,6 +130,34 @@ public class ExcelReader<T> {
             // はそのまま再スロー（IOExceptionのサブクラスなので、throws IOExceptionで宣言済み）
             throw e;
         }
+    }
+
+    /**
+     * Excelファイルを読み込んでRowDataのListとして返す
+     * 
+     * <p>既存のドメインモデルを変更せずに行番号情報を取得したい場合に使用します。</p>
+     * 
+     * @return RowDataのList
+     * @throws IOException ファイル読み込みエラー
+     * @throws SheetNotFoundException シートが見つからない場合
+     * @throws HeaderNotFoundException ヘッダー行が見つからない場合
+     * @throws KeyColumnNotFoundException キー列が見つからない場合
+     */
+    public List<RowData<T>> readWithLineNumber() throws IOException {
+        List<T> result = read();
+        
+        // 位置ベースマッピング（ヘッダーなし）の場合は1行目から、
+        // ヘッダーベースマッピングの場合は2行目からデータが始まる
+        int startLineNumber = (usePositionMapping != null && usePositionMapping) ? 1 : 2;
+        
+        List<RowData<T>> rowDataList = new ArrayList<>();
+        int lineNumber = startLineNumber;
+        for (T data : result) {
+            rowDataList.add(new RowData<>(lineNumber, data));
+            lineNumber++;
+        }
+        
+        return rowDataList;
     }
 
     /**
@@ -291,6 +321,24 @@ public class ExcelReader<T> {
         }
 
         /**
+         * Excelファイルを読み込んでRowDataのListとして返す
+         * 
+         * <p>既存のドメインモデルを変更せずに行番号情報を取得したい場合に使用します。</p>
+         * 
+         * @return RowDataのList
+         * @throws IOException ファイル読み込みエラー
+         */
+        @SuppressWarnings("PMD.AvoidLiteralsInIfCondition")
+        public List<RowData<T>> readWithLineNumber() throws IOException {
+            // 複数ファイルの場合は並列処理（意図が明確なリテラル使用）
+            final int singleFileThreshold = 1;
+            if (filePaths.size() > singleFileThreshold) {
+                return readAllWithLineNumber();
+            }
+            return reader.readWithLineNumber();
+        }
+
+        /**
          * 全ファイルを読み込む
          * 
          * <p>設定されたファイルリストを読み込み、
@@ -306,6 +354,36 @@ public class ExcelReader<T> {
                     path -> {
                         try {
                             return reader.cloneConfig(path).read();
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    },
+                    parallelism
+                );
+            } catch (RuntimeException e) {
+                if (e.getCause() instanceof IOException) {
+                    throw (IOException) e.getCause();
+                }
+                throw e;
+            }
+        }
+
+        /**
+         * 全ファイルを読み込んでRowDataのListとして返す
+         * 
+         * <p>設定されたファイルリストを読み込み、
+         * 並列度に従って処理を実行します。</p>
+         * 
+         * @return RowDataのList
+         * @throws IOException ファイル読み込みエラー
+         */
+        public List<RowData<T>> readAllWithLineNumber() throws IOException {
+            try {
+                return com.example.common.reader.ParallelReadExecutor.readAll(
+                    filePaths,
+                    path -> {
+                        try {
+                            return reader.cloneConfig(path).readWithLineNumber();
                         } catch (IOException e) {
                             throw new RuntimeException(e);
                         }

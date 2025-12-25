@@ -23,10 +23,7 @@ import java.util.Objects;
  * }
  *
  * // 使用方法: readWithLineNumber() メソッドを使用
- * List<RowData<Person>> results = CsvReaderWrapper.builder()
- *     .file(csvFile)
- *     .clazz(Person.class)
- *     .build()
+ * List<RowData<Person>> results = CsvReaderWrapper.builder(Person.class, csvFile)
  *     .readWithLineNumber();
  *
  * results.forEach(row -> {

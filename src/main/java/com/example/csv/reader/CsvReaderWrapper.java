@@ -22,6 +22,7 @@ import com.example.exception.CsvReadException;
 import com.opencsv.bean.CsvToBean;
 import com.opencsv.bean.CsvToBeanBuilder;
 import com.example.common.mapping.FieldMappingCache;
+import com.example.common.model.RowData;
 import com.opencsv.bean.MappingStrategy;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import lombok.extern.slf4j.Slf4j;
@@ -252,6 +253,32 @@ public class CsvReaderWrapper {
     }
 
     /**
+     * CSVファイルを読み込んでRowDataのListとして返す
+     * 
+     * <p>既存のドメインモデルを変更せずに行番号情報を取得したい場合に使用します。</p>
+     * 
+     * @param <T> Beanの型
+     * @return RowDataのList
+     * @throws CsvReadException CSV読み込みエラー
+     */
+    public <T> List<RowData<T>> readWithLineNumber() {
+        List<T> result = read();
+        
+        // 位置ベースマッピング（ヘッダーなし）の場合は1行目から、
+        // ヘッダーベースマッピングの場合は2行目からデータが始まる
+        int startLineNumber = (usePositionMapping != null && usePositionMapping) ? 1 : 2;
+        
+        List<RowData<T>> rowDataList = new ArrayList<>();
+        int lineNumber = startLineNumber;
+        for (T data : result) {
+            rowDataList.add(new RowData<>(lineNumber, data));
+            lineNumber++;
+        }
+        
+        return rowDataList;
+    }
+
+    /**
      * スキップ行数を適用
      *
      * @param <T> Beanの型
@@ -438,6 +465,25 @@ public class CsvReaderWrapper {
         }
 
         /**
+         * CSVファイルを読み込んでRowDataのListとして返す
+         * 
+         * <p>既存のドメインモデルを変更せずに行番号情報を取得したい場合に使用します。</p>
+         * 
+         * @param <T> Beanの型
+         * @return RowDataのList
+         * @throws CsvReadException CSV読み込みエラー
+         */
+        @SuppressWarnings("PMD.AvoidLiteralsInIfCondition")
+        public <T> List<RowData<T>> readWithLineNumber() {
+            // 複数ファイルの場合は並列処理（意図が明確なリテラル使用）
+            final int singleFileThreshold = 1;
+            if (filePaths.size() > singleFileThreshold) {
+                return readAllWithLineNumber();
+            }
+            return wrapper.readWithLineNumber();
+        }
+
+        /**
          * 並列度を設定
          * 
          * @param parallelism 並列度（1以下の場合は逐次処理）
@@ -461,6 +507,23 @@ public class CsvReaderWrapper {
             return com.example.common.reader.ParallelReadExecutor.readAll(
                 filePaths,
                 path -> wrapper.cloneConfig(path).read(),
+                parallelism
+            );
+        }
+
+        /**
+         * 全ファイルを読み込んでRowDataのListとして返す
+         * 
+         * <p>設定されたファイルリストを読み込み、
+         * 並列度に従って処理を実行します。</p>
+         * 
+         * @param <T> Beanの型
+         * @return RowDataのList
+         */
+        public <T> List<RowData<T>> readAllWithLineNumber() {
+            return com.example.common.reader.ParallelReadExecutor.readAll(
+                filePaths,
+                path -> wrapper.cloneConfig(path).readWithLineNumber(),
                 parallelism
             );
         }

@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
 
+import com.example.common.model.RowData;
 import com.example.model.linenumber.PersonWithLineNumber;
 import com.example.model.linenumber.PersonWithLineNumberAnnotation;
 import com.example.model.linenumber.PersonWithLineNumberInterface;
@@ -25,10 +26,7 @@ class LineNumberTest {
     @Test
     void testLineNumberWithAbstractClass() {
         // LineNumberAware抽象クラスを継承したモデルのテスト
-        List<PersonWithLineNumber> results = CsvReaderWrapper.builder()
-                .file(CSV_FILE)
-                .clazz(PersonWithLineNumber.class)
-                .build()
+        List<PersonWithLineNumber> results = CsvReaderWrapper.builder(PersonWithLineNumber.class, CSV_FILE)
                 .read();
 
         assertEquals(3, results.size());
@@ -58,10 +56,7 @@ class LineNumberTest {
     @Test
     void testLineNumberWithInterface() {
         // ILineNumberAwareインターフェースを実装したモデルのテスト
-        List<PersonWithLineNumberInterface> results = CsvReaderWrapper.builder()
-                .file(CSV_FILE)
-                .clazz(PersonWithLineNumberInterface.class)
-                .build()
+        List<PersonWithLineNumberInterface> results = CsvReaderWrapper.builder(PersonWithLineNumberInterface.class, CSV_FILE)
                 .read();
 
         assertEquals(3, results.size());
@@ -82,10 +77,7 @@ class LineNumberTest {
     @Test
     void testLineNumberWithAnnotationOnly() {
         // @LineNumberアノテーションのみを使用したモデルのテスト
-        List<PersonWithLineNumberAnnotation> results = CsvReaderWrapper.builder()
-                .file(CSV_FILE)
-                .clazz(PersonWithLineNumberAnnotation.class)
-                .build()
+        List<PersonWithLineNumberAnnotation> results = CsvReaderWrapper.builder(PersonWithLineNumberAnnotation.class, CSV_FILE)
                 .read();
 
         assertEquals(3, results.size());
@@ -107,7 +99,6 @@ class LineNumberTest {
     void testLineNumberWithStream() throws Exception {
         // CsvStreamReaderでの行番号テスト
         List<PersonWithLineNumber> results = CsvStreamReader.builder(PersonWithLineNumber.class, CSV_FILE)
-                .build()
                 .extract(stream -> stream.collect(Collectors.toList()));
 
         assertEquals(3, results.size());
@@ -128,11 +119,8 @@ class LineNumberTest {
     @Test
     void testLineNumberWithSkipLines() {
         // skipLinesと併用した場合のテスト
-        List<PersonWithLineNumber> results = CsvReaderWrapper.builder()
-                .file(CSV_FILE)
-                .clazz(PersonWithLineNumber.class)
+        List<PersonWithLineNumber> results = CsvReaderWrapper.builder(PersonWithLineNumber.class, CSV_FILE)
                 .skipLines(1)
-                .build()
                 .read();
 
         assertEquals(2, results.size());
@@ -150,10 +138,7 @@ class LineNumberTest {
     @Test
     void testLineNumberWithoutHeader() {
         // ヘッダーなしCSVファイルの行番号テスト（位置ベースマッピング）
-        List<PersonWithoutHeaderAndLineNumber> results = CsvReaderWrapper.builder()
-                .file(CSV_FILE_NO_HEADER)
-                .clazz(PersonWithoutHeaderAndLineNumber.class)
-                .build()
+        List<PersonWithoutHeaderAndLineNumber> results = CsvReaderWrapper.builder(PersonWithoutHeaderAndLineNumber.class, CSV_FILE_NO_HEADER)
                 .read();
 
         assertEquals(3, results.size());
@@ -184,7 +169,6 @@ class LineNumberTest {
     void testLineNumberWithoutHeaderStream() throws Exception {
         // CsvStreamReaderでヘッダーなしCSVの行番号テスト
         List<PersonWithoutHeaderAndLineNumber> results = CsvStreamReader.builder(PersonWithoutHeaderAndLineNumber.class, CSV_FILE_NO_HEADER)
-                .build()
                 .extract(stream -> stream.collect(Collectors.toList()));
 
         assertEquals(3, results.size());
@@ -200,5 +184,30 @@ class LineNumberTest {
         PersonWithoutHeaderAndLineNumber person3 = results.get(2);
         assertEquals(3, person3.getLineNumber());
         assertEquals("次郎", person3.getName());
+    }
+
+    @Test
+    void testRowData() {
+        // RowDataを使用した行番号取得のテスト
+        List<RowData<com.example.model.Person>> results = CsvReaderWrapper.builder(com.example.model.Person.class, CSV_FILE)
+                .readWithLineNumber();
+
+        assertEquals(3, results.size());
+
+        // 1行目のデータ(ヘッダーの次の行 = 行番号2)
+        RowData<com.example.model.Person> row1 = results.get(0);
+        assertEquals(2, row1.getLineNumber());
+        assertEquals("太郎", row1.getData().getName());
+        assertEquals(25, row1.getData().getAge());
+
+        // 2行目のデータ(行番号3)
+        RowData<com.example.model.Person> row2 = results.get(1);
+        assertEquals(3, row2.getLineNumber());
+        assertEquals("花子", row2.getData().getName());
+
+        // 3行目のデータ(行番号4)
+        RowData<com.example.model.Person> row3 = results.get(2);
+        assertEquals(4, row3.getLineNumber());
+        assertEquals("次郎", row3.getData().getName());
     }
 }
