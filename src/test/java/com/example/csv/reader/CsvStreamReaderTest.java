@@ -17,6 +17,7 @@ import java.util.stream.Stream;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import com.opencsv.exceptions.CsvException;
+import com.example.exception.CsvReadException;
 
 @DisplayName("CsvStreamReader: Stream APIを使用したCSV読み込み")
 public class CsvStreamReaderTest {
@@ -240,5 +241,30 @@ public class CsvStreamReaderTest {
         assertFalse(result.contains("田中太郎")); // スキップされているはず
         assertFalse(result.contains("佐藤花子")); // スキップされているはず
         assertTrue(result.contains("山田次郎"));
+    }
+
+    @Test
+    @DisplayName("異常系 - 存在しないファイルの場合、CsvReadExceptionをスローすること")
+    void testStreamReaderWithFileNotFound() {
+        // Stream APIで存在しないファイル
+        assertThrows(CsvReadException.class, () -> {
+            CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/nonexistent.csv"))
+                .extract(stream -> stream.collect(Collectors.toList()));
+        });
+    }
+
+    @Test
+    @DisplayName("異常系 - 文字コード自動判別時にファイルが存在しない場合、CsvReadExceptionをスローすること")
+    void testStreamReaderWithFileNotFoundDuringCharsetDetection() {
+        // 文字コードを明示的に指定せず（自動判別）、存在しないファイルを読み込もうとした場合
+        CsvReadException exception = assertThrows(CsvReadException.class, () -> {
+            CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/nonexistent.csv"))
+                // charsetTypeを指定しない = 自動判別が実行される
+                .extract(stream -> stream.collect(Collectors.toList()));
+        });
+        
+        // エラーメッセージにファイルパスが含まれていることを確認
+        assertTrue(exception.getMessage().contains("nonexistent.csv"), 
+            "エラーメッセージにファイルパスが含まれていること");
     }
 }

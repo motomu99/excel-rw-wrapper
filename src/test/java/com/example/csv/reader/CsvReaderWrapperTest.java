@@ -160,6 +160,21 @@ public class CsvReaderWrapperTest {
     }
 
     @Test
+    @DisplayName("異常系 - 文字コード自動判別時にファイルが存在しない場合、CsvReadExceptionをスローすること")
+    void testBuilderWithFileNotFoundDuringCharsetDetection() {
+        // 文字コードを明示的に指定せず（自動判別）、存在しないファイルを読み込もうとした場合
+        CsvReadException exception = assertThrows(CsvReadException.class, () -> {
+            CsvReaderWrapper.builder(Person.class, Paths.get("src/test/resources/nonexistent.csv"))
+                // charsetTypeを指定しない = 自動判別が実行される
+                .read();
+        });
+        
+        // エラーメッセージにファイルパスが含まれていることを確認
+        assertTrue(exception.getMessage().contains("nonexistent.csv"), 
+            "エラーメッセージにファイルパスが含まれていること");
+    }
+
+    @Test
     @DisplayName("異常系 - CSV列数が不一致の場合にCsvReadExceptionをスローすること")
     void testBuilderWithColumnMismatchCsv() {
         assertThrows(CsvReadException.class, () -> {

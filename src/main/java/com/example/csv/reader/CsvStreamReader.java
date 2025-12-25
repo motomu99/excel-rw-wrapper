@@ -1,6 +1,7 @@
 package com.example.csv.reader;
 
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -83,28 +84,10 @@ public class CsvStreamReader<T> {
                     .orElse(false); // デフォルトはヘッダーベース
         }
 
-        // 文字コードが明示的に指定されていない場合は自動判別
-        Charset charset;
-        boolean withBom;
-        if (charsetType == null) {
-            try {
-                charset = CharsetDetector.detect(filePath);
-                // UTF-8の場合はBOMの有無を確認
-                if (StandardCharsets.UTF_8.equals(charset)) {
-                    withBom = BomHandler.hasBom(filePath);
-                } else {
-                    withBom = false;
-                }
-                log.debug("文字コードを自動判別しました: charset={}, withBom={}", charset, withBom);
-            } catch (IOException e) {
-                log.warn("文字コードの自動判別に失敗しました。UTF-8を使用します: {}", e.getMessage());
-                charset = StandardCharsets.UTF_8;
-                withBom = false;
-            }
-        } else {
-            charset = Charset.forName(charsetType.getCharsetName());
-            withBom = charsetType.isWithBom();
-        }
+        // 文字コードとBOMを決定
+        CharsetAndBom charsetAndBom = determineCharsetAndBom();
+        Charset charset = charsetAndBom.charset;
+        boolean withBom = charsetAndBom.withBom;
         
         CsvColumnValidator.validate(filePath, charset, withBom, fileType.getDelimiter().charAt(0));
 
@@ -159,6 +142,59 @@ public class CsvStreamReader<T> {
         } catch (IOException e) {
             log.error("CSVファイル読み込み中にエラーが発生: ファイルパス={}, エラー={}", filePath, e.getMessage(), e);
             throw new CsvReadException("CSVファイルの読み込みに失敗しました: " + filePath, e);
+        }
+    }
+
+    /**
+     * 文字コードとBOMを決定する
+     * 
+     * <p>ファイルが存在しない場合は即座にCsvReadExceptionを投げます。</p>
+     * 文字コードの自動判別に失敗した場合はUTF-8をデフォルトとして使用します。
+     * 
+     * @return 文字コードとBOMの情報
+     * @throws CsvReadException ファイルが存在しない場合
+     */
+    private CharsetAndBom determineCharsetAndBom() {
+        if (charsetType == null) {
+            // 文字コードが明示的に指定されていない場合は自動判別
+            try {
+                Charset detectedCharset = CharsetDetector.detect(filePath);
+                
+                // UTF-8の場合はBOMの有無を確認
+                boolean bom = false;
+                if (StandardCharsets.UTF_8.equals(detectedCharset)) {
+                    bom = BomHandler.hasBom(filePath);
+                }
+                
+                log.debug("文字コードを自動判別しました: charset={}, withBom={}", detectedCharset, bom);
+                return new CharsetAndBom(detectedCharset, bom);
+            } catch (FileNotFoundException e) {
+                // ファイルが存在しない場合は即座にエラーにする
+                log.error("ファイルが存在しません: ファイルパス={}", filePath, e);
+                throw new CsvReadException("CSVファイルの読み込みに失敗しました: " + filePath, e);
+            } catch (IOException e) {
+                // 文字コードの自動判別に失敗した場合はUTF-8をデフォルトとして使用
+                log.warn("文字コードの自動判別に失敗しました。UTF-8を使用します: {}", e.getMessage());
+                return new CharsetAndBom(StandardCharsets.UTF_8, false);
+            }
+        } else {
+            // 明示的に指定された文字コードを使用
+            Charset charset = Charset.forName(charsetType.getCharsetName());
+            boolean bom = charsetType.isWithBom();
+            return new CharsetAndBom(charset, bom);
+        }
+    }
+
+    /**
+     * 文字コードとBOMの情報を保持する内部クラス
+     */
+    private static class CharsetAndBom {
+        final Charset charset;
+        final boolean withBom;
+        
+        CharsetAndBom(Charset charset, boolean withBom) {
+            this.charset = charset;
+            this.withBom = withBom;
         }
     }
 
