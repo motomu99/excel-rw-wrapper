@@ -287,6 +287,21 @@ public class ExcelRowIterator<T> implements Iterator<T> {
             }
         }
 
+        // 行番号フィールドが存在する場合は行番号を設定
+        if (fieldMappingCache.hasLineNumberField()) {
+            java.lang.reflect.Field lineNumberField = fieldMappingCache.getLineNumberField();
+            // row.getRowNum()は0始まりなので、1始まりに変換
+            int lineNumber = row.getRowNum() + 1;
+
+            // フィールドの型に応じて値を設定
+            Class<?> fieldType = lineNumberField.getType();
+            if (fieldType == Integer.class || fieldType == int.class) {
+                lineNumberField.set(bean, lineNumber);
+            } else if (fieldType == Long.class || fieldType == long.class) {
+                lineNumberField.set(bean, (long) lineNumber);
+            }
+        }
+
         return bean;
     }
 

@@ -7,6 +7,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
@@ -14,6 +15,7 @@ import java.util.stream.Stream;
 import com.opencsv.exceptions.CsvException;
 import com.example.common.config.CharsetType;
 import com.example.common.config.FileType;
+import com.example.common.mapping.FieldMappingCache;
 import com.example.common.mapping.MappingStrategyDetector;
 import com.example.common.mapping.MappingStrategyFactory;
 import com.example.common.util.BomHandler;
@@ -120,12 +122,38 @@ public class CsvStreamReader<T> {
                     .build();
             
             Stream<T> stream = csvToBean.stream();
-            
+
+            // 行番号フィールドが存在する場合は行番号を設定
+            FieldMappingCache fieldMappingCache = new FieldMappingCache(beanClass);
+            if (fieldMappingCache.hasLineNumberField()) {
+                java.lang.reflect.Field lineNumberField = fieldMappingCache.getLineNumberField();
+                Class<?> fieldType = lineNumberField.getType();
+
+                // 位置ベースマッピング（ヘッダーなし）の場合は1行目から、
+                // ヘッダーベースマッピングの場合は2行目からデータが始まる
+                int startLineNumber = (usePositionMapping != null && usePositionMapping) ? 1 : 2;
+                AtomicInteger lineNumber = new AtomicInteger(startLineNumber);
+
+                stream = stream.peek(bean -> {
+                    try {
+                        int currentLineNumber = lineNumber.getAndIncrement();
+                        if (fieldType == Integer.class || fieldType == int.class) {
+                            lineNumberField.set(bean, currentLineNumber);
+                        } else if (fieldType == Long.class || fieldType == long.class) {
+                            lineNumberField.set(bean, (long) currentLineNumber);
+                        }
+                    } catch (IllegalAccessException e) {
+                        log.error("行番号の設定に失敗しました: bean={}", bean, e);
+                        throw new CsvReadException("行番号の設定に失敗しました", e);
+                    }
+                });
+            }
+
             // データ行をスキップする処理
             if (skipLines > 0) {
                 stream = stream.skip(skipLines);
             }
-            
+
             // 呼び出し側でStreamを処理（try-with-resources内で完了）
             return processor.apply(stream);
         } catch (IOException e) {
