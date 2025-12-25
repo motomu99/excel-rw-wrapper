@@ -148,6 +148,8 @@ ExcelStreamWriter.builder(Person.class, Paths.get("template.xlsx"))
 
 ## ストリーミング処理のベストプラクティス
 
+大量データをメモリ効率よく処理するためのベストプラクティスです。
+
 ### ⚠️ 重要な注意点
 
 **Beanに詰めて全部メモリに載せたらダメ！**
@@ -159,183 +161,22 @@ List<Person> allData = ExcelStreamReader.builder(Person.class, path)
 // ↑ 10万件とかあったらメモリ不足で死ぬ！
 ```
 
-### ✅ 正しい使い方
+### ✅ 正しい使い方のポイント
 
-#### 1. forEach で1件ずつDB保存（メモリ最小）
+1. **forEach で1件ずつ処理** = 最もメモリ効率が良い
+2. **バッチ処理** = メモリとDB性能のバランスが良い
+3. **集計処理** = 超高速＆超省メモリ
+4. **フィルタリング** = 必要なデータだけ処理
 
-```java
-ExcelStreamReader.builder(Person.class, path)
-    .consume(stream -> {
-        stream.forEach(person -> {
-            // 1件ずつDB保存
-            personRepository.save(person);
-        });
-    });
+### 📚 詳細情報
 
-// 💡 メモリ使用量: 常に100行分程度（数MB）
-// 💡 100万行でも問題なし！
-```
-
-#### 2. バッチ処理（100件ごとにまとめて保存）
-
-```java
-List<Person> batch = new ArrayList<>();
-final int BATCH_SIZE = 100;
-
-ExcelStreamReader.builder(Person.class, path)
-    .consume(stream -> {
-        stream.forEach(person -> {
-            batch.add(person);
-            
-            // 100件たまったらまとめて保存
-            if (batch.size() >= BATCH_SIZE) {
-                personRepository.saveAll(batch);  // バッチ保存
-                batch.clear();  // ⭐ メモリ解放！
-            }
-        });
-        
-        // 残りを保存
-        if (!batch.isEmpty()) {
-            personRepository.saveAll(batch);
-            batch.clear();
-        }
-    });
-
-// 💡 メモリ使用量: バッチサイズ分（100件=数MB）
-// 💡 DB保存の効率も良い！
-```
-
-#### 3. 集計処理（全件メモリに載せずに集計）
-
-```java
-// 件数カウント
-long totalCount = ExcelStreamReader.builder(Person.class, path)
-    .extract(stream -> stream.count());
-
-// 平均年齢
-double averageAge = ExcelStreamReader.builder(Person.class, path)
-    .extract(stream -> stream
-        .mapToInt(Person::getAge)
-        .average()
-        .orElse(0.0));
-
-// 💡 メモリ使用量: 集計値のみ（数バイト）
-// 💡 100万行でも一瞬で集計可能！
-```
-
-#### 4. フィルタリング＋1件ずつ処理
-
-```java
-ExcelStreamReader.builder(Person.class, path)
-    .consume(stream -> {
-        stream
-            .filter(person -> person.getAge() >= 30)  // 30歳以上
-            .filter(person -> "東京".equals(person.getBirthplace()))  // 東京在住
-            .forEach(person -> {
-                // 条件に合った人だけ処理
-                sendEmail(person);
-            });
-    });
-
-// 💡 フィルタリングされた分だけ処理されるから超高速！
-```
-
-#### 5. 必要な件数だけ処理（早期終了）
-
-```java
-ExcelStreamReader.builder(Person.class, path)
-    .consume(stream -> {
-        stream
-            .limit(1000)  // 最初の1000件だけ
-            .forEach(person -> {
-                // 処理
-                sendEmail(person);
-            });
-    });
-
-// 💡 残りのデータは読み込まない！超高速！
-```
-
-### ❌ やっちゃダメなこと
-
-1. **全件をListに格納**
-```java
-// ❌ NG！
-List<Person> all = ExcelStreamReader.builder(Person.class, path)
-    .extract(stream -> stream.collect(Collectors.toList()));
-```
-
-2. **全件をMapに格納**
-```java
-// ❌ NG！
-Map<String, Person> map = ExcelStreamReader.builder(Person.class, path)
-    .extract(stream -> stream.collect(
-        Collectors.toMap(Person::getName, p -> p)
-    ));
-```
-
-3. **中間でListを作成**
-```java
-// ❌ NG！
-ExcelStreamReader.builder(Person.class, path)
-    .consume(stream -> {
-        List<Person> list = stream.collect(Collectors.toList());  // 全件メモリに！
-        list.forEach(p -> save(p));  // これじゃ意味ない
-    });
-```
-
-### 💡 ポイント
-
-| 項目 | 従来の方法 | ストリーミング処理 |
-|------|-----------|------------------|
-| **メモリ使用量** | 全件分（数GB） | 常に100行分（数MB） |
-| **処理速度** | 全件読み込み後に処理 | 読み込みながら処理 |
-| **大量データ対応** | ❌ OutOfMemoryError | ✅ 100万行でもOK |
-| **推奨される処理** | 小規模データのみ | 全ての場合 |
-
-### 🚀 実装のコツ
-
-#### Spring Bootでの実装例
-
-```java
-@Service
-public class PersonImportService {
-    
-    @Autowired
-    private PersonRepository personRepository;
-    
-    @Transactional
-    public void importFromExcel(Path excelPath) throws IOException {
-        List<Person> batch = new ArrayList<>();
-        final int BATCH_SIZE = 1000;
-        
-        ExcelStreamReader.builder(Person.class, excelPath)
-            .headerKey("名前")  // ヘッダー自動検出
-            .consume(stream -> {
-                stream.forEach(person -> {
-                    batch.add(person);
-                    
-                    if (batch.size() >= BATCH_SIZE) {
-                        personRepository.saveAll(batch);
-                        personRepository.flush();  // メモリ解放
-                        batch.clear();
-                    }
-                });
-                
-                // 残りを保存
-                if (!batch.isEmpty()) {
-                    personRepository.saveAll(batch);
-                }
-                
-                return null;
-            });
-    }
-}
-```
+**詳細なベストプラクティスと実装例は [ストリーミング処理のベストプラクティス](STREAMING_BEST_PRACTICES.md) を参照してください。**
 
 ---
 
 ## グルーピング処理のベストプラクティス
+
+グルーピング処理でメモリを節約するためのベストプラクティスです。
 
 ### ⚠️ 重要な注意点
 
@@ -350,172 +191,16 @@ Map<String, List<Person>> grouped = ExcelStreamReader.builder(Person.class, path
 // ↑ メモリ爆発！OutOfMemoryError確定！
 ```
 
-### ✅ 正しいグルーピング方法
+### ✅ 正しいグルーピング方法のポイント
 
-#### 1. 集計値のみ保持（メモリ最小）⭐おすすめ！
+1. **集計値のみ保持** = グルーピングで最も軽量
+2. **グループごとにバッチ保存** = 大量データ向け
+3. **トップNのみ保持** = ランキング処理向け
+4. **フィルタリング** = 条件でデータ量を減らす
 
-**グループごとの件数・平均・合計だけ保持**
+### 📚 詳細情報
 
-```java
-// 職業ごとの統計情報を保持（実データは保持しない）
-Map<String, OccupationStats> statsMap = new ConcurrentHashMap<>();
-
-ExcelStreamReader.builder(Person.class, path)
-    .consume(stream -> {
-        stream.forEach(person -> {
-            String occupation = person.getOccupation();
-            statsMap.computeIfAbsent(occupation, k -> new OccupationStats())
-                   .add(person.getAge());
-        });
-    });
-
-// 結果
-statsMap.forEach((occupation, stats) -> {
-    System.out.println(occupation + ":");
-    System.out.println("  人数: " + stats.getCount());
-    System.out.println("  平均年齢: " + stats.getAverage());
-});
-
-// 💡 メモリ: グループ数×集計値のみ（数KB）
-// 💡 10万件のデータは保持していない！
-
-// OccupationStatsクラス
-class OccupationStats {
-    private int count = 0;
-    private long sum = 0;
-    
-    public void add(int age) {
-        count++;
-        sum += age;
-    }
-    
-    public int getCount() { return count; }
-    public double getAverage() { return count == 0 ? 0 : (double) sum / count; }
-}
-```
-
-#### 2. グループごとにバッチ保存（大量データ向け）⭐おすすめ！
-
-**各グループごとに100件ずつDB保存**
-
-```java
-final int BATCH_SIZE = 100;
-Map<String, List<Person>> batchMap = new HashMap<>();
-
-ExcelStreamReader.builder(Person.class, path)
-    .consume(stream -> {
-        stream.forEach(person -> {
-            String occupation = person.getOccupation();
-            
-            // 職業ごとのバッチに追加
-            batchMap.computeIfAbsent(occupation, k -> new ArrayList<>())
-                   .add(person);
-            
-            // バッチサイズに達したらDB保存
-            List<Person> batch = batchMap.get(occupation);
-            if (batch.size() >= BATCH_SIZE) {
-                personRepository.saveAllByOccupation(occupation, batch);
-                batch.clear();  // ⭐ メモリ解放！
-            }
-        });
-        
-        // 残りを保存
-        batchMap.forEach((occupation, batch) -> {
-            if (!batch.isEmpty()) {
-                personRepository.saveAllByOccupation(occupation, batch);
-                batch.clear();
-            }
-        });
-    });
-
-// 💡 メモリ: グループ数×バッチサイズ
-// 💡 例：5グループ×100件 = 500件分だけメモリに！
-```
-
-#### 3. トップNのみ保持（ランキング処理）
-
-**各グループの上位10件だけ保持**
-
-```java
-Map<String, TopNCollector> topNMap = new HashMap<>();
-final int TOP_N = 10;
-
-ExcelStreamReader.builder(Person.class, path)
-    .consume(stream -> {
-        stream.forEach(person -> {
-            String city = person.getBirthplace();
-            topNMap.computeIfAbsent(city, k -> new TopNCollector(TOP_N))
-                  .add(person);
-        });
-    });
-
-// 結果
-topNMap.forEach((city, topN) -> {
-    System.out.println(city + "（年齢トップ10）:");
-    topN.getTop().forEach(person -> 
-        System.out.println("  - " + person.getName() + " (" + person.getAge() + "歳)")
-    );
-});
-
-// 💡 メモリ: グループ数×トップN件
-// 💡 例：5グループ×10件 = 50件分だけ！
-
-// TopNCollectorクラス
-class TopNCollector {
-    private final int maxSize;
-    private final PriorityQueue<Person> queue;
-    
-    public TopNCollector(int maxSize) {
-        this.maxSize = maxSize;
-        this.queue = new PriorityQueue<>(Comparator.comparingInt(Person::getAge));
-    }
-    
-    public void add(Person person) {
-        queue.offer(person);
-        if (queue.size() > maxSize) {
-            queue.poll();  // 最小値を削除
-        }
-    }
-    
-    public List<Person> getTop() {
-        List<Person> result = new ArrayList<>(queue);
-        result.sort(Comparator.comparingInt(Person::getAge).reversed());
-        return result;
-    }
-}
-```
-
-### 🎯 使い分けガイド
-
-| ケース | 推奨方法 | メモリ使用量 |
-|--------|---------|-------------|
-| **集計だけ必要** | 方法1: 集計値のみ | 数KB |
-| **グループごとにDB保存** | 方法2: バッチ保存 | 数MB |
-| **ランキング表示** | 方法3: トップN保持 | 数十KB |
-| **条件付き集計** | 方法4: フィルタ＋集計 | 数バイト |
-| **グループ数が超少ない** | 方法5: 制限付き保持 | 要注意 |
-
-### 💡 判断フローチャート
-
-```
-グルーピング処理が必要
-    ↓
-実データが必要？
-    ├─ NO → 集計値のみ保持（方法1）⭐最軽量
-    └─ YES
-         ↓
-    グループ数は？
-         ├─ 少ない（10個以下）
-         │    ↓
-         │  各グループのデータ量は？
-         │    ├─ 少ない（1000件以下/グループ）→ 制限付き保持もOK
-         │    └─ 多い → バッチ処理（方法2）
-         └─ 多い（10個以上）
-              ↓
-         全件必要？
-              ├─ NO → トップNのみ保持（方法3）
-              └─ YES → バッチ処理（方法2）⭐推奨
-```
+**詳細なベストプラクティスと実装例は [グルーピング処理のベストプラクティス](GROUPING_BEST_PRACTICES.md) を参照してください。**
 
 ---
 
@@ -759,100 +444,18 @@ BookWriter.write(book);
 
 ## 移行ガイド
 
-### 概要
-
 `CsvReaderWrapper` と `CsvWriterWrapper` が新しいBuilderパターンを導入してリファクタリングされました。
 **既存のコードは完全に互換性を維持しており、すぐに動作しなくなることはありません。**
 
-しかし、新しいBuilderパターンはより直感的で読みやすいため、今後の開発では新しいAPIの使用を推奨します。
+### 主な変更点
 
-### 変更内容
+- **新しいBuilderパターン**: `builder()` メソッドを使用したより直感的なAPI
+- **メソッド名の改善**: `setSkip()` → `skipLines()`, `setCharset()` → `charset()` など
+- **エラーハンドリング**: `CsvReadException` / `CsvWriteException` の追加
 
-#### CsvReaderWrapper
+### 📚 詳細情報
 
-**Before (従来のAPI - 引き続き使用可能)**
-```java
-List<Person> persons = CsvReaderWrapper.execute(
-    Person.class,
-    Paths.get("sample.csv"),
-    instance -> instance.setCharset(CharsetType.UTF_8_BOM).setSkip(1).read()
-);
-```
-
-**After (新しいAPI - 推奨)**
-```java
-List<Person> persons = CsvReaderWrapper.builder(Person.class, Paths.get("sample.csv"))
-    .charset(CharsetType.UTF_8_BOM)
-    .skipLines(1)
-    .read();
-```
-
-#### CsvWriterWrapper
-
-**Before (従来のAPI - 引き続き使用可能)**
-```java
-List<Person> persons = Arrays.asList(new Person("田中", 25));
-CsvWriterWrapper.execute(
-    Person.class,
-    Paths.get("output.csv"),
-    instance -> instance.setCharset(CharsetType.UTF_8).write(persons)
-);
-```
-
-**After (新しいAPI - 推奨)**
-```java
-List<Person> persons = Arrays.asList(new Person("田中", 25));
-CsvWriterWrapper.builder(Person.class, Paths.get("output.csv"))
-    .charset(CharsetType.UTF_8)
-    .write(persons);
-```
-
-### 移行方法
-
-#### ステップ1: 既存コードの動作確認
-
-まず、現在のコードがそのまま動作することを確認してください。
-
-```bash
-# テストを実行
-./gradlew test
-```
-
-#### ステップ2: 新しいAPIへの段階的移行
-
-**重要: 一度にすべてを変更する必要はありません。**
-プロジェクトの開発サイクルに合わせて、段階的に移行してください。
-
-#### 推奨移行順序
-
-1. **新機能・新規実装**: 新しいBuilderパターンを使用
-2. **既存コードの修正時**: 該当部分を新しいAPIに移行
-3. **リファクタリング期間**: 既存コード全体を徐々に移行
-
-### 新旧API対応表
-
-| 従来のAPI | 新しいAPI | 説明 |
-|-----------|-----------|------|
-| `execute()` | `builder()` | エントリーポイント |
-| `setSkip(n)` | `skipLines(n)` | より明確な命名 |
-| `setCharset(type)` | `charset(type)` | より簡潔な命名 |
-| `setFileType(type)` | `fileType(type)` | より簡潔な命名 |
-| `usePositionMapping()` | `usePositionMapping()` | 変更なし |
-| `useHeaderMapping()` | `useHeaderMapping()` | 変更なし |
-
-### FAQ
-
-#### Q1: 既存のコードはすぐに変更する必要がありますか？
-
-**A:** いいえ、必要ありません。従来の `execute()` メソッドは完全に互換性を維持しており、引き続き使用できます。ただし、新しいコードでは `builder()` メソッドの使用を推奨します。
-
-#### Q2: いつまでに移行する必要がありますか？
-
-**A:** 明確な期限はありません。プロジェクトの開発サイクルに合わせて、段階的に移行することを推奨します。
-
-#### Q3: 新旧APIを混在させても問題ありませんか？
-
-**A:** はい、問題ありません。同一プロジェクト内で両方のAPIを使用できます。
+**詳細な移行方法、新旧API対応表、FAQは [移行ガイド](MIGRATION.md) を参照してください。**
 
 ---
 

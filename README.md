@@ -101,7 +101,7 @@ List<Person> persons = CsvReaderWrapper.builder(Person.class, Paths.get("no_head
 
 ファイル読み込み時に、データの元ファイル行番号を自動的に取得できます。エラー発生時の行特定やデータ検証に便利です。
 
-**実装方法は3つ（お好みで選択）:**
+**実装方法は4つ（お好みで選択）:**
 
 ##### 方法1: 抽象クラス継承（最も簡単 ⭐推奨）
 
@@ -158,6 +158,48 @@ public class Person {
     private String name;
 }
 ```
+
+##### 方法4: RowDataラッパー（既存モデルを変更したくない場合）
+
+既存のドメインモデルを変更せずに行番号情報を取得したい場合に使用します。
+
+```java
+import com.example.common.model.RowData;
+
+// 既存のモデルクラス（変更不要）
+@Data
+public class Person {
+    @CsvBindByName(column = "名前")
+    private String name;
+
+    @CsvBindByName(column = "年齢")
+    private Integer age;
+}
+
+// 使用方法: readWithLineNumber() メソッドを使用
+List<RowData<Person>> results = CsvReaderWrapper.builder(Person.class, Paths.get("data.csv"))
+    .readWithLineNumber();
+
+results.forEach(row -> {
+    System.out.println("行番号: " + row.getLineNumber());
+    System.out.println("名前: " + row.getData().getName());
+});
+
+// ストリーム処理での使用例
+results.stream()
+    .filter(row -> row.getLineNumber() > 10)
+    .map(RowData::getData)
+    .forEach(person -> System.out.println(person.getName()));
+```
+
+**メリット:**
+- ドメインモデルを変更する必要がない
+- 行番号が必要な場合のみ使用できる
+- 既存コードへの影響が最小限
+
+**デメリット:**
+- データ取得時に `getData()` の呼び出しが必要
+- ラッピング/アンラッピングの手間がある
 
 **動作:**
 - **ヘッダーあり**（`@CsvBindByName`使用時）: 行番号は **2** から開始（1行目はヘッダー）
