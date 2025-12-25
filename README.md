@@ -10,6 +10,7 @@ OpenCSVをラップしたシンプルなCSV読み込みライブラリです。
 - 📊 **便利**: ヘッダー分離、データのみ取得などの便利機能
 - 🎯 **Bean対応**: アノテーションで項目名を指定してBeanにマッピング
 - ✅ **列数検証**: CSV/TSVファイルの列数不整合を自動検出し、エラーを早期に検知
+- 🔢 **行番号トラッキング**: データの元ファイル行番号を自動取得してエラー特定を容易に
 
 ## 依存関係
 
@@ -95,6 +96,75 @@ List<Person> persons = CsvReaderWrapper.builder(Person.class, Paths.get("no_head
     .usePositionMapping()  // 位置ベースマッピング
     .read();
 ```
+
+#### 行番号トラッキング機能 🔢
+
+ファイル読み込み時に、データの元ファイル行番号を自動的に取得できます。エラー発生時の行特定やデータ検証に便利です。
+
+**実装方法は3つ（お好みで選択）:**
+
+##### 方法1: 抽象クラス継承（最も簡単 ⭐推奨）
+
+```java
+import com.example.common.model.LineNumberAware;
+
+@Data
+@EqualsAndHashCode(callSuper = true)
+public class Person extends LineNumberAware {
+    @CsvBindByName(column = "名前")
+    private String name;
+
+    @CsvBindByName(column = "年齢")
+    private Integer age;
+}
+
+// 使用例
+List<Person> persons = CsvReaderWrapper.builder(Person.class, Paths.get("data.csv"))
+    .read();
+
+persons.forEach(person -> {
+    System.out.println("行番号: " + person.getLineNumber()); // 行番号が自動設定される
+    System.out.println("名前: " + person.getName());
+});
+```
+
+##### 方法2: インターフェース実装（既に他のクラスを継承している場合）
+
+```java
+import com.example.common.model.ILineNumberAware;
+import com.example.common.annotation.LineNumber;
+
+@Data
+public class Person implements ILineNumberAware {
+    @LineNumber  // このアノテーションが必要
+    private Integer lineNumber;
+
+    @CsvBindByName(column = "名前")
+    private String name;
+}
+```
+
+##### 方法3: アノテーションのみ（柔軟に使いたい場合）
+
+```java
+import com.example.common.annotation.LineNumber;
+
+@Data
+public class Person {
+    @LineNumber  // このフィールドに行番号が自動設定される
+    private Integer lineNumber;
+
+    @CsvBindByName(column = "名前")
+    private String name;
+}
+```
+
+**動作:**
+- **ヘッダーあり**（`@CsvBindByName`使用時）: 行番号は **2** から開始（1行目はヘッダー）
+- **ヘッダーなし**（`@CsvBindByPosition`使用時）: 行番号は **1** から開始
+- Excel/CSVの両方で動作
+- ストリーミング処理（`CsvStreamReader`、`ExcelStreamReader`）でも使用可能
+- `@CsvCustomBindByName`、`@CsvCustomBindByPosition`にも対応
 
 #### 列数検証機能
 
