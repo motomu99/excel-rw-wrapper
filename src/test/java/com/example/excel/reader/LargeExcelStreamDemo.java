@@ -5,11 +5,13 @@ import com.example.model.Person;
 
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
@@ -24,6 +26,19 @@ import static org.junit.jupiter.api.Assertions.*;
  * メモリ効率の良い処理を実演
  */
 public class LargeExcelStreamDemo {
+
+    @AfterAll
+    static void tearDown() throws IOException {
+        // テスト終了時に生成されたファイルを削除
+        Path largeExcel = Paths.get("target/large_data.xlsx");
+        if (Files.exists(largeExcel)) {
+            try {
+                Files.delete(largeExcel);
+            } catch (IOException e) {
+                // 削除に失敗しても続行（ファイルがロックされている場合など）
+            }
+        }
+    }
 
     @Test
     @DisplayName("🔥 Excel大量読み込みデモ - メモリ効率の良いストリーミング処理")
