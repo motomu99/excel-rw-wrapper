@@ -189,7 +189,7 @@ public class CsvReaderWrapper {
             List<T> result = csvToBean.parse();
 
             // 行番号フィールドが存在する場合は行番号を設定
-            setLineNumbers(result);
+            setLineNumbers(result, usePositionMapping);
 
             return applySkipLines(result);
         } catch (IOException e) {
@@ -216,8 +216,9 @@ public class CsvReaderWrapper {
      *
      * @param <T> Beanの型
      * @param result Beanのリスト
+     * @param usePositionMapping 位置ベースマッピングを使用するかどうか
      */
-    private <T> void setLineNumbers(List<T> result) {
+    private <T> void setLineNumbers(List<T> result, Boolean usePositionMapping) {
         if (result.isEmpty()) {
             return;
         }
@@ -231,8 +232,9 @@ public class CsvReaderWrapper {
         java.lang.reflect.Field lineNumberField = fieldMappingCache.getLineNumberField();
         Class<?> fieldType = lineNumberField.getType();
 
-        // CSVファイルの場合、ヘッダー行を考慮して2行目からデータが始まる(1ベースで行番号2)
-        int lineNumber = 2;
+        // 位置ベースマッピング（ヘッダーなし）の場合は1行目から、
+        // ヘッダーベースマッピングの場合は2行目からデータが始まる
+        int lineNumber = (usePositionMapping != null && usePositionMapping) ? 1 : 2;
 
         for (T bean : result) {
             try {

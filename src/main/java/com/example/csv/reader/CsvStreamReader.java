@@ -129,8 +129,10 @@ public class CsvStreamReader<T> {
                 java.lang.reflect.Field lineNumberField = fieldMappingCache.getLineNumberField();
                 Class<?> fieldType = lineNumberField.getType();
 
-                // CSVファイルの場合、ヘッダー行を考慮して2行目からデータが始まる(1ベースで行番号2)
-                AtomicInteger lineNumber = new AtomicInteger(2);
+                // 位置ベースマッピング（ヘッダーなし）の場合は1行目から、
+                // ヘッダーベースマッピングの場合は2行目からデータが始まる
+                int startLineNumber = (usePositionMapping != null && usePositionMapping) ? 1 : 2;
+                AtomicInteger lineNumber = new AtomicInteger(startLineNumber);
 
                 stream = stream.peek(bean -> {
                     try {
