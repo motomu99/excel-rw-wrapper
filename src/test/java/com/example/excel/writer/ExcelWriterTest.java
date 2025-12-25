@@ -10,6 +10,7 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -32,6 +33,22 @@ public class ExcelWriterTest {
     static void setUp() throws IOException {
         // テスト出力ディレクトリを作成
         Files.createDirectories(TEST_OUTPUT_DIR);
+    }
+
+    @AfterAll
+    static void tearDown() throws IOException {
+        // テスト終了時に生成されたファイルを削除
+        if (Files.exists(TEST_OUTPUT_DIR)) {
+            Files.walk(TEST_OUTPUT_DIR)
+                .sorted((a, b) -> b.compareTo(a)) // ディレクトリを先に削除するため逆順
+                .forEach(path -> {
+                    try {
+                        Files.delete(path);
+                    } catch (IOException e) {
+                        // 削除に失敗しても続行（ファイルがロックされている場合など）
+                    }
+                });
+        }
     }
 
     @Test

@@ -8,6 +8,7 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -27,6 +28,45 @@ import java.util.concurrent.atomic.AtomicInteger;
  * <p>5GB級の大量CSVファイルをメモリ効率的に処理する方法を紹介</p>
  */
 public class LargeDataGroupingSorterDemo {
+    
+    @AfterAll
+    static void tearDown() throws IOException {
+        // テスト終了時に生成されたファイルを削除
+        Path[] csvFiles = {
+            Paths.get("target/large_grouping_test.csv"),
+            Paths.get("target/large_grouping_test2.csv"),
+            Paths.get("target/large_grouping_test3.csv"),
+            Paths.get("target/large_grouping_test4.csv")
+        };
+        
+        for (Path csvFile : csvFiles) {
+            if (Files.exists(csvFile)) {
+                try {
+                    Files.delete(csvFile);
+                } catch (IOException e) {
+                    // 削除に失敗しても続行（ファイルがロックされている場合など）
+                }
+            }
+        }
+        
+        // grouped_outputディレクトリを削除
+        Path outputDir = Paths.get("target/grouped_output");
+        if (Files.exists(outputDir)) {
+            try {
+                Files.walk(outputDir)
+                    .sorted((a, b) -> b.compareTo(a)) // ディレクトリを先に削除するため逆順
+                    .forEach(path -> {
+                        try {
+                            Files.delete(path);
+                        } catch (IOException e) {
+                            // 削除に失敗しても続行
+                        }
+                    });
+            } catch (IOException e) {
+                // 削除に失敗しても続行
+            }
+        }
+    }
     
     @Test
     @DisplayName("🔥 パターン1: Lambda指定でグルーピング＆ソート")

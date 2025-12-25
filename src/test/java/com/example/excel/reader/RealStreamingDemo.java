@@ -5,11 +5,13 @@ import com.example.model.Person;
 
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -25,6 +27,19 @@ import java.util.stream.Stream;
  * メモリに全件載せないでExcelを処理する方法
  */
 public class RealStreamingDemo {
+
+    @AfterAll
+    static void tearDown() throws IOException {
+        // テスト終了時に生成されたファイルを削除
+        Path hugeExcel = Paths.get("target/huge_data.xlsx");
+        if (Files.exists(hugeExcel)) {
+            try {
+                Files.delete(hugeExcel);
+            } catch (IOException e) {
+                // 削除に失敗しても続行（ファイルがロックされている場合など）
+            }
+        }
+    }
 
     @Test
     @DisplayName("🚀 正しいストリーミング処理 - メモリに全件載せない！")

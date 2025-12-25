@@ -5,11 +5,13 @@ import com.example.model.Person;
 
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -21,6 +23,19 @@ import java.util.concurrent.atomic.AtomicInteger;
  * メモリに優しいグルーピング方法を紹介
  */
 public class GroupingStreamingDemo {
+
+    @AfterAll
+    static void tearDown() throws IOException {
+        // テスト終了時に生成されたファイルを削除
+        Path groupingExcel = Paths.get("target/grouping_data.xlsx");
+        if (Files.exists(groupingExcel)) {
+            try {
+                Files.delete(groupingExcel);
+            } catch (IOException e) {
+                // 削除に失敗しても続行（ファイルがロックされている場合など）
+            }
+        }
+    }
 
     @Test
     @DisplayName("📊 グルーピング処理の正しい方法")
