@@ -8,12 +8,15 @@ import java.io.InputStreamReader;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
+import com.opencsv.CSVWriter;
 import com.opencsv.exceptions.CsvException;
+import com.opencsv.exceptions.CsvValidationException;
 import com.example.common.config.CharsetType;
 import com.example.common.config.FileType;
 import com.example.common.mapping.FieldMappingCache;
@@ -186,19 +189,6 @@ public class CsvStreamReader<T> {
     }
 
     /**
-     * 文字コードとBOMの情報を保持する内部クラス
-     */
-    private static class CharsetAndBom {
-        final Charset charset;
-        final boolean withBom;
-        
-        CharsetAndBom(Charset charset, boolean withBom) {
-            this.charset = charset;
-            this.withBom = withBom;
-        }
-    }
-
-    /**
      * 戻り値不要の処理用ショートカット
      * 
      * @param consumer Streamを消費する処理
@@ -210,6 +200,29 @@ public class CsvStreamReader<T> {
             consumer.accept(stream);
             return null;
         });
+    }
+    
+    /**
+     * CSV行が空かどうかを判定（CsvColumnValidatorと同じロジック）
+     * 
+     * @param row CSV行
+     * @return 空行の場合true
+     */
+    private static boolean isRowEmptyForCsv(String[] row) {
+        return row.length == 1 && row[0].isEmpty();
+    }
+
+    /**
+     * 文字コードとBOMの情報を保持する内部クラス
+     */
+    private static class CharsetAndBom {
+        final Charset charset;
+        final boolean withBom;
+        
+        CharsetAndBom(Charset charset, boolean withBom) {
+            this.charset = charset;
+            this.withBom = withBom;
+        }
     }
     
     /**
@@ -304,6 +317,218 @@ public class CsvStreamReader<T> {
          */
         public void consume(Consumer<Stream<T>> consumer) throws IOException, CsvException {
             reader.consume(consumer);
+        }
+        
+        /**
+         * 列数チェックを有効にしてCSVファイルを読み込み、エラー行も含めた結果を返す
+         * 
+         * <p>列数が不一致の行はスキップされ、エラー情報として記録されます。
+         * 処理は最後まで続行され、成功した行とエラー行の情報が返されます。</p>
+         * 
+         * @return CsvReadResult（成功した行のデータとエラー行の情報を含む）
+         * @throws IOException ファイル読み込みエラー
+         * @throws CsvException CSV解析エラー
+         */
+        public CsvReadResult<T> readWithValidation() throws IOException, CsvException {
+            // マッピング戦略が未設定の場合、アノテーションから自動判定
+            if (reader.usePositionMapping == null) {
+                reader.usePositionMapping = MappingStrategyDetector.detectUsePositionMapping(reader.beanClass)
+                        .orElse(false); // デフォルトはヘッダーベース
+            }
+
+            // 文字コードとBOMを決定
+            CharsetAndBom charsetAndBom = reader.determineCharsetAndBom();
+            Charset charset = charsetAndBom.charset;
+            boolean withBom = charsetAndBom.withBom;
+            
+            // 列数チェックを実行してエラー行を収集
+            List<CsvReadError> columnErrors = CsvColumnValidator.validateAndCollectErrors(
+                reader.filePath, charset, withBom, reader.fileType.getDelimiter().charAt(0)
+            );
+            
+            // エラー行の行番号をSetに変換して高速検索
+            java.util.Set<Integer> errorLineNumbers = columnErrors.stream()
+                .map(CsvReadError::getLineNumber)
+                .collect(java.util.stream.Collectors.toSet());
+
+            // エラー行を除外した一時ファイルを作成
+            java.nio.file.Path tempFile = null;
+            java.util.Map<Integer, Integer> originalLineNumberMap = new java.util.HashMap<>();
+            try {
+                if (!errorLineNumbers.isEmpty()) {
+                    TempFileResult tempFileResult = createTempFileWithoutErrors(
+                        charset, withBom, errorLineNumbers);
+                    tempFile = tempFileResult.tempFile;
+                    originalLineNumberMap = tempFileResult.originalLineNumberMap;
+                }
+
+                // エラー行を除外したファイル（または元のファイル）を読み込む
+                java.nio.file.Path fileToRead = tempFile != null ? tempFile : reader.filePath;
+                List<T> data = readDataFromFile(fileToRead, charset, withBom, originalLineNumberMap);
+                
+                return new CsvReadResult<>(data, columnErrors);
+            } catch (IOException e) {
+                log.error("CSVファイル読み込み中にエラーが発生: ファイルパス={}, エラー={}", 
+                         reader.filePath, e.getMessage(), e);
+                throw new CsvReadException("CSVファイルの読み込みに失敗しました: " + reader.filePath, e);
+            } finally {
+                // 一時ファイルを削除
+                if (tempFile != null) {
+                    try {
+                        java.nio.file.Files.deleteIfExists(tempFile);
+                    } catch (IOException e) {
+                        log.warn("一時ファイルの削除に失敗しました: {}", tempFile, e);
+                    }
+                }
+            }
+        }
+        
+        /**
+         * エラー行を除外した一時ファイルを作成
+         */
+        private TempFileResult createTempFileWithoutErrors(Charset charset, boolean withBom,
+                java.util.Set<Integer> errorLineNumbers) throws IOException, CsvException {
+            java.nio.file.Path tempFile = java.nio.file.Files.createTempFile("csv-read-", ".csv");
+            java.util.Map<Integer, Integer> originalLineNumberMap = new java.util.HashMap<>();
+            
+            try (FileInputStream fis1 = new FileInputStream(reader.filePath.toFile());
+                 InputStream is1 = withBom ? BomHandler.skipBom(fis1) : fis1;
+                 InputStreamReader isr1 = new InputStreamReader(is1, charset);
+                 com.opencsv.CSVReader csvReader = new com.opencsv.CSVReaderBuilder(isr1)
+                     .withCSVParser(new com.opencsv.CSVParserBuilder()
+                         .withSeparator(reader.fileType.getDelimiter().charAt(0))
+                         .withQuoteChar('"')
+                         .withIgnoreQuotations(false)
+                         .withIgnoreLeadingWhiteSpace(true)
+                         .build())
+                     .withFieldAsNull(com.opencsv.enums.CSVReaderNullFieldIndicator.NEITHER)
+                     .build();
+                 java.io.FileOutputStream fos = new java.io.FileOutputStream(tempFile.toFile());
+                 java.io.OutputStreamWriter osw = new java.io.OutputStreamWriter(fos, charset);
+                 CSVWriter csvWriter = new CSVWriter(osw, 
+                     reader.fileType.getDelimiter().charAt(0),
+                     CSVWriter.DEFAULT_QUOTE_CHARACTER,
+                     CSVWriter.DEFAULT_ESCAPE_CHARACTER,
+                     CSVWriter.DEFAULT_LINE_END)) {
+                
+                String[] row;
+                int logicalLineNumber = 0; // 論理的な行番号（空行をスキップ）
+                int tempFileLineNumber = 0;
+                
+                try {
+                    row = csvReader.readNext();
+                    while (row != null) {
+                        // 空行をスキップ（CsvColumnValidatorと同じロジック）
+                        if (isRowEmptyForCsv(row)) {
+                            // 空行も一時ファイルに書き込む（CSV形式で）
+                            csvWriter.writeNext(new String[]{""}, false);
+                            row = csvReader.readNext();
+                            continue;
+                        }
+                        logicalLineNumber++;
+                        
+                        // エラー行でない場合は一時ファイルに書き込む
+                        if (!errorLineNumbers.contains(logicalLineNumber)) {
+                            tempFileLineNumber++;
+                            // CSVパーサーが解析した行をそのままCSV形式で書き込む
+                            csvWriter.writeNext(row, false);
+                            // 一時ファイルの行番号 → 元のファイルの論理的行番号のマッピング
+                            originalLineNumberMap.put(tempFileLineNumber, logicalLineNumber);
+                        }
+                        // エラー行はスキップ（一時ファイルに書き込まない）
+                        
+                        row = csvReader.readNext();
+                    }
+                } catch (CsvValidationException e) {
+                    throw new CsvReadException("CSVファイルの読み込みに失敗しました: " + reader.filePath, e);
+                }
+            }
+            
+            return new TempFileResult(tempFile, originalLineNumberMap);
+        }
+        
+        /**
+         * ファイルからデータを読み込む
+         */
+        private List<T> readDataFromFile(java.nio.file.Path fileToRead, Charset charset, 
+                boolean withBom, java.util.Map<Integer, Integer> originalLineNumberMap) 
+                throws IOException, CsvException {
+            try (FileInputStream fis = new FileInputStream(fileToRead.toFile());
+                 InputStream is = withBom ? BomHandler.skipBom(fis) : fis;
+                 InputStreamReader isr = new InputStreamReader(is, charset)) {
+                
+                MappingStrategy<T> strategy = MappingStrategyFactory.createStrategy(
+                    reader.beanClass, reader.usePositionMapping);
+                
+                CsvToBean<T> csvToBean = new CsvToBeanBuilder<T>(isr)
+                        .withMappingStrategy(strategy)
+                        .withSeparator(reader.fileType.getDelimiter().charAt(0))
+                        .withIgnoreLeadingWhiteSpace(true)
+                        .withIgnoreEmptyLine(true)
+                        .build();
+                
+                Stream<T> stream = csvToBean.stream();
+
+                // 行番号フィールドが存在する場合は行番号を設定
+                FieldMappingCache fieldMappingCache = new FieldMappingCache(reader.beanClass);
+                if (fieldMappingCache.hasLineNumberField()) {
+                    stream = setLineNumbers(stream, fieldMappingCache, originalLineNumberMap);
+                }
+
+                // データ行をスキップする処理
+                if (reader.skipLines > 0) {
+                    stream = stream.skip(reader.skipLines);
+                }
+
+                // ストリームからデータを収集
+                return stream.collect(java.util.stream.Collectors.toList());
+            }
+        }
+        
+        /**
+         * ストリームの各行に元のファイルの行番号を設定
+         */
+        private Stream<T> setLineNumbers(Stream<T> stream, FieldMappingCache fieldMappingCache,
+                java.util.Map<Integer, Integer> originalLineNumberMap) {
+            java.lang.reflect.Field lineNumberField = fieldMappingCache.getLineNumberField();
+            Class<?> fieldType = lineNumberField.getType();
+
+            // 位置ベースマッピング（ヘッダーなし）の場合は1行目から、
+            // ヘッダーベースマッピングの場合は2行目からデータが始まる
+            int startLineNumber = (reader.usePositionMapping != null && reader.usePositionMapping) ? 1 : 2;
+            AtomicInteger tempFileLineNumber = new AtomicInteger(startLineNumber);
+
+            return stream.peek(bean -> {
+                try {
+                    int currentTempFileLineNumber = tempFileLineNumber.getAndIncrement();
+                    // 一時ファイルの行番号から元のファイルの行番号を取得
+                    Integer originalLineNumber = originalLineNumberMap.get(currentTempFileLineNumber);
+                    int lineNumberToSet = originalLineNumber != null ? originalLineNumber : currentTempFileLineNumber;
+                    
+                    if (fieldType == Integer.class || fieldType == int.class) {
+                        lineNumberField.set(bean, lineNumberToSet);
+                    } else if (fieldType == Long.class || fieldType == long.class) {
+                        lineNumberField.set(bean, (long) lineNumberToSet);
+                    }
+                } catch (IllegalAccessException e) {
+                    log.error("行番号の設定に失敗しました: bean={}", bean, e);
+                    throw new CsvReadException("行番号の設定に失敗しました", e);
+                }
+            });
+        }
+        
+        /**
+         * 一時ファイル作成結果を保持する内部クラス
+         */
+        private static class TempFileResult {
+            final java.nio.file.Path tempFile;
+            final java.util.Map<Integer, Integer> originalLineNumberMap;
+            
+            TempFileResult(java.nio.file.Path tempFile, 
+                    java.util.Map<Integer, Integer> originalLineNumberMap) {
+                this.tempFile = tempFile;
+                this.originalLineNumberMap = originalLineNumberMap;
+            }
         }
     }
 }

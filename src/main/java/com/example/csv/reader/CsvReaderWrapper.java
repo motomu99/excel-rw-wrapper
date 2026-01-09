@@ -12,7 +12,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
 
+import com.opencsv.CSVWriter;
 import com.opencsv.exceptions.CsvException;
+import com.opencsv.exceptions.CsvValidationException;
 import com.example.common.config.CharsetType;
 import com.example.common.config.FileType;
 import com.example.common.mapping.MappingStrategyDetector;
@@ -271,6 +273,55 @@ public class CsvReaderWrapper {
             }
         }
     }
+    
+    /**
+     * 行番号を設定（元のファイルの行番号マッピングを使用）
+     *
+     * <p>@LineNumberアノテーションが付与されたフィールドがある場合、行番号を設定します。
+     * エラー行を除外した一時ファイルを使用している場合、元のファイルの行番号を設定します。</p>
+     *
+     * @param <T> Beanの型
+     * @param result Beanのリスト
+     * @param usePositionMapping 位置ベースマッピングを使用するかどうか
+     * @param originalLineNumberMap 一時ファイルの行番号 → 元のファイルの行番号のマッピング
+     */
+    private <T> void setLineNumbersWithMapping(List<T> result, Boolean usePositionMapping, 
+                                               java.util.Map<Integer, Integer> originalLineNumberMap) {
+        if (result.isEmpty()) {
+            return;
+        }
+
+        // FieldMappingCacheから行番号フィールドを取得
+        FieldMappingCache fieldMappingCache = new FieldMappingCache(result.get(0).getClass());
+        if (!fieldMappingCache.hasLineNumberField()) {
+            return;
+        }
+
+        java.lang.reflect.Field lineNumberField = fieldMappingCache.getLineNumberField();
+        Class<?> fieldType = lineNumberField.getType();
+
+        // 位置ベースマッピング（ヘッダーなし）の場合は1行目から、
+        // ヘッダーベースマッピングの場合は2行目からデータが始まる
+        int tempFileLineNumber = (usePositionMapping != null && usePositionMapping) ? 1 : 2;
+
+        for (T bean : result) {
+            try {
+                // 一時ファイルの行番号から元のファイルの行番号を取得
+                Integer originalLineNumber = originalLineNumberMap.get(tempFileLineNumber);
+                int lineNumberToSet = originalLineNumber != null ? originalLineNumber : tempFileLineNumber;
+                
+                if (fieldType == Integer.class || fieldType == int.class) {
+                    lineNumberField.set(bean, lineNumberToSet);
+                } else if (fieldType == Long.class || fieldType == long.class) {
+                    lineNumberField.set(bean, (long) lineNumberToSet);
+                }
+                tempFileLineNumber++;
+            } catch (IllegalAccessException e) {
+                log.error("行番号の設定に失敗しました: tempFileLineNumber={}, bean={}", tempFileLineNumber, bean, e);
+                throw new CsvReadException("行番号の設定に失敗しました", e);
+            }
+        }
+    }
 
     /**
      * CSVファイルを読み込んでRowDataのListとして返す
@@ -297,7 +348,158 @@ public class CsvReaderWrapper {
         
         return rowDataList;
     }
+    
+    /**
+     * 列数チェックを有効にしてCSVファイルを読み込み、エラー行も含めた結果を返す
+     * 
+     * <p>列数が不一致の行はスキップされ、エラー情報として記録されます。
+     * 処理は最後まで続行され、成功した行とエラー行の情報が返されます。</p>
+     * 
+     * @param <T> Beanの型
+     * @return CsvReadResult（成功した行のデータとエラー行の情報を含む）
+     * @throws CsvReadException CSV読み込みエラー
+     */
+    @SuppressWarnings("PMD.AvoidLiteralsInIfCondition")
+    public <T> CsvReadResult<T> readWithValidation() {
+        // マッピング戦略が未設定の場合、アノテーションから自動判定
+        if (usePositionMapping == null) {
+            usePositionMapping = MappingStrategyDetector.detectUsePositionMapping(beanClass)
+                    .orElse(false); // デフォルトはヘッダーベース
+        }
 
+        // 文字コードが明示的に指定されていない場合は自動判別
+        if (charsetType == null) {
+            detectCharsetAndBom();
+        }
+
+        // 列数チェックを実行してエラー行を収集
+        List<CsvReadError> columnErrors = CsvColumnValidator.validateAndCollectErrors(
+            filePath, charset, withBom, fileType.getDelimiter().charAt(0)
+        );
+        
+        // エラー行の行番号をSetに変換して高速検索
+        java.util.Set<Integer> errorLineNumbers = columnErrors.stream()
+            .map(CsvReadError::getLineNumber)
+            .collect(java.util.stream.Collectors.toSet());
+
+        // エラー行を除外した一時ファイルを作成
+        // 元のファイルの行番号と一時ファイルの行番号のマッピングを作成
+        Path tempFile = null;
+        java.util.Map<Integer, Integer> originalLineNumberMap = new java.util.HashMap<>();
+        try {
+            if (!errorLineNumbers.isEmpty()) {
+                // エラー行を除外した一時ファイルを作成
+                // CsvColumnValidatorと同じロジックで空行をスキップして論理的な行番号を追跡
+                tempFile = java.nio.file.Files.createTempFile("csv-read-", ".csv");
+                try (FileInputStream fis1 = new FileInputStream(filePath.toFile());
+                     InputStream is1 = withBom ? BomHandler.skipBom(fis1) : fis1;
+                     InputStreamReader isr1 = new InputStreamReader(is1, charset);
+                     com.opencsv.CSVReader csvReader = new com.opencsv.CSVReaderBuilder(isr1)
+                         .withCSVParser(new com.opencsv.CSVParserBuilder()
+                             .withSeparator(fileType.getDelimiter().charAt(0))
+                             .withQuoteChar('"')
+                             .withIgnoreQuotations(false)
+                             .withIgnoreLeadingWhiteSpace(true)
+                             .build())
+                         .withFieldAsNull(com.opencsv.enums.CSVReaderNullFieldIndicator.NEITHER)
+                         .build();
+                     java.io.FileOutputStream fos = new java.io.FileOutputStream(tempFile.toFile());
+                     java.io.OutputStreamWriter osw = new java.io.OutputStreamWriter(fos, charset);
+                     CSVWriter csvWriter = new CSVWriter(osw, 
+                         fileType.getDelimiter().charAt(0),
+                         CSVWriter.DEFAULT_QUOTE_CHARACTER,
+                         CSVWriter.DEFAULT_ESCAPE_CHARACTER,
+                         CSVWriter.DEFAULT_LINE_END)) {
+                    
+                    String[] row;
+                    int logicalLineNumber = 0; // 論理的な行番号（空行をスキップ）
+                    int tempFileLineNumber = 0;
+                    
+                    try {
+                        row = csvReader.readNext();
+                        while (row != null) {
+                            // 空行をスキップ（CsvColumnValidatorと同じロジック）
+                            if (isRowEmptyForCsv(row)) {
+                                // 空行も一時ファイルに書き込む（CSV形式で）
+                                csvWriter.writeNext(new String[]{""}, false);
+                                row = csvReader.readNext();
+                                continue;
+                            }
+                            logicalLineNumber++;
+                            
+                            // エラー行でない場合は一時ファイルに書き込む
+                            if (!errorLineNumbers.contains(logicalLineNumber)) {
+                                tempFileLineNumber++;
+                                // CSVパーサーが解析した行をそのままCSV形式で書き込む
+                                csvWriter.writeNext(row, false);
+                                // 一時ファイルの行番号 → 元のファイルの論理的行番号のマッピング
+                                originalLineNumberMap.put(tempFileLineNumber, logicalLineNumber);
+                            }
+                            // エラー行はスキップ（一時ファイルに書き込まない）
+                            
+                            row = csvReader.readNext();
+                        }
+                    } catch (CsvValidationException e) {
+                        throw new CsvReadException("CSVファイルの読み込みに失敗しました: " + filePath, e);
+                    }
+                }
+            }
+
+            // エラー行を除外したファイル（または元のファイル）を読み込む
+            Path fileToRead = tempFile != null ? tempFile : filePath;
+            
+            try (FileInputStream fis = new FileInputStream(fileToRead.toFile());
+                 InputStream is = withBom ? BomHandler.skipBom(fis) : fis;
+                 InputStreamReader isr = new InputStreamReader(is, charset)) {
+                
+                MappingStrategy<T> strategy = createMappingStrategy();
+                
+                CsvToBean<T> csvToBean = new CsvToBeanBuilder<T>(isr)
+                        .withMappingStrategy(strategy)
+                        .withSeparator(fileType.getDelimiter().charAt(0))
+                        .withIgnoreLeadingWhiteSpace(true)
+                        .withIgnoreEmptyLine(true)
+                        .build();
+
+                List<T> result = csvToBean.parse();
+
+                // 行番号フィールドが存在する場合は行番号を設定
+                // エラー行を除外したファイルの場合は、元のファイルの行番号を設定
+                if (!originalLineNumberMap.isEmpty()) {
+                    setLineNumbersWithMapping(result, usePositionMapping, originalLineNumberMap);
+                } else {
+                    setLineNumbers(result, usePositionMapping);
+                }
+
+                List<T> finalData = applySkipLines(result);
+                
+                return new CsvReadResult<>(finalData, columnErrors);
+            }
+        } catch (IOException e) {
+            log.error("CSVファイル読み込み中にエラーが発生: ファイルパス={}, エラー={}", filePath, e.getMessage(), e);
+            throw new CsvReadException("CSVファイルの読み込みに失敗しました: " + filePath, e);
+        } finally {
+            // 一時ファイルを削除
+            if (tempFile != null) {
+                try {
+                    java.nio.file.Files.deleteIfExists(tempFile);
+                } catch (IOException e) {
+                    log.warn("一時ファイルの削除に失敗しました: {}", tempFile, e);
+                }
+            }
+        }
+    }
+
+    /**
+     * CSV行が空かどうかを判定（CsvColumnValidatorと同じロジック）
+     * 
+     * @param row CSV行
+     * @return 空行の場合true
+     */
+    private static boolean isRowEmptyForCsv(String[] row) {
+        return row.length == 1 && row[0].isEmpty();
+    }
+    
     /**
      * スキップ行数を適用
      *
@@ -546,6 +748,27 @@ public class CsvReaderWrapper {
                 path -> wrapper.cloneConfig(path).readWithLineNumber(),
                 parallelism
             );
+        }
+        
+        /**
+         * 列数チェックを有効にしてCSVファイルを読み込み、エラー行も含めた結果を返す
+         * 
+         * <p>列数が不一致の行はスキップされ、エラー情報として記録されます。
+         * 処理は最後まで続行され、成功した行とエラー行の情報が返されます。</p>
+         * 
+         * @param <T> Beanの型
+         * @return CsvReadResult（成功した行のデータとエラー行の情報を含む）
+         * @throws CsvReadException CSV読み込みエラー
+         */
+        @SuppressWarnings("PMD.AvoidLiteralsInIfCondition")
+        public <T> CsvReadResult<T> readWithValidation() {
+            // 複数ファイルの場合は未サポート（意図が明確なリテラル使用）
+            final int singleFileThreshold = 1;
+            if (filePaths.size() > singleFileThreshold) {
+                throw new CsvReadException("列数チェック機能は単一ファイルのみサポートしています");
+            }
+            
+            return wrapper.readWithValidation();
         }
     }
 }

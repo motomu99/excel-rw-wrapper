@@ -397,5 +397,47 @@ public class ExcelReader<T> {
                 throw e;
             }
         }
+        
+        /**
+         * 列数チェックを有効にしてExcelファイルを読み込み、エラー行も含めた結果を返す
+         * 
+         * <p>列数が不一致の行はスキップされ、エラー情報として記録されます。
+         * 処理は最後まで続行され、成功した行とエラー行の情報が返されます。</p>
+         * 
+         * @return ExcelReadResult（成功した行のデータとエラー行の情報を含む）
+         * @throws IOException ファイル読み込みエラー
+         */
+        @SuppressWarnings("PMD.AvoidLiteralsInIfCondition")
+        public ExcelReadResult<T> readWithValidation() throws IOException {
+            // 複数ファイルの場合は未サポート（意図が明確なリテラル使用）
+            final int singleFileThreshold = 1;
+            if (filePaths.size() > singleFileThreshold) {
+                throw new IOException("列数チェック機能は単一ファイルのみサポートしています");
+            }
+            
+            // ExcelStreamReaderの内部実装を再利用
+            ExcelStreamReader.Builder<T> builder = ExcelStreamReader.builder(reader.beanClass, reader.filePath)
+                .sheetIndex(reader.sheetIndex)
+                .skip(reader.skipLines)
+                .headerSearchRows(reader.headerSearchRows);
+            
+            if (reader.sheetName != null) {
+                builder.sheetName(reader.sheetName);
+            }
+            
+            if (reader.usePositionMapping != null) {
+                if (reader.usePositionMapping) {
+                    builder.usePositionMapping();
+                } else {
+                    builder.useHeaderMapping();
+                }
+            }
+            
+            if (reader.headerKeyColumn != null) {
+                builder.headerKey(reader.headerKeyColumn);
+            }
+            
+            return builder.readWithValidation();
+        }
     }
 }

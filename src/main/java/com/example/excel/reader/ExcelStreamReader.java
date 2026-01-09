@@ -264,6 +264,63 @@ public class ExcelStreamReader<T> {
             throw new IOException("Excelファイルオープン中にエラー: " + path, e);
         }
     }
+    
+    /**
+     * 列数チェックを有効にしたリソースを開く
+     */
+    @SuppressWarnings({"PMD.AvoidInstanceofChecksInCatchClause", "PMD.EmptyCatchBlock"})
+    private OpenedResourceWithValidation<T> openResourceWithValidation(Path path) throws IOException {
+        if (!Files.exists(path)) {
+            throw new IOException("ファイルが存在しません: " + path);
+        }
+        if (!Files.isReadable(path)) {
+            throw new IOException("ファイルを読み込めません: " + path);
+        }
+
+        FileInputStream fis = new FileInputStream(path.toFile());
+        Workbook workbook = null;
+        
+        try {
+            workbook = StreamingReader.builder()
+                 .rowCacheSize(DEFAULT_ROW_CACHE_SIZE)
+                 .bufferSize(DEFAULT_BUFFER_SIZE)
+                 .open(fis);
+
+            Sheet sheet;
+            try {
+                sheet = getSheet(workbook);
+            } catch (MissingSheetException e) {
+                throwSheetNotFound();
+                return null; // unreachable
+            }
+            if (sheet == null) {
+                throwSheetNotFound();
+            }
+            
+            ExcelRowIterator<T> iterator = createStreamingIteratorWithValidation(sheet);
+            
+            return new OpenedResourceWithValidation<>(fis, workbook, iterator);
+        } catch (Exception e) {
+            // エラー発生時のクリーンアップ: リソースクローズ時のエラーは無視する（意図的な実装）
+            if (workbook != null) {
+                try { 
+                    workbook.close(); 
+                } catch (IOException ignore) {
+                    // クローズ時のエラーは無視（既に例外が発生しているため）
+                }
+            }
+            try { 
+                fis.close(); 
+            } catch (IOException ignore) {
+                // クローズ時のエラーは無視（既に例外が発生しているため）
+            }
+            
+            // 例外の型に応じて再スロー（catch句の外でのinstanceofチェックは意図的な実装）
+            if (e instanceof IOException) throw (IOException) e;
+            if (e instanceof RuntimeException) throw (RuntimeException) e;
+            throw new IOException("Excelファイルオープン中にエラー: " + path, e);
+        }
+    }
 
     /**
      * ストリーミング処理用のIteratorを作成
@@ -276,7 +333,24 @@ public class ExcelStreamReader<T> {
             headerKeyColumn, 
             headerSearchRows, 
             usePositionMapping,
-            usePositionMapping // 位置ベースマッピングの場合は最初の行もデータとして扱う
+            usePositionMapping, // 位置ベースマッピングの場合は最初の行もデータとして扱う
+            false // 列数チェックはデフォルトで無効（後方互換性のため）
+        );
+    }
+    
+    /**
+     * 列数チェックを有効にしたストリーミング処理用のIteratorを作成
+     * 行ごとにBeanを生成することでメモリ効率を向上
+     */
+    private ExcelRowIterator<T> createStreamingIteratorWithValidation(Sheet sheet) {
+        return new ExcelRowIterator<>(
+            sheet.iterator(), 
+            beanClass, 
+            headerKeyColumn, 
+            headerSearchRows, 
+            usePositionMapping,
+            usePositionMapping, // 位置ベースマッピングの場合は最初の行もデータとして扱う
+            true // 列数チェックを有効化
         );
     }
 
@@ -307,6 +381,24 @@ public class ExcelStreamReader<T> {
         final Iterator<T> iterator;
         
         OpenedResource(FileInputStream fis, Workbook workbook, Iterator<T> iterator) {
+            this.fis = fis;
+            this.workbook = workbook;
+            this.iterator = iterator;
+        }
+        
+        @Override
+        public void close() throws IOException {
+            if (workbook != null) workbook.close();
+            if (fis != null) fis.close();
+        }
+    }
+    
+    private static class OpenedResourceWithValidation<T> implements AutoCloseable {
+        final FileInputStream fis;
+        final Workbook workbook;
+        final ExcelRowIterator<T> iterator;
+        
+        OpenedResourceWithValidation(FileInputStream fis, Workbook workbook, ExcelRowIterator<T> iterator) {
             this.fis = fis;
             this.workbook = workbook;
             this.iterator = iterator;
@@ -554,6 +646,49 @@ public class ExcelStreamReader<T> {
                 log.warn("ExcelStreamReader does not support parallel reading to avoid OOM. Processing sequentially.");
             }
             return this;
+        }
+        
+        /**
+         * 列数チェックを有効にしてExcelファイルを読み込み、エラー行も含めた結果を返す
+         * 
+         * <p>列数が不一致の行はスキップされ、エラー情報として記録されます。
+         * 処理は最後まで続行され、成功した行とエラー行の情報が返されます。</p>
+         * 
+         * @return ExcelReadResult（成功した行のデータとエラー行の情報を含む）
+         * @throws IOException ファイル読み込みエラー
+         */
+        @SuppressWarnings("PMD.AvoidLiteralsInIfCondition")
+        public ExcelReadResult<T> readWithValidation() throws IOException {
+            // 複数ファイルの場合は未サポート（意図が明確なリテラル使用）
+            final int singleFileThreshold = 1;
+            if (filePaths.size() > singleFileThreshold) {
+                throw new IOException("列数チェック機能は単一ファイルのみサポートしています");
+            }
+            
+            reader.resolveMappingStrategy();
+            try (OpenedResourceWithValidation<T> resource = reader.openResourceWithValidation(reader.filePath)) {
+                List<T> data = new java.util.ArrayList<>();
+                try (Stream<T> stream = StreamSupport.stream(
+                    Spliterators.spliteratorUnknownSize(resource.iterator, 0), 
+                    false
+                )) {
+                    Stream<T> processedStream = reader.skipLines > 0 ? stream.skip(reader.skipLines) : stream;
+                    processedStream.forEach(data::add);
+                } catch (UncheckedExcelException e) {
+                    throw reader.toIOException(e);
+                }
+                
+                List<ExcelReadError> errors = resource.iterator.getErrors();
+                return new ExcelReadResult<>(data, errors);
+            } catch (IOException e) {
+                log.error("Excelファイル読み込み中にエラーが発生: ファイルパス={}, エラー={}", 
+                         reader.filePath, e.getMessage(), e);
+                throw e;
+            } catch (Exception e) {
+                log.error("Excel処理中にエラーが発生: ファイルパス={}, エラー={}", 
+                         reader.filePath, e.getMessage(), e);
+                throw new IOException("Excel処理中にエラーが発生しました", e);
+            }
         }
         
     }

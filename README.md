@@ -231,6 +231,65 @@ try {
 - CSV/TSVの両方で動作（区切り文字は自動判定）
 - ダブルクォート内の区切り文字は正しく処理されます
 
+#### 列数不一致でも最後まで読み込む機能（readWithValidation）
+
+列数が不一致の行があっても処理を止めず、最後まで読み込んでエラー行の情報を取得できます。
+
+**CSVの場合:**
+```java
+// 列数不一致の行をスキップして最後まで読み込む
+CsvReadResult<Person> result = CsvReaderWrapper.builder(Person.class, Paths.get("sample.csv"))
+    .readWithValidation();
+
+// 成功した行のデータを取得
+List<Person> data = result.getData();
+
+// エラー行の情報を取得
+List<CsvReadError> errors = result.getErrors();
+
+// エラーがあるかチェック
+if (result.hasErrors()) {
+    System.out.println("エラー行数: " + result.getErrorCount());
+    errors.forEach(error -> {
+        System.out.println("行番号: " + error.getLineNumber() + 
+                          ", 期待値: " + error.getExpectedColumnCount() +
+                          ", 実際: " + error.getActualColumnCount());
+    });
+}
+```
+
+**Excelの場合:**
+```java
+// 列数不一致の行をスキップして最後まで読み込む
+ExcelReadResult<Person> result = ExcelReader.builder(Person.class, Paths.get("sample.xlsx"))
+    .readWithValidation();
+
+// 成功した行のデータを取得
+List<Person> data = result.getData();
+
+// エラー行の情報を取得
+List<ExcelReadError> errors = result.getErrors();
+
+// エラーがあるかチェック
+if (result.hasErrors()) {
+    System.out.println("エラー行数: " + result.getErrorCount());
+    errors.forEach(error -> {
+        System.out.println("行番号: " + error.getLineNumber() + 
+                          ", 期待値: " + error.getExpectedColumnCount() +
+                          ", 実際: " + error.getActualColumnCount());
+    });
+}
+```
+
+**動作:**
+- 列数不一致の行はスキップされ、エラー情報として記録されます
+- 処理は最後まで続行されます
+- 成功した行のデータとエラー行の情報の両方が返されます
+- CSV/TSV/Excelの全てで動作します
+- `CsvStreamReader`と`ExcelStreamReader`でも使用可能です
+
+**注意:** `readWithValidation()`は単一ファイルのみサポートしています。複数ファイルの場合は通常の`read()`メソッドを使用してください。
+
 #### 従来のAPI（互換性維持）
 
 既存コードとの互換性のため、従来の`execute()`メソッドも引き続き使用できます。
@@ -269,6 +328,19 @@ List<Person> persons = CsvReaderWrapper.builder(Person.class, files)
 レコードをJava Streamとして扱える軽量リーダー。メモリに載せずに逐次処理したいときに最適だよ！
 
 **注意:** `CsvStreamReader`も`CsvReaderWrapper`と同様に、読み込み前に自動的に列数検証が行われます。列数が不一致の場合は`CsvReadException`がスローされます。
+
+**列数不一致でも最後まで読み込む機能:**
+`CsvStreamReader`でも`readWithValidation()`メソッドを使用することで、列数不一致の行をスキップして最後まで読み込むことができます。
+
+```java
+// CsvStreamReaderで列数不一致の行をスキップして最後まで読み込む
+CsvReadResult<Person> result = CsvStreamReader.builder(Person.class, Paths.get("sample.csv"))
+    .readWithValidation();
+
+// 成功した行のデータとエラー行の情報を取得
+List<Person> data = result.getData();
+List<CsvReadError> errors = result.getErrors();
+```
 
 #### 基本（Listに集約）
 
@@ -848,6 +920,45 @@ List<Person> persons = ExcelReader.builder(Person.class, excelFiles)
 
 **注意**: 大きなファイルの場合は、メモリに全てのデータを保持するため、`ExcelStreamReader`を使用したストリーミング処理を推奨します。
 
+#### Excel列数チェック機能（readWithValidation）
+
+Excelファイルでも列数不一致の行をスキップして最後まで読み込むことができます。
+
+```java
+// 列数不一致の行をスキップして最後まで読み込む
+ExcelReadResult<Person> result = ExcelReader.builder(Person.class, Paths.get("sample.xlsx"))
+    .readWithValidation();
+
+// 成功した行のデータを取得
+List<Person> data = result.getData();
+
+// エラー行の情報を取得
+List<ExcelReadError> errors = result.getErrors();
+
+// エラーがあるかチェック
+if (result.hasErrors()) {
+    System.out.println("エラー行数: " + result.getErrorCount());
+    errors.forEach(error -> {
+        System.out.println("行番号: " + error.getLineNumber() + 
+                          ", 期待値: " + error.getExpectedColumnCount() +
+                          ", 実際: " + error.getActualColumnCount());
+    });
+}
+
+// ExcelStreamReaderでも同様に使用可能
+ExcelReadResult<Person> result = ExcelStreamReader.builder(Person.class, Paths.get("sample.xlsx"))
+    .readWithValidation();
+```
+
+**動作:**
+- ヘッダー行の列数を基準として設定
+- 列数不一致の行はスキップされ、エラー情報として記録されます
+- 処理は最後まで続行されます
+- 成功した行のデータとエラー行の情報の両方が返されます
+- `ExcelStreamReader`でも使用可能です
+
+**注意:** `readWithValidation()`は単一ファイルのみサポートしています。複数ファイルの場合は通常の`read()`メソッドを使用してください。
+
 ---
 
 ## Excel書き込み機能 📝
@@ -1225,14 +1336,16 @@ Table<Person> table = Table.builder(Person.class)
   - その他の想定外例外は原因を保持したうえで `UncheckedIOException` に包まれる場合があります。
   - そのため、ラムダ内で `try-catch` は基本的に不要です。
 
-- Excel 読み込み（`ExcelStreamReader`）
-  - `extract(...)` / `consume(...)` は **`IOException`（チェック例外）** をスローします。呼び出し元で `try-catch` するか、メソッドに `throws IOException` を付与してください。
+- Excel 読み込み（`ExcelStreamReader` / `ExcelReader`）
+  - `extract(...)` / `consume(...)` / `read()` は **`IOException`（チェック例外）** をスローします。呼び出し元で `try-catch` するか、メソッドに `throws IOException` を付与してください。
   - シートやヘッダー関連のドメイン例外（例: `SheetNotFoundException`, `HeaderNotFoundException`, `KeyColumnNotFoundException`）は、状況に応じて非チェック例外としてスローされます。
+  - `readWithValidation()` を使用した場合、列数不一致の行はスキップされ、エラー情報として `ExcelReadResult` に含まれます。処理は最後まで続行されます。
 
 - CSV 読み込み（`CsvStreamReader` / `CsvReaderWrapper`）
   - `extract(...)` / `consume(...)` は **`IOException`（チェック例外）** と **`CsvException`（チェック例外）** をスローします。
   - 列数が不一致の場合、**非チェック例外**の `CsvReadException` がスローされます。
   - エラーメッセージには行番号、期待される列数、実際の列数、該当行の内容（プレビュー）が含まれます。
+  - `readWithValidation()` を使用した場合、列数不一致の行はスキップされ、エラー情報として `CsvReadResult` に含まれます。処理は最後まで続行されます。
 
 - CSV 書き込み（`CsvStreamWriter` / `CsvWriterWrapper`）
   - 書き込み時のエラーは **非チェック例外**の `CsvWriteException` に変換されます。

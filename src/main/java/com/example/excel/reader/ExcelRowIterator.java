@@ -1,6 +1,8 @@
 package com.example.excel.reader;
 
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
@@ -46,6 +48,15 @@ public class ExcelRowIterator<T> implements Iterator<T> {
     private boolean hasNext = false;
     private boolean hasNextComputed = false;
     private Row pendingFirstDataRow = null;
+    
+    /** 列数チェックを有効にするかどうか */
+    private final boolean validateColumnCount;
+    
+    /** エラー行の情報を収集するリスト */
+    private final List<ExcelReadError> errors;
+    
+    /** 期待される列数（ヘッダー行の列数） */
+    private int expectedColumnCount = -1;
 
     /**
      * ExcelRowIteratorを作成
@@ -55,11 +66,14 @@ public class ExcelRowIterator<T> implements Iterator<T> {
      * @param headerKeyColumn キー列名（nullの場合は最初の行をヘッダーとする）
      * @param headerSearchRows ヘッダー探索行数
      * @param usePositionMapping 位置ベースマッピングを使用するかどうか
+     * @param treatFirstRowAsData 最初の行をデータとして扱うかどうか
+     * @param validateColumnCount 列数チェックを有効にするかどうか
      */
     @SuppressFBWarnings("EI_EXPOSE_REP2")
     public ExcelRowIterator(Iterator<Row> rowIterator, Class<T> beanClass, 
                            String headerKeyColumn, int headerSearchRows, 
-                           boolean usePositionMapping, boolean treatFirstRowAsData) {
+                           boolean usePositionMapping, boolean treatFirstRowAsData,
+                           boolean validateColumnCount) {
         // Iteratorはこのクラス内で読み取り専用として使用されるため、コピーを作成する必要はない
         this.rowIterator = rowIterator;
         this.beanClass = beanClass;
@@ -67,6 +81,35 @@ public class ExcelRowIterator<T> implements Iterator<T> {
         this.headerSearchRows = headerSearchRows;
         this.usePositionMapping = usePositionMapping;
         this.treatFirstRowAsData = treatFirstRowAsData;
+        this.validateColumnCount = validateColumnCount;
+        this.errors = validateColumnCount ? new ArrayList<>() : null;
+    }
+    
+    /**
+     * ExcelRowIteratorを作成（後方互換性のため）
+     * 
+     * @param rowIterator 行のIterator
+     * @param beanClass マッピング先のBeanクラス
+     * @param headerKeyColumn キー列名（nullの場合は最初の行をヘッダーとする）
+     * @param headerSearchRows ヘッダー探索行数
+     * @param usePositionMapping 位置ベースマッピングを使用するかどうか
+     * @param treatFirstRowAsData 最初の行をデータとして扱うかどうか
+     */
+    @SuppressFBWarnings("EI_EXPOSE_REP2")
+    public ExcelRowIterator(Iterator<Row> rowIterator, Class<T> beanClass, 
+                           String headerKeyColumn, int headerSearchRows, 
+                           boolean usePositionMapping, boolean treatFirstRowAsData) {
+        this(rowIterator, beanClass, headerKeyColumn, headerSearchRows, 
+             usePositionMapping, treatFirstRowAsData, false);
+    }
+    
+    /**
+     * エラー行の情報を取得
+     * 
+     * @return エラー行の情報リスト（列数チェックが無効の場合は空リスト）
+     */
+    public List<ExcelReadError> getErrors() {
+        return errors != null ? new ArrayList<>(errors) : new ArrayList<>();
     }
 
     @Override
@@ -101,6 +144,23 @@ public class ExcelRowIterator<T> implements Iterator<T> {
                 if (isEmptyRow(row)) {
                     row = fetchNextRow();
                     continue;
+                }
+
+                // 列数チェック
+                if (validateColumnCount && expectedColumnCount >= 0) {
+                    int actualColumnCount = (int) row.getLastCellNum();
+                    if (actualColumnCount != expectedColumnCount) {
+                        int lineNumber = row.getRowNum() + 1; // 1始まりに変換
+                        ExcelReadError error = ExcelReadError.columnCountMismatch(
+                            lineNumber, expectedColumnCount, actualColumnCount
+                        );
+                        errors.add(error);
+                        log.warn("列数不一致を検出: 行={}, 期待値={}, 実際={}", 
+                                lineNumber, expectedColumnCount, actualColumnCount);
+                        // エラー行はスキップして次の行へ
+                        row = fetchNextRow();
+                        continue;
+                    }
                 }
 
                 // キー列が指定されている場合、その列が空なら終了
@@ -169,6 +229,12 @@ public class ExcelRowIterator<T> implements Iterator<T> {
                     throw new HeaderNotFoundException("必須ヘッダーカラムが見つかりません: " + mappingInfo.getColumnName());
                 }
             }
+        }
+
+        // 列数チェック用に期待される列数を設定
+        if (validateColumnCount && headerDetector.getHeaderRow() != null) {
+            expectedColumnCount = (int) headerDetector.getHeaderRow().getLastCellNum();
+            log.debug("列数チェックを有効化: 期待される列数={}", expectedColumnCount);
         }
 
         if (treatFirstRowAsData && headerKeyColumn == null && usePositionMapping && headerDetector.getHeaderRow() != null) {
