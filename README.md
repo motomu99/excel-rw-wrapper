@@ -24,6 +24,8 @@ OpenCSVをラップしたシンプルなCSV読み込みライブラリです。
 
 **完全ガイド**: [docs/GUIDE.md](docs/GUIDE.md) - 全機能とベストプラクティスをまとめた統合ガイド
 
+**機能一覧**: [docs/FEATURE_LIST.md](docs/FEATURE_LIST.md) - 全機能の一覧と各機能へのリンク
+
 ### 個別ガイド
 
 - [ストリーミング処理のベストプラクティス](docs/STREAMING_BEST_PRACTICES.md) - 大量データをメモリ効率よく処理する方法
