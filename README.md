@@ -75,8 +75,14 @@ import com.example.csv.FileType;
 // 複数の設定を組み合わせ
 List<Person> persons = CsvReaderWrapper.builder(Person.class, Paths.get("data.tsv"))
     .charset(CharsetType.S_JIS)       // 文字セット指定
-    .fileType(FileType.TSV)            // TSVファイル
-    .skipLines(1)                      // 最初の1行をスキップ
+    .fileType(FileType.TSV)           // TSVファイル
+    .skipLines(1)                     // 最初の1行をスキップ
+    .read();
+
+// ダブルクォートの扱いを緩くしたいTSV/CSV（エスケープされていない\"が混ざる等）の場合
+List<Person> looseQuoted = CsvReaderWrapper.builder(Person.class, Paths.get("data_with_quotes.tsv"))
+    .fileType(FileType.TSV)
+    .ignoreQuotations(true)           // クォートを通常文字として扱う（列数チェックにも適用）
     .read();
 ```
 
@@ -387,6 +393,12 @@ List<Person> sjis = CsvStreamReader.builder(Person.class, Paths.get("src/test/re
 
 List<Person> tsv = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.tsv"))
     .fileType(FileType.TSV)
+    .extract(stream -> stream.collect(Collectors.toList()));
+
+// クォート無視オプション（ダブルクォートの崩れがあるTSVなど向け）
+List<Person> tsvLoose = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.tsv"))
+    .fileType(FileType.TSV)
+    .ignoreQuotations(true)           // 列数検証・一時ファイル作成時にクォートを通常文字として扱う
     .extract(stream -> stream.collect(Collectors.toList()));
 ```
 

@@ -34,8 +34,15 @@ List<Person> persons = CsvReaderWrapper.builder(Person.class, Paths.get("path/to
 // 詳細設定
 List<Person> persons = CsvReaderWrapper.builder(Person.class, Paths.get("data.tsv"))
     .charset(CharsetType.S_JIS)       // 文字セット指定
-    .fileType(FileType.TSV)            // TSVファイル
-    .skipLines(1)                      // 最初の1行をスキップ
+    .fileType(FileType.TSV)           // TSVファイル
+    .skipLines(1)                     // 最初の1行をスキップ
+    .read();
+
+// ダブルクォートの崩れを緩く扱いたい場合（TSVなどで値中にエスケープされていない\"が混在するケース）
+// ※ 本来は入力ファイル側を正しいCSV/TSV形式に修正することを推奨
+List<Person> looseQuoted = CsvReaderWrapper.builder(Person.class, Paths.get("broken_quotes.tsv"))
+    .fileType(FileType.TSV)
+    .ignoreQuotations(true)           // 列数検証・一時ファイル作成時にクォートを通常文字として扱う
     .read();
 ```
 
@@ -60,6 +67,12 @@ List<String> namesOver30 = CsvStreamReader.builder(Person.class, Paths.get("samp
         .filter(p -> p.getAge() >= 30)
         .map(Person::getName)
         .collect(Collectors.toList()));
+
+// TSV + クォート無視オプション（TSVでダブルクォートが雑に混ざるようなケース向け）
+List<Person> tsvLoose = CsvStreamReader.builder(Person.class, Paths.get("sample.tsv"))
+    .fileType(FileType.TSV)
+    .ignoreQuotations(true)           // 列数検証・一時ファイル作成でクォートを通常文字扱いにする
+    .extract(stream -> stream.collect(Collectors.toList()));
 ```
 
 ### CSV書き込み

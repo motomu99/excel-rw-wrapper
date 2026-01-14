@@ -88,6 +88,23 @@ public class CsvReaderWrapperTest {
     }
 
     @Test
+    @DisplayName("オプション指定 - ignoreQuotations(true)を指定しても通常のTSVを正しく読み込めること")
+    void testBuilderWithIgnoreQuotationsOption() {
+        // ignoreQuotations オプションを付与しても既存TSVが問題なく読めることを確認
+        List<Person> persons = CsvReaderWrapper.builder(Person.class, Paths.get("src/test/resources/sample.tsv"))
+            .fileType(FileType.TSV)
+            .ignoreQuotations(true)
+            .read();
+
+        assertNotNull(persons);
+        assertEquals(5, persons.size());
+
+        Person firstPerson = persons.get(0);
+        assertEquals("田中太郎", firstPerson.getName());
+        assertEquals(25, firstPerson.getAge());
+    }
+
+    @Test
     @DisplayName("位置ベースマッピング - ヘッダーなしCSVを位置で読み込めること")
     void testBuilderWithPositionMapping() {
         // Builderパターンで位置ベースマッピング

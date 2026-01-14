@@ -126,6 +126,21 @@ public class CsvStreamReaderTest {
     }
 
     @Test
+    @DisplayName("オプション指定 - ignoreQuotations(true)を指定しても通常のTSVをStreamで正しく読み込めること")
+    void testStreamWithIgnoreQuotationsOption() throws IOException, CsvException {
+        List<Person> result = CsvStreamReader.builder(Person.class, Paths.get("src/test/resources/sample.tsv"))
+            .fileType(FileType.TSV)
+            .ignoreQuotations(true)
+            .extract(stream -> stream.collect(Collectors.toList()));
+
+        assertNotNull(result);
+        assertEquals(5, result.size());
+
+        Person firstPerson = result.get(0);
+        assertEquals("田中太郎", firstPerson.getName());
+    }
+
+    @Test
     @DisplayName("位置ベースマッピング - usePositionMapping()でヘッダーなしCSVを読み込めること")
     void testStreamWithPositionMapping() throws IOException, CsvException {
         // 位置ベースマッピングのテスト

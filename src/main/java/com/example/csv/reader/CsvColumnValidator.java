@@ -27,11 +27,11 @@ final class CsvColumnValidator {
         // ユーティリティクラス
     }
 
-    static void validate(Path filePath, Charset charset, boolean withBom, char delimiter) {
+    static void validate(Path filePath, Charset charset, boolean withBom, char delimiter, boolean ignoreQuotations) {
         CSVParser parser = new CSVParserBuilder()
                 .withSeparator(delimiter)
                 .withQuoteChar('"')
-                .withIgnoreQuotations(false)
+                .withIgnoreQuotations(ignoreQuotations)
                 .withIgnoreLeadingWhiteSpace(true)
                 .build();
 
@@ -97,12 +97,12 @@ final class CsvColumnValidator {
      * @param delimiter 区切り文字
      * @return エラー行の情報リスト
      */
-    static List<CsvReadError> validateAndCollectErrors(Path filePath, Charset charset, boolean withBom, char delimiter) {
+    static List<CsvReadError> validateAndCollectErrors(Path filePath, Charset charset, boolean withBom, char delimiter, boolean ignoreQuotations) {
         List<CsvReadError> errors = new ArrayList<>();
         CSVParser parser = new CSVParserBuilder()
                 .withSeparator(delimiter)
                 .withQuoteChar('"')
-                .withIgnoreQuotations(false)
+                .withIgnoreQuotations(ignoreQuotations)
                 .withIgnoreLeadingWhiteSpace(true)
                 .build();
 

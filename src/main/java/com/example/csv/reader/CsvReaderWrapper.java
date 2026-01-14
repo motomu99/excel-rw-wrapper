@@ -71,6 +71,8 @@ public class CsvReaderWrapper {
     private boolean withBom = false;
     /** 文字コードが明示的に指定されたかどうか（nullの場合は自動判別） */
     private CharsetType charsetType = null;
+    /** クォートを無視するかどうか（デフォルト: false） */
+    private boolean ignoreQuotations = false;
 
     private CsvReaderWrapper(Class<?> beanClass, Path filePath) {
         this.beanClass = beanClass;
@@ -91,6 +93,7 @@ public class CsvReaderWrapper {
         clone.usePositionMapping = this.usePositionMapping;
         clone.withBom = this.withBom;
         clone.charsetType = this.charsetType;
+        clone.ignoreQuotations = this.ignoreQuotations;
         return clone;
     }
 
@@ -161,17 +164,24 @@ public class CsvReaderWrapper {
             detectCharsetAndBom();
         }
 
-        CsvColumnValidator.validate(filePath, charset, withBom, fileType.getDelimiter().charAt(0));
+        CsvColumnValidator.validate(filePath, charset, withBom, fileType.getDelimiter().charAt(0), ignoreQuotations);
 
         try (FileInputStream fis = new FileInputStream(filePath.toFile());
              InputStream is = withBom ? BomHandler.skipBom(fis) : fis;
-             InputStreamReader isr = new InputStreamReader(is, charset)) {
+             InputStreamReader isr = new InputStreamReader(is, charset);
+             com.opencsv.CSVReader csvReader = new com.opencsv.CSVReaderBuilder(isr)
+                 .withCSVParser(new com.opencsv.CSVParserBuilder()
+                     .withSeparator(fileType.getDelimiter().charAt(0))
+                     .withQuoteChar('"')
+                     .withIgnoreQuotations(ignoreQuotations)
+                     .withIgnoreLeadingWhiteSpace(true)
+                     .build())
+                 .build()) {
             
             MappingStrategy<T> strategy = createMappingStrategy();
             
-            CsvToBean<T> csvToBean = new CsvToBeanBuilder<T>(isr)
+            CsvToBean<T> csvToBean = new CsvToBeanBuilder<T>(csvReader)
                     .withMappingStrategy(strategy)
-                    .withSeparator(fileType.getDelimiter().charAt(0))
                     .withIgnoreLeadingWhiteSpace(true)
                     .withIgnoreEmptyLine(true)
                     .build();
@@ -374,7 +384,7 @@ public class CsvReaderWrapper {
 
         // 列数チェックを実行してエラー行を収集
         List<CsvReadError> columnErrors = CsvColumnValidator.validateAndCollectErrors(
-            filePath, charset, withBom, fileType.getDelimiter().charAt(0)
+            filePath, charset, withBom, fileType.getDelimiter().charAt(0), ignoreQuotations
         );
         
         // エラー行の行番号をSetに変換して高速検索
@@ -398,7 +408,7 @@ public class CsvReaderWrapper {
                          .withCSVParser(new com.opencsv.CSVParserBuilder()
                              .withSeparator(fileType.getDelimiter().charAt(0))
                              .withQuoteChar('"')
-                             .withIgnoreQuotations(false)
+                             .withIgnoreQuotations(ignoreQuotations)
                              .withIgnoreLeadingWhiteSpace(true)
                              .build())
                          .withFieldAsNull(com.opencsv.enums.CSVReaderNullFieldIndicator.NEITHER)
@@ -450,13 +460,20 @@ public class CsvReaderWrapper {
             
             try (FileInputStream fis = new FileInputStream(fileToRead.toFile());
                  InputStream is = withBom ? BomHandler.skipBom(fis) : fis;
-                 InputStreamReader isr = new InputStreamReader(is, charset)) {
+                 InputStreamReader isr = new InputStreamReader(is, charset);
+                 com.opencsv.CSVReader csvReader = new com.opencsv.CSVReaderBuilder(isr)
+                     .withCSVParser(new com.opencsv.CSVParserBuilder()
+                         .withSeparator(fileType.getDelimiter().charAt(0))
+                         .withQuoteChar('"')
+                         .withIgnoreQuotations(ignoreQuotations)
+                         .withIgnoreLeadingWhiteSpace(true)
+                         .build())
+                     .build()) {
                 
                 MappingStrategy<T> strategy = createMappingStrategy();
                 
-                CsvToBean<T> csvToBean = new CsvToBeanBuilder<T>(isr)
+                CsvToBean<T> csvToBean = new CsvToBeanBuilder<T>(csvReader)
                         .withMappingStrategy(strategy)
-                        .withSeparator(fileType.getDelimiter().charAt(0))
                         .withIgnoreLeadingWhiteSpace(true)
                         .withIgnoreEmptyLine(true)
                         .build();
@@ -666,6 +683,21 @@ public class CsvReaderWrapper {
          */
         public Builder useHeaderMapping() {
             wrapper.usePositionMapping = false;
+            return this;
+        }
+        
+        /**
+         * クォートを無視するかどうかを設定
+         * 
+         * <p>エスケープされていないダブルクォートが含まれるTSV/CSVファイルを
+         * 読み込む場合に使用します。trueに設定すると、ダブルクォートを
+         * 通常の文字として扱います。</p>
+         * 
+         * @param ignoreQuotations クォートを無視する場合true（デフォルト: false）
+         * @return このBuilderインスタンス
+         */
+        public Builder ignoreQuotations(boolean ignoreQuotations) {
+            wrapper.ignoreQuotations = ignoreQuotations;
             return this;
         }
         
