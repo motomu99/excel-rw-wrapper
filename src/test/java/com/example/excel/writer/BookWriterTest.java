@@ -228,6 +228,42 @@ public class BookWriterTest {
     }
     
     @Test
+    @DisplayName("Anchor行・列インデックス指定 - 行と列の数値で正しく位置を指定できること")
+    void testAnchorRowColumnIndex() throws IOException {
+        Path outputPath = TEST_OUTPUT_DIR.resolve("anchor_row_column_index.xlsx");
+        
+        List<Person> persons = List.of(
+            new Person("数値指定太郎", 28, "エンジニア", "東京")
+        );
+        
+        // 行・列インデックス（0始まり）で指定
+        // row=4, column=1 は B5セル（行5、列B）に対応
+        Book book = Book.of(outputPath)
+            .addSheet(Sheet.of("Test")
+                .addTable(Table.builder(Person.class)
+                    .anchor(4, 1)  // B5セル（0始まり: 行4=5行目、列1=B列）
+                    .data(persons)
+                    .build()));
+        
+        BookWriter.write(book);
+        
+        assertTrue(Files.exists(outputPath));
+        
+        try (FileInputStream fis = new FileInputStream(outputPath.toFile());
+             Workbook workbook = WorkbookFactory.create(fis)) {
+            
+            org.apache.poi.ss.usermodel.Sheet sheet = workbook.getSheet("Test");
+            
+            // B5セル（行4、列1）から開始されることを確認
+            Row headerRow = sheet.getRow(4);
+            assertEquals("名前", getCellValueAsString(headerRow.getCell(1)));
+            
+            Row dataRow = sheet.getRow(5);
+            assertEquals("数値指定太郎", getCellValueAsString(dataRow.getCell(1)));
+        }
+    }
+    
+    @Test
     @DisplayName("空のデータテーブル - データが空でもヘッダーは書き込まれること")
     void testEmptyDataTable() throws IOException {
         Path outputPath = TEST_OUTPUT_DIR.resolve("empty_data_table.xlsx");

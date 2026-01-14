@@ -1294,6 +1294,27 @@ Book book = Book.of(Paths.get("output.xlsx"))
 BookWriter.write(book);
 ```
 
+### Anchor行・列インデックス指定
+
+行と列の数値（0始まり）でAnchorを指定することもできます。
+
+```java
+// 行・列インデックス（0始まり）で指定
+// row=4, column=1 は B5セル（行5、列B）に対応
+Book book = Book.of(Paths.get("output.xlsx"))
+    .addSheet(Sheet.of("Test")
+        .addTable(Table.builder(Person.class)
+            .anchor(4, 1)  // B5セル（0始まり: 行4=5行目、列1=B列）
+            .data(persons)
+            .build()));
+
+BookWriter.write(book);
+```
+
+**注意**: 行・列のインデックスは0始まりです。
+- 行0 = 1行目、行4 = 5行目
+- 列0 = A列、列1 = B列
+
 ### @CsvBindByNameアノテーションからのヘッダー自動抽出
 
 `Table`は`@CsvBindByName`アノテーションから自動的にヘッダーを抽出します。特別な設定は不要です。

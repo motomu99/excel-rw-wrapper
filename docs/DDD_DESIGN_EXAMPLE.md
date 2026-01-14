@@ -28,7 +28,13 @@ Excelシート内の1つのテーブル（ブロック）を表すドメイン�
 ### Anchor（値オブジェクト）
 Excelセルの位置を表す値オブジェクト。
 - アンカーセル文字列（例: "A1"）を解析して行・列インデックスを保持
+- 行・列インデックス（0始まり）から直接生成することも可能
 - 不変性を保証
+
+Anchorの指定方法は以下の3通りがあります：
+1. **文字列指定**: `Anchor.of("A1")` または `Table.builder(...).anchor("A1")`
+2. **Anchorオブジェクト指定**: `Anchor anchor = Anchor.of("B5"); Table.builder(...).anchor(anchor)`
+3. **行・列インデックス指定**: `Anchor.of(4, 1)` または `Table.builder(...).anchor(4, 1)` （0始まり）
 
 ## 使用例
 
@@ -103,6 +109,35 @@ Book book = Book.of(Paths.get("template.xlsx"))
 
 BookWriter.write(book);
 ```
+
+### Anchorの指定方法
+
+Anchorは3通りの方法で指定できます：
+
+```java
+// ① 文字列で指定（最もシンプル）
+Table.builder(Person.class)
+    .anchor("A1")
+    .data(users)
+    .build()
+
+// ② Anchorオブジェクトで指定（再利用可能）
+Anchor anchor = Anchor.of("B5");
+Table.builder(Person.class)
+    .anchor(anchor)
+    .data(users)
+    .build()
+
+// ③ 行・列インデックス（0始まり）で指定（プログラムで計算した位置を指定可能）
+Table.builder(Person.class)
+    .anchor(4, 1)  // B5セル（0始まり: 行4=5行目、列1=B列）
+    .data(users)
+    .build()
+```
+
+**注意**: 行・列のインデックスは0始まりです。
+- 行0 = 1行目、行4 = 5行目
+- 列0 = A列、列1 = B列
 
 ## 設計のメリット
 

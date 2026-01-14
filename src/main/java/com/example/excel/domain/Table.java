@@ -163,6 +163,18 @@ public class Table<T> {
         }
         
         /**
+         * アンカーセル（開始位置）を設定（行・列インデックス指定）
+         * 
+         * @param row 行インデックス（0始まり、例: 0=A1, 4=B5）
+         * @param column 列インデックス（0始まり、例: 0=A列, 1=B列）
+         * @return このBuilderインスタンス
+         */
+        public Builder<T> anchor(int row, int column) {
+            this.anchor = Anchor.of(row, column);
+            return this;
+        }
+        
+        /**
          * 書き込むデータを設定（List）
          * 
          * @param data 書き込むデータのリスト

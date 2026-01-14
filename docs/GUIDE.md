@@ -425,6 +425,37 @@ Book book = Book.of(Paths.get("template.xlsx"))
 BookWriter.write(book);
 ```
 
+### Anchor値オブジェクトの使用
+
+Anchorは文字列、Anchorオブジェクト、または行・列インデックスで指定できます。
+
+```java
+import com.example.excel.domain.Anchor;
+
+// ① 文字列で指定
+Table.builder(Person.class)
+    .anchor("A1")
+    .data(persons)
+    .build()
+
+// ② Anchorオブジェクトで指定
+Anchor anchor = Anchor.of("B5");
+Table.builder(Person.class)
+    .anchor(anchor)
+    .data(persons)
+    .build()
+
+// ③ 行・列インデックス（0始まり）で指定
+Table.builder(Person.class)
+    .anchor(4, 1)  // B5セル（0始まり: 行4=5行目、列1=B列）
+    .data(persons)
+    .build()
+```
+
+**注意**: 行・列のインデックスは0始まりです。
+- 行0 = 1行目、行4 = 5行目
+- 列0 = A列、列1 = B列
+
 ### ドメインモデルの特徴
 
 - **`Book`**（エンティティ）: Excelファイル全体を表す
