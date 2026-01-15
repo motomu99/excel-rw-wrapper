@@ -20,12 +20,12 @@ import java.util.List;
 @DisplayName("ExcelReader: 列数チェック機能（readWithValidation）")
 public class ExcelReadWithValidationTest {
 
-    private static final Path TEST_RESOURCES_DIR = Paths.get("src/test/resources");
+    private static final Path TEST_RESOURCES_DIR = Paths.get("build/test-outputs/test-resources");
     private static final Path SAMPLE_EXCEL_COLUMN_MISMATCH = TEST_RESOURCES_DIR.resolve("sample_column_mismatch.xlsx");
 
     @BeforeAll
     static void setUp() throws IOException {
-        // テストリソースディレクトリを作成
+        // テストリソース出力ディレクトリを作成（リポジトリ配下に書かない）
         Files.createDirectories(TEST_RESOURCES_DIR);
 
         // 列数不一致のサンプルExcelファイルを作成

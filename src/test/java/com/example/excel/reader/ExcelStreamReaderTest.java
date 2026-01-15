@@ -37,7 +37,7 @@ import java.util.stream.Stream;
 @DisplayName("ExcelStreamReader: Stream APIを使用したExcel読み込み")
 public class ExcelStreamReaderTest {
 
-    private static final Path TEST_RESOURCES_DIR = Paths.get("src/test/resources");
+    private static final Path TEST_RESOURCES_DIR = Paths.get("build/test-outputs/test-resources");
     private static final Path SAMPLE_EXCEL = TEST_RESOURCES_DIR.resolve("sample.xlsx");
     private static final Path SAMPLE_EXCEL_NO_HEADER = TEST_RESOURCES_DIR.resolve("sample_no_header.xlsx");
     private static final Path SAMPLE_EXCEL_MULTI_SHEET = TEST_RESOURCES_DIR.resolve("sample_multi_sheet.xlsx");
@@ -52,7 +52,7 @@ public class ExcelStreamReaderTest {
 
     @BeforeAll
     static void setUp() throws IOException {
-        // テストリソースディレクトリを作成
+        // テストリソース出力ディレクトリを作成（リポジトリ配下に書かない）
         Files.createDirectories(TEST_RESOURCES_DIR);
 
         // 基本的なサンプルExcelファイルを作成

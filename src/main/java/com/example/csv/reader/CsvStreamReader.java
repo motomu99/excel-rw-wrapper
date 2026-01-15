@@ -98,59 +98,68 @@ public class CsvStreamReader<T> {
 
         try (FileInputStream fis = new FileInputStream(filePath.toFile());
              InputStream is = withBom ? BomHandler.skipBom(fis) : fis;
-             InputStreamReader isr = new InputStreamReader(is, charset);
-             com.opencsv.CSVReader csvReader = new com.opencsv.CSVReaderBuilder(isr)
-                 .withCSVParser(new com.opencsv.CSVParserBuilder()
-                     .withSeparator(fileType.getDelimiter().charAt(0))
-                     .withQuoteChar('"')
-                     .withIgnoreQuotations(ignoreQuotations)
-                     .withIgnoreLeadingWhiteSpace(true)
-                     .build())
-                 .build()) {
-            
-            MappingStrategy<T> strategy = MappingStrategyFactory.createStrategy(beanClass, usePositionMapping);
-            
-            CsvToBean<T> csvToBean = new CsvToBeanBuilder<T>(csvReader)
-                    .withMappingStrategy(strategy)
+             InputStreamReader isr = new InputStreamReader(is, charset)) {
+            com.opencsv.CSVReaderBuilder csvReaderBuilder = new com.opencsv.CSVReaderBuilder(isr)
+                .withCSVParser(new com.opencsv.CSVParserBuilder()
+                    .withSeparator(fileType.getDelimiter().charAt(0))
+                    .withQuoteChar('"')
+                    .withIgnoreQuotations(ignoreQuotations)
                     .withIgnoreLeadingWhiteSpace(true)
-                    .withIgnoreEmptyLine(true)
-                    .build();
-            
-            Stream<T> stream = csvToBean.stream();
+                    .build());
 
-            // 行番号フィールドが存在する場合は行番号を設定
-            FieldMappingCache fieldMappingCache = new FieldMappingCache(beanClass);
-            if (fieldMappingCache.hasLineNumberField()) {
-                java.lang.reflect.Field lineNumberField = fieldMappingCache.getLineNumberField();
-                Class<?> fieldType = lineNumberField.getType();
+            boolean isPositionMapping = Boolean.TRUE.equals(usePositionMapping);
+            if (isPositionMapping && skipLines > 0) {
+                // ポジションベースではヘッダー行が自動でスキップされないため、
+                // skipLinesはCSVReader側で処理してパース前に除外する
+                csvReaderBuilder.withSkipLines(skipLines);
+            }
 
-                // 位置ベースマッピング（ヘッダーなし）の場合は1行目から、
-                // ヘッダーベースマッピングの場合は2行目からデータが始まる
-                int startLineNumber = (usePositionMapping != null && usePositionMapping) ? 1 : 2;
-                AtomicInteger lineNumber = new AtomicInteger(startLineNumber);
+            try (com.opencsv.CSVReader csvReader = csvReaderBuilder.build()) {
+                MappingStrategy<T> strategy = MappingStrategyFactory.createStrategy(beanClass, usePositionMapping);
 
-                stream = stream.peek(bean -> {
-                    try {
-                        int currentLineNumber = lineNumber.getAndIncrement();
-                        if (fieldType == Integer.class || fieldType == int.class) {
-                            lineNumberField.set(bean, currentLineNumber);
-                        } else if (fieldType == Long.class || fieldType == long.class) {
-                            lineNumberField.set(bean, (long) currentLineNumber);
+                CsvToBean<T> csvToBean = new CsvToBeanBuilder<T>(csvReader)
+                        .withMappingStrategy(strategy)
+                        .withIgnoreLeadingWhiteSpace(true)
+                        .withIgnoreEmptyLine(true)
+                        .build();
+
+                Stream<T> stream = csvToBean.stream();
+
+                // 行番号フィールドが存在する場合は行番号を設定
+                FieldMappingCache fieldMappingCache = new FieldMappingCache(beanClass);
+                if (fieldMappingCache.hasLineNumberField()) {
+                    java.lang.reflect.Field lineNumberField = fieldMappingCache.getLineNumberField();
+                    Class<?> fieldType = lineNumberField.getType();
+
+                    // 位置ベースマッピング（ヘッダーなし）の場合は1行目から、
+                    // ヘッダーベースマッピングの場合は2行目からデータが始まる
+                    int baseLineNumber = isPositionMapping ? 1 : 2;
+                    int startLineNumber = baseLineNumber + skipLines;
+                    AtomicInteger lineNumber = new AtomicInteger(startLineNumber);
+
+                    stream = stream.peek(bean -> {
+                        try {
+                            int currentLineNumber = lineNumber.getAndIncrement();
+                            if (fieldType == Integer.class || fieldType == int.class) {
+                                lineNumberField.set(bean, currentLineNumber);
+                            } else if (fieldType == Long.class || fieldType == long.class) {
+                                lineNumberField.set(bean, (long) currentLineNumber);
+                            }
+                        } catch (IllegalAccessException e) {
+                            log.error("行番号の設定に失敗しました: bean={}", bean, e);
+                            throw new CsvReadException("行番号の設定に失敗しました", e);
                         }
-                    } catch (IllegalAccessException e) {
-                        log.error("行番号の設定に失敗しました: bean={}", bean, e);
-                        throw new CsvReadException("行番号の設定に失敗しました", e);
-                    }
-                });
-            }
+                    });
+                }
 
-            // データ行をスキップする処理
-            if (skipLines > 0) {
-                stream = stream.skip(skipLines);
-            }
+                // データ行をスキップする処理（ヘッダーベースのみ）
+                if (!isPositionMapping && skipLines > 0) {
+                    stream = stream.skip(skipLines);
+                }
 
-            // 呼び出し側でStreamを処理（try-with-resources内で完了）
-            return processor.apply(stream);
+                // 呼び出し側でStreamを処理（try-with-resources内で完了）
+                return processor.apply(stream);
+            }
         } catch (IOException e) {
             log.error("CSVファイル読み込み中にエラーが発生: ファイルパス={}, エラー={}", filePath, e.getMessage(), e);
             throw new CsvReadException("CSVファイルの読み込みに失敗しました: " + filePath, e);

@@ -3,19 +3,22 @@ package com.example.csv.reader;
 import com.example.common.config.CharsetType;
 import com.example.common.config.FileType;
 import com.example.model.Person;
+import com.example.model.PersonWithCustomConverter;
 import com.example.model.PersonWithoutHeader;
+import com.example.model.PersonWithCustomType;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.util.function.Consumer;
-import java.util.function.Function;
 import com.opencsv.exceptions.CsvException;
 import com.example.exception.CsvReadException;
 
@@ -281,5 +284,74 @@ public class CsvStreamReaderTest {
         // エラーメッセージにファイルパスが含まれていることを確認
         assertTrue(exception.getMessage().contains("nonexistent.csv"), 
             "エラーメッセージにファイルパスが含まれていること");
+    }
+
+    @Test
+    @DisplayName("カスタムコンバーター - ヘッダーマッピングで@CsvCustomBindByNameが適用されること")
+    void testStreamWithHeaderMappingAndCustomConverter() throws IOException, CsvException {
+        String csvContent = String.join(System.lineSeparator(),
+            "名前,年齢,職業",
+            "田中太郎, 40 ,エンジニア",
+            "佐藤花子,30,デザイナー"
+        );
+
+        Path tempCsv = Files.createTempFile("csv-header-custom-converter-", ".csv");
+        Files.writeString(tempCsv, csvContent, StandardCharsets.UTF_8);
+
+        List<PersonWithCustomConverter> result = CsvStreamReader
+            .builder(PersonWithCustomConverter.class, tempCsv)
+            .useHeaderMapping()
+            .extract(stream -> stream.collect(Collectors.toList()));
+
+        assertNotNull(result);
+        assertEquals(2, result.size());
+
+        PersonWithCustomConverter first = result.get(0);
+        assertEquals("田中太郎", first.getName());
+        assertEquals(40, first.getAge()); // " 40 " -> 40
+        // occupation は @CsvCustomBindByPosition 用なので、このテストでは null のまま
+        assertNull(first.getOccupation());
+
+        PersonWithCustomConverter second = result.get(1);
+        assertEquals("佐藤花子", second.getName());
+        assertEquals(30, second.getAge());
+        assertNull(second.getOccupation());
+    }
+
+    @Test
+    @DisplayName("独自型とコンバーター - ポジションベースマッピングでヘッダーありCSVを読み込み、コンバーターで独自型に変換できること")
+    void testStreamWithCustomTypeAndConverter() throws IOException, CsvException {
+        // 独自の型（Email）とコンバーターを使用したポジションベースマッピングのテスト
+        // ヘッダーありのCSVファイルを使用するが、ポジションでマッピングする
+        // ヘッダー行をスキップするため、skip(1)を使用
+        
+        List<PersonWithCustomType> result = CsvStreamReader.builder(PersonWithCustomType.class, Paths.get("src/test/resources/sample.csv"))
+            .usePositionMapping()
+            .skip(1)
+            .extract(stream -> stream.collect(Collectors.toList()));
+        
+        assertNotNull(result);
+        assertEquals(5, result.size()); // ヘッダーを除いた5件のデータ
+        
+        // 最初のPersonWithCustomTypeの確認
+        PersonWithCustomType firstPerson = result.get(0);
+        assertEquals("田中太郎", firstPerson.getName());
+        assertEquals(25, firstPerson.getAge());
+        assertNotNull(firstPerson.getEmail());
+        // コンバーターにより、職業「エンジニア」が「エンジニア@example.com」に変換される
+        assertEquals("エンジニア@example.com", firstPerson.getEmail().getValue());
+        assertEquals("東京", firstPerson.getBirthplace());
+        
+        // 2番目のPersonWithCustomTypeの確認
+        PersonWithCustomType secondPerson = result.get(1);
+        assertEquals("佐藤花子", secondPerson.getName());
+        assertEquals(30, secondPerson.getAge());
+        assertNotNull(secondPerson.getEmail());
+        assertEquals("デザイナー@example.com", secondPerson.getEmail().getValue());
+        assertEquals("大阪", secondPerson.getBirthplace());
+        
+        // コンバーターが正しく動作していることを確認（独自型が設定されている）
+        assertTrue(result.stream().allMatch(person -> person.getEmail() != null),
+            "すべてのレコードでEmailが設定されていること");
     }
 }

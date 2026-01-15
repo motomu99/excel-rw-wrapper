@@ -4,7 +4,6 @@ import com.opencsv.bean.CsvBindByName;
 import com.opencsv.bean.CsvBindByPosition;
 import com.opencsv.bean.CsvCustomBindByName;
 import com.opencsv.bean.CsvCustomBindByPosition;
-import com.opencsv.bean.AbstractBeanField;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -29,36 +28,6 @@ public class PersonWithCustomConverter {
     // 位置ベースのカスタム変換（前処理）
     @CsvCustomBindByPosition(position = 2, converter = UpperCaseConverter.class)
     private String occupation;
-}
-
-/**
- * 前後の空白をトリムしてから整数に変換するコンバーター。
- */
-class TrimToIntegerConverter extends AbstractBeanField<Integer, String> {
-    @Override
-    protected Integer convert(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        if (trimmed.isEmpty()) {
-            return null;
-        }
-        return Integer.parseInt(trimmed);
-    }
-}
-
-/**
- * 文字列をトリムして大文字に変換するコンバーター。
- */
-class UpperCaseConverter extends AbstractBeanField<String, String> {
-    @Override
-    protected String convert(String value) {
-        if (value == null) {
-            return null;
-        }
-        return value.trim().toUpperCase();
-    }
 }
 
 
