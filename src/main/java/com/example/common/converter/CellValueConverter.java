@@ -1,15 +1,19 @@
 package com.example.common.converter;
 
+import java.math.BigDecimal;
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
+import java.util.Optional;
 import java.util.Set;
 
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.DateUtil;
+import org.dhatim.fastexcel.reader.Row;
 
 import com.example.exception.CellValueConversionException;
 
@@ -270,6 +274,194 @@ public class CellValueConverter {
         } else {
             return dateTime.toString();
         }
+    }
+
+    /**
+     * fastexcelのRowからセルの値を文字列として取得
+     * 
+     * @param row 行
+     * @param index セルインデックス
+     * @return セルの値（文字列形式、フリガナ正規化済み）
+     */
+    public static String getCellValueAsString(Row row, int index) {
+        if (row == null) {
+            return null;
+        }
+        try {
+            if (!row.hasCell(index)) {
+                return null;
+            }
+            org.dhatim.fastexcel.reader.Cell cell = row.getCell(index);
+            if (cell == null) {
+                return null;
+            }
+            if (cell.getType() == org.dhatim.fastexcel.reader.CellType.FORMULA) {
+                String formula = cell.getFormula();
+                return formula == null ? null : normalizeStringValue(formula);
+            }
+            if (cell.getType() == org.dhatim.fastexcel.reader.CellType.STRING) {
+                String text = cell.asString();
+                return text == null ? null : normalizeStringValue(text);
+            }
+            String text = cell.getText();
+            return text == null ? null : normalizeStringValue(text);
+        } catch (Exception e) {
+            // セルが存在しない場合はnullを返す
+            return null;
+        }
+    }
+
+    /**
+     * fastexcelのRowからセルの値を指定された型に変換
+     *
+     * @param row 行
+     * @param index セルインデックス
+     * @param targetType 変換先の型
+     * @param rowNum 行番号（エラーメッセージ用、0始まり）
+     * @param columnName 列名（エラーメッセージ用）
+     * @return 変換された値
+     * @throws CellValueConversionException 型変換に失敗した場合
+     */
+    public static Object convertCellValue(Row row, int index, Class<?> targetType, int rowNum, String columnName)
+            throws CellValueConversionException {
+        if (row == null) {
+            return null;
+        }
+
+        try {
+            // セルが存在するかチェック
+            String cellText = getCellValueAsString(row, index);
+            if (cellText == null || cellText.isEmpty()) {
+                return null;
+            }
+
+            if (targetType == String.class) {
+                return cellText;
+            } else if (isNumericType(targetType)) {
+                return convertToNumericType(row, index, targetType, cellText);
+            } else if (targetType == Boolean.class || targetType == boolean.class) {
+                return convertToBooleanType(row, index, cellText);
+            } else if (targetType == LocalDate.class) {
+                return convertToLocalDate(row, index, cellText);
+            } else if (targetType == LocalDateTime.class) {
+                return convertToLocalDateTime(row, index, cellText);
+            }
+        } catch (IllegalArgumentException e) {
+            String cellValue = getCellValueAsString(row, index);
+            log.error("セル値の変換に失敗しました: 行={}, 列='{}', 値='{}', 型={}",
+                    rowNum + 1, columnName, cellValue, targetType.getSimpleName());
+            throw new CellValueConversionException(rowNum, columnName, cellValue, targetType, e);
+        }
+
+        return null;
+    }
+
+    /**
+     * fastexcelのRowから数値型に変換
+     * 
+     * @param row 行
+     * @param index セルインデックス
+     * @param targetType 変換先の型
+     * @param cellText セルのテキスト（フォールバック用）
+     * @return 変換された数値
+     */
+    private static Number convertToNumericType(Row row, int index, Class<?> targetType, String cellText) {
+        // まず数値として取得を試みる
+        try {
+            Optional<BigDecimal> optNumber = row.getCellAsNumber(index);
+            if (optNumber.isPresent()) {
+                BigDecimal num = optNumber.get();
+                if (targetType == Integer.class || targetType == int.class) {
+                    return num.intValue();
+                } else if (targetType == Long.class || targetType == long.class) {
+                    return num.longValue();
+                } else if (targetType == Double.class || targetType == double.class) {
+                    return num.doubleValue();
+                }
+            }
+        } catch (org.dhatim.fastexcel.reader.ExcelReaderException e) {
+            // 数値取得に失敗した場合はフォールバック
+        }
+        // 数値として取得できない場合は文字列からパース
+        return parseNumericString(cellText, targetType);
+    }
+
+    /**
+     * fastexcelのRowからBoolean型に変換
+     * 
+     * @param row 行
+     * @param index セルインデックス
+     * @param cellText セルのテキスト（フォールバック用）
+     * @return 変換されたBoolean値
+     */
+    private static Boolean convertToBooleanType(Row row, int index, String cellText) {
+        try {
+            Optional<Boolean> optBoolean = row.getCellAsBoolean(index);
+            if (optBoolean.isPresent()) {
+                return optBoolean.get();
+            }
+        } catch (org.dhatim.fastexcel.reader.ExcelReaderException e) {
+            // Boolean取得に失敗した場合はフォールバック
+        }
+        return Boolean.parseBoolean(cellText);
+    }
+
+    /**
+     * fastexcelのRowからLocalDate型に変換
+     * 
+     * @param row 行
+     * @param index セルインデックス
+     * @param cellText セルのテキスト（フォールバック用）
+     * @return 変換されたLocalDate
+     */
+    private static LocalDate convertToLocalDate(Row row, int index, String cellText) {
+        try {
+            Optional<LocalDateTime> optDateTime = row.getCellAsDate(index);
+            if (optDateTime.isPresent()) {
+                return optDateTime.get().toLocalDate();
+            }
+        } catch (org.dhatim.fastexcel.reader.ExcelReaderException e) {
+            // 日付取得に失敗した場合はフォールバック
+        }
+        return LocalDate.parse(cellText);
+    }
+
+    /**
+     * fastexcelのRowからLocalDateTime型に変換
+     * 
+     * @param row 行
+     * @param index セルインデックス
+     * @param cellText セルのテキスト（フォールバック用）
+     * @return 変換されたLocalDateTime
+     */
+    private static LocalDateTime convertToLocalDateTime(Row row, int index, String cellText) {
+        try {
+            Optional<LocalDateTime> optDateTime = row.getCellAsDate(index);
+            if (optDateTime.isPresent()) {
+                return optDateTime.get();
+            }
+        } catch (org.dhatim.fastexcel.reader.ExcelReaderException e) {
+            // 日時取得に失敗した場合はフォールバック
+        }
+        return LocalDateTime.parse(cellText);
+    }
+
+    /**
+     * 文字列値を正規化（フリガナ削除、制御文字削除など）
+     * 
+     * @param value 元の値
+     * @return 正規化後の値
+     */
+    public static String normalizeStringValue(String value) {
+        if (value == null) {
+            return "";
+        }
+        String normalizedValue = Normalizer.normalize(value, Normalizer.Form.NFKC);
+        String cleanedValue = normalizedValue.replace("\uFEFF", "").replace("\u200B", "");
+        cleanedValue = cleanedValue.replace("\u00A0", " ").replace("\u3000", " ");
+        cleanedValue = cleanedValue.replaceAll("\\p{C}", "");
+        cleanedValue = cleanedValue.replaceAll("\\s+[\\p{IsHiragana}\\p{IsKatakana}\\u30FC]+$", "");
+        return cleanedValue.trim();
     }
 }
 

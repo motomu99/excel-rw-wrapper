@@ -11,8 +11,9 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
+import org.dhatim.fastexcel.reader.ReadableWorkbook;
+import org.dhatim.fastexcel.reader.Sheet;
+import org.dhatim.fastexcel.reader.Row;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
@@ -21,8 +22,6 @@ import com.example.exception.HeaderNotFoundException;
 import com.example.exception.KeyColumnNotFoundException;
 import com.example.exception.SheetNotFoundException;
 import com.example.exception.UncheckedExcelException;
-import com.github.pjfanning.xlsx.StreamingReader;
-import com.github.pjfanning.xlsx.exceptions.MissingSheetException;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -59,12 +58,6 @@ public class ExcelStreamReader<T> {
 
     /** デフォルトのヘッダー探索行数 */
     private static final int DEFAULT_HEADER_SEARCH_ROWS = 10;
-    
-    /** StreamingReaderのデフォルト行キャッシュサイズ（メモリに保持する行数） */
-    private static final int DEFAULT_ROW_CACHE_SIZE = 100;
-    
-    /** StreamingReaderのデフォルトバッファサイズ（バイト単位） */
-    private static final int DEFAULT_BUFFER_SIZE = 4096;
 
 
     private final Class<T> beanClass;
@@ -221,34 +214,38 @@ public class ExcelStreamReader<T> {
         }
 
         FileInputStream fis = new FileInputStream(path.toFile());
-        Workbook workbook = null;
+        ReadableWorkbook workbook = null;
+        Stream<Row> rowStream = null;
         
         try {
-            workbook = StreamingReader.builder()
-                 .rowCacheSize(DEFAULT_ROW_CACHE_SIZE)
-                 .bufferSize(DEFAULT_BUFFER_SIZE)
-                 .open(fis);
+            workbook = new ReadableWorkbook(fis);
 
-            Sheet sheet;
-            try {
-                sheet = getSheet(workbook);
-            } catch (MissingSheetException e) {
-                throwSheetNotFound();
-                return null; // unreachable
-            }
+            Sheet sheet = getSheet(workbook);
             if (sheet == null) {
                 throwSheetNotFound();
             }
             
-            Iterator<T> iterator = createStreamingIterator(sheet);
+            rowStream = sheet.openStream();
+            Iterator<Row> rowIterator = rowStream.iterator();
+            Iterator<T> iterator = createStreamingIterator(rowIterator);
             
-            return new OpenedResource<>(fis, workbook, iterator);
+            return new OpenedResource<>(fis, workbook, rowStream, iterator);
+        } catch (org.dhatim.fastexcel.reader.ExcelReaderException e) {
+            // fastexcelのExcelReaderExceptionをIOExceptionに変換
+            throw new IOException("Excelファイル読み込みエラー: " + path, e);
         } catch (Exception e) {
             // エラー発生時のクリーンアップ: リソースクローズ時のエラーは無視する（意図的な実装）
+            if (rowStream != null) {
+                try { 
+                    rowStream.close(); 
+                } catch (Exception ignore) {
+                    // クローズ時のエラーは無視（既に例外が発生しているため）
+                }
+            }
             if (workbook != null) {
                 try { 
                     workbook.close(); 
-                } catch (IOException ignore) {
+                } catch (Exception ignore) {
                     // クローズ時のエラーは無視（既に例外が発生しているため）
                 }
             }
@@ -278,34 +275,38 @@ public class ExcelStreamReader<T> {
         }
 
         FileInputStream fis = new FileInputStream(path.toFile());
-        Workbook workbook = null;
+        ReadableWorkbook workbook = null;
+        Stream<Row> rowStream = null;
         
         try {
-            workbook = StreamingReader.builder()
-                 .rowCacheSize(DEFAULT_ROW_CACHE_SIZE)
-                 .bufferSize(DEFAULT_BUFFER_SIZE)
-                 .open(fis);
+            workbook = new ReadableWorkbook(fis);
 
-            Sheet sheet;
-            try {
-                sheet = getSheet(workbook);
-            } catch (MissingSheetException e) {
-                throwSheetNotFound();
-                return null; // unreachable
-            }
+            Sheet sheet = getSheet(workbook);
             if (sheet == null) {
                 throwSheetNotFound();
             }
             
-            ExcelRowIterator<T> iterator = createStreamingIteratorWithValidation(sheet);
+            rowStream = sheet.openStream();
+            Iterator<Row> rowIterator = rowStream.iterator();
+            FastExcelRowIterator<T> iterator = createStreamingIteratorWithValidation(rowIterator);
             
-            return new OpenedResourceWithValidation<>(fis, workbook, iterator);
+            return new OpenedResourceWithValidation<>(fis, workbook, rowStream, iterator);
+        } catch (org.dhatim.fastexcel.reader.ExcelReaderException e) {
+            // fastexcelのExcelReaderExceptionをIOExceptionに変換
+            throw new IOException("Excelファイル読み込みエラー: " + path, e);
         } catch (Exception e) {
             // エラー発生時のクリーンアップ: リソースクローズ時のエラーは無視する（意図的な実装）
+            if (rowStream != null) {
+                try { 
+                    rowStream.close(); 
+                } catch (Exception ignore) {
+                    // クローズ時のエラーは無視（既に例外が発生しているため）
+                }
+            }
             if (workbook != null) {
                 try { 
                     workbook.close(); 
-                } catch (IOException ignore) {
+                } catch (Exception ignore) {
                     // クローズ時のエラーは無視（既に例外が発生しているため）
                 }
             }
@@ -326,9 +327,9 @@ public class ExcelStreamReader<T> {
      * ストリーミング処理用のIteratorを作成
      * 行ごとにBeanを生成することでメモリ効率を向上
      */
-    private Iterator<T> createStreamingIterator(Sheet sheet) {
-        return new ExcelRowIterator<>(
-            sheet.iterator(), 
+    private Iterator<T> createStreamingIterator(Iterator<Row> rowIterator) {
+        return new FastExcelRowIterator<>(
+            rowIterator, 
             beanClass, 
             headerKeyColumn, 
             headerSearchRows, 
@@ -342,9 +343,9 @@ public class ExcelStreamReader<T> {
      * 列数チェックを有効にしたストリーミング処理用のIteratorを作成
      * 行ごとにBeanを生成することでメモリ効率を向上
      */
-    private ExcelRowIterator<T> createStreamingIteratorWithValidation(Sheet sheet) {
-        return new ExcelRowIterator<>(
-            sheet.iterator(), 
+    private FastExcelRowIterator<T> createStreamingIteratorWithValidation(Iterator<Row> rowIterator) {
+        return new FastExcelRowIterator<>(
+            rowIterator, 
             beanClass, 
             headerKeyColumn, 
             headerSearchRows, 
@@ -357,11 +358,11 @@ public class ExcelStreamReader<T> {
     /**
      * ワークブックからシートを取得
      */
-    private Sheet getSheet(Workbook workbook) {
+    private Sheet getSheet(ReadableWorkbook workbook) {
         if (sheetName != null) {
-            return workbook.getSheet(sheetName);
+            return workbook.findSheet(sheetName).orElse(null);
         } else {
-            return workbook.getSheetAt(sheetIndex);
+            return workbook.getSheet(sheetIndex).orElse(null);
         }
     }
 
@@ -377,36 +378,66 @@ public class ExcelStreamReader<T> {
     
     private static class OpenedResource<T> implements AutoCloseable {
         final FileInputStream fis;
-        final Workbook workbook;
+        final ReadableWorkbook workbook;
+        final Stream<Row> rowStream;
         final Iterator<T> iterator;
         
-        OpenedResource(FileInputStream fis, Workbook workbook, Iterator<T> iterator) {
+        OpenedResource(FileInputStream fis, ReadableWorkbook workbook, Stream<Row> rowStream, Iterator<T> iterator) {
             this.fis = fis;
             this.workbook = workbook;
+            this.rowStream = rowStream;
             this.iterator = iterator;
         }
         
         @Override
         public void close() throws IOException {
-            if (workbook != null) workbook.close();
+            if (rowStream != null) {
+                try {
+                    rowStream.close();
+                } catch (Exception e) {
+                    // クローズ時のエラーは無視
+                }
+            }
+            if (workbook != null) {
+                try {
+                    workbook.close();
+                } catch (Exception e) {
+                    // クローズ時のエラーは無視
+                }
+            }
             if (fis != null) fis.close();
         }
     }
     
     private static class OpenedResourceWithValidation<T> implements AutoCloseable {
         final FileInputStream fis;
-        final Workbook workbook;
-        final ExcelRowIterator<T> iterator;
+        final ReadableWorkbook workbook;
+        final Stream<Row> rowStream;
+        final FastExcelRowIterator<T> iterator;
         
-        OpenedResourceWithValidation(FileInputStream fis, Workbook workbook, ExcelRowIterator<T> iterator) {
+        OpenedResourceWithValidation(FileInputStream fis, ReadableWorkbook workbook, Stream<Row> rowStream, FastExcelRowIterator<T> iterator) {
             this.fis = fis;
             this.workbook = workbook;
+            this.rowStream = rowStream;
             this.iterator = iterator;
         }
         
         @Override
         public void close() throws IOException {
-            if (workbook != null) workbook.close();
+            if (rowStream != null) {
+                try {
+                    rowStream.close();
+                } catch (Exception e) {
+                    // クローズ時のエラーは無視
+                }
+            }
+            if (workbook != null) {
+                try {
+                    workbook.close();
+                } catch (Exception e) {
+                    // クローズ時のエラーは無視
+                }
+            }
             if (fis != null) fis.close();
         }
     }

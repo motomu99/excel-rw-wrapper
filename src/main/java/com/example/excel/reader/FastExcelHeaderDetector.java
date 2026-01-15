@@ -10,34 +10,30 @@ import java.util.Map;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.CellType;
-import org.apache.poi.ss.usermodel.DataFormatter;
-import org.apache.poi.ss.usermodel.Row;
+import org.dhatim.fastexcel.reader.Row;
 
-import com.example.common.converter.CellValueConverter;
 import com.example.exception.HeaderNotFoundException;
 import com.example.exception.KeyColumnNotFoundException;
 
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Excelシートのヘッダー行を検出するクラス
+ * Excelシートのヘッダー行を検出するクラス（fastexcel版）
  * 
  * <p>キー列を指定してヘッダー行を探索する機能を提供します。
  * 検出したヘッダー情報（カラム名→インデックスのマップ）を保持します。</p>
  */
 @Slf4j
-public class ExcelHeaderDetector {
+public class FastExcelHeaderDetector {
 
     /** デフォルトのヘッダー探索行数 */
     private static final int DEFAULT_HEADER_SEARCH_ROWS = 10;
-    private static final DataFormatter HEADER_FORMATTER = new DataFormatter();
 
     private final String headerKeyColumn;
     private final int headerSearchRows;
     
     private Row headerRow = null;
+    private int headerRowIndex = -1;
     private Map<Integer, String> headerMap = null;
     private Map<String, Integer> columnMap = null;
     private Integer keyColumnIndex = null;
@@ -45,7 +41,7 @@ public class ExcelHeaderDetector {
     /**
      * ヘッダー検出器を作成（キー列指定なし）
      */
-    public ExcelHeaderDetector() {
+    public FastExcelHeaderDetector() {
         this(null, DEFAULT_HEADER_SEARCH_ROWS);
     }
 
@@ -55,7 +51,7 @@ public class ExcelHeaderDetector {
      * @param headerKeyColumn キー列名（nullの場合は最初の行をヘッダーとする）
      * @param headerSearchRows ヘッダー探索行数
      */
-    public ExcelHeaderDetector(String headerKeyColumn, int headerSearchRows) {
+    public FastExcelHeaderDetector(String headerKeyColumn, int headerSearchRows) {
         this.headerKeyColumn = headerKeyColumn;
         this.headerSearchRows = headerSearchRows;
     }
@@ -69,9 +65,9 @@ public class ExcelHeaderDetector {
      * @throws KeyColumnNotFoundException ヘッダー行にキー列が存在しない場合
      */
     public boolean detectHeader(Iterator<Row> rowIterator) throws HeaderNotFoundException, KeyColumnNotFoundException {
-        int headerRowIndex = findHeaderRowInStream(rowIterator);
+        int foundHeaderRowIndex = findHeaderRowInStream(rowIterator);
         
-        if (headerRowIndex == -1) {
+        if (foundHeaderRowIndex == -1) {
             if (headerKeyColumn != null) {
                 log.error("キー列 '{}' を持つヘッダー行が {}行以内に見つかりませんでした", headerKeyColumn, headerSearchRows);
                 throw new HeaderNotFoundException(headerKeyColumn, headerSearchRows);
@@ -105,7 +101,8 @@ public class ExcelHeaderDetector {
             // キー列が指定されていない場合は最初の行をヘッダーとする
             if (rowIterator.hasNext()) {
                 headerRow = rowIterator.next();
-                return headerRow.getRowNum();
+                headerRowIndex = 0;
+                return headerRowIndex;
             }
             return -1;
         }
@@ -114,28 +111,61 @@ public class ExcelHeaderDetector {
         int rowCount = 0;
         while (rowIterator.hasNext() && rowCount < headerSearchRows) {
             Row row = rowIterator.next();
-            rowCount++;
             
             if (row == null) {
+                rowCount++;
                 continue;
             }
 
             // 行内のすべてのセルをチェックして、キー列名があるか確認
-            for (int cellIndex = 0; cellIndex < row.getLastCellNum(); cellIndex++) {
-                Cell cell = row.getCell(cellIndex);
-                if (cell != null) {
-                    for (String candidate : getHeaderCandidates(cell)) {
-                        if (normalizedHeaderKey != null && normalizedHeaderKey.equals(candidate)) {
-                            log.debug("ヘッダー行を検出: 行={}, キー列={}", row.getRowNum(), headerKeyColumn);
-                            headerRow = row;
-                            return row.getRowNum();
-                        }
+            // fastexcelのRowは最大列数を直接取得できないため、適切な範囲でチェック
+            int cellCount = row.getCellCount();
+            for (int cellIndex = 0; cellIndex < cellCount; cellIndex++) {
+                String cellText = getCellTextSafely(row, cellIndex);
+                if (cellText == null) {
+                    // この列以降にセルがない可能性があるので、次の行へ
+                    if (cellIndex == 0) {
+                        // 最初のセルがnullなら空行として扱う
+                        break;
+                    }
+                    // セルがなくなったら次の行へ
+                    break;
+                }
+                
+                List<String> candidates = getHeaderCandidates(cellText);
+                for (String candidate : candidates) {
+                    if (normalizedHeaderKey != null && normalizedHeaderKey.equals(candidate)) {
+                        log.debug("ヘッダー行を検出: 行={}, キー列={}", row.getRowNum(), headerKeyColumn);
+                        headerRow = row;
+                        headerRowIndex = row.getRowNum() - 1;
+                        return headerRowIndex;
                     }
                 }
             }
+            rowCount++;
         }
 
         return -1;
+    }
+
+    /**
+     * セルのテキストを安全に取得
+     * 
+     * @param row 行
+     * @param index セルインデックス
+     * @return セルのテキスト（nullの場合は空文字列）
+     */
+    private String getCellTextSafely(Row row, int index) {
+        try {
+            if (!row.hasCell(index)) {
+                return null;
+            }
+            String text = row.getCellText(index);
+            return text;
+        } catch (Exception e) {
+            // セルが存在しない場合はnullを返す
+            return null;
+        }
     }
 
     /**
@@ -149,23 +179,33 @@ public class ExcelHeaderDetector {
         columnMap = new HashMap<>();
 
         // ヘッダー情報を構築
-        for (int i = 0; i < headerRow.getLastCellNum(); i++) {
-            Cell cell = headerRow.getCell(i);
-            if (cell != null) {
-                List<String> candidates = getHeaderCandidates(cell);
-                if (!candidates.isEmpty()) {
-                    String originalHeader = HEADER_FORMATTER.formatCellValue(cell);
-                    headerMap.put(i, candidates.get(0));
-                    for (String candidate : candidates) {
-                        Integer existingIndex = columnMap.putIfAbsent(candidate, i);
-                        if (existingIndex != null && !existingIndex.equals(i)) {
-                            String existingOriginal = headerMap.get(existingIndex);
-                            log.error("正規化後のヘッダー名が衝突しました: 正規化後='{}', 列{}='{}', 列{}='{}'",
-                                    candidate, existingIndex, existingOriginal, i, originalHeader);
-                            throw new HeaderNotFoundException(
-                                    String.format("正規化後のヘッダー名が衝突しました: 正規化後='%s', 列%d='%s', 列%d='%s'",
-                                            candidate, existingIndex, existingOriginal, i, originalHeader));
-                        }
+        // fastexcelのRowは最大列数を直接取得できないため、適切な範囲でチェック
+        int cellCount = headerRow.getCellCount();
+        for (int i = 0; i < cellCount; i++) {
+            String cellText = getCellTextSafely(headerRow, i);
+            if (cellText == null) {
+                // セルがなくなったら終了
+                if (i == 0) {
+                    // 最初のセルがnullなら空行として扱う
+                    break;
+                }
+                // セルがなくなったら終了
+                break;
+            }
+            
+            List<String> candidates = getHeaderCandidates(cellText);
+            if (!candidates.isEmpty()) {
+                String originalHeader = cellText.trim();
+                headerMap.put(i, candidates.get(0));
+                for (String candidate : candidates) {
+                    Integer existingIndex = columnMap.putIfAbsent(candidate, i);
+                    if (existingIndex != null && !existingIndex.equals(i)) {
+                        String existingOriginal = headerMap.get(existingIndex);
+                        log.error("正規化後のヘッダー名が衝突しました: 正規化後='{}', 列{}='{}', 列{}='{}'",
+                                candidate, existingIndex, existingOriginal, i, originalHeader);
+                        throw new HeaderNotFoundException(
+                                String.format("正規化後のヘッダー名が衝突しました: 正規化後='%s', 列%d='%s', 列%d='%s'",
+                                        candidate, existingIndex, existingOriginal, i, originalHeader));
                     }
                 }
             }
@@ -182,6 +222,12 @@ public class ExcelHeaderDetector {
         }
     }
 
+    /**
+     * ヘッダー値を正規化（フリガナ削除など）
+     * 
+     * @param value 元の値
+     * @return 正規化後の値
+     */
     static String normalizeHeaderValue(String value) {
         if (value == null) {
             return null;
@@ -194,15 +240,26 @@ public class ExcelHeaderDetector {
         return normalized.trim();
     }
 
-    private static List<String> getHeaderCandidates(Cell cell) {
+    /**
+     * ヘッダー候補を取得
+     * 
+     * @param cellText セルのテキスト
+     * @return ヘッダー候補のリスト
+     */
+    private static List<String> getHeaderCandidates(String cellText) {
         List<String> candidates = new ArrayList<>();
-        String formatted = HEADER_FORMATTER.formatCellValue(cell);
-        if (formatted != null && !formatted.trim().isEmpty()) {
-            addCandidate(candidates, formatted.trim());
+        if (cellText != null && !cellText.trim().isEmpty()) {
+            addCandidate(candidates, cellText.trim());
         }
         return candidates;
     }
 
+    /**
+     * ヘッダー候補を追加
+     * 
+     * @param candidates 候補リスト
+     * @param value 値
+     */
     private static void addCandidate(List<String> candidates, String value) {
         String normalized = normalizeHeaderValue(value);
         if (normalized != null && !normalized.isEmpty() && !candidates.contains(normalized)) {
@@ -214,6 +271,12 @@ public class ExcelHeaderDetector {
         }
     }
 
+    /**
+     * ヘッダー値を圧縮（空白・記号・フリガナを削除）
+     * 
+     * @param value 値
+     * @return 圧縮後の値
+     */
     private static String compactHeaderValue(String value) {
         if (value == null) {
             return null;
@@ -231,6 +294,15 @@ public class ExcelHeaderDetector {
     @SuppressFBWarnings("EI_EXPOSE_REP")
     public Row getHeaderRow() {
         return headerRow;
+    }
+
+    /**
+     * ヘッダー行のインデックスを取得
+     * 
+     * @return ヘッダー行のインデックス（0始まり）
+     */
+    public int getHeaderRowIndex() {
+        return headerRowIndex;
     }
 
     /**
@@ -260,4 +332,3 @@ public class ExcelHeaderDetector {
         return keyColumnIndex;
     }
 }
-

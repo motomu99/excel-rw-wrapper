@@ -4,17 +4,18 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.junit.jupiter.api.BeforeAll;
+import org.dhatim.fastexcel.reader.ReadableWorkbook;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -22,8 +23,8 @@ import org.junit.jupiter.api.io.TempDir;
 import com.example.exception.HeaderNotFoundException;
 import com.example.exception.KeyColumnNotFoundException;
 
-@DisplayName("ExcelHeaderDetector テスト")
-class ExcelHeaderDetectorTest {
+@DisplayName("FastExcelHeaderDetector テスト")
+class FastExcelHeaderDetectorTest {
 
     @TempDir
     Path tempDir;
@@ -47,12 +48,14 @@ class ExcelHeaderDetectorTest {
             workbook.write(fos);
         }
 
-        try (Workbook workbook = new XSSFWorkbook(Files.newInputStream(excelFile))) {
-            Sheet sheet = workbook.getSheetAt(0);
-            Iterator<Row> rowIterator = sheet.iterator();
+        try (InputStream inputStream = Files.newInputStream(excelFile);
+             ReadableWorkbook workbook = new ReadableWorkbook(inputStream)) {
+            org.dhatim.fastexcel.reader.Sheet sheet = workbook.getFirstSheet();
+            Stream<org.dhatim.fastexcel.reader.Row> rowStream = sheet.openStream();
+            Iterator<org.dhatim.fastexcel.reader.Row> rowIterator = rowStream.iterator();
 
             // キー列 "名前" で検出（Excel側は "  名前  "）
-            ExcelHeaderDetector detector = new ExcelHeaderDetector("名前", 10);
+            FastExcelHeaderDetector detector = new FastExcelHeaderDetector("名前", 10);
             boolean found = detector.detectHeader(rowIterator);
 
             assertTrue(found, "ヘッダーが見つかること");
@@ -63,6 +66,8 @@ class ExcelHeaderDetectorTest {
             
             Map<Integer, String> headerMap = detector.getHeaderMap();
             assertEquals("名前", headerMap.get(0), "インデックス0のヘッダー名が正規化されていること");
+            
+            rowStream.close();
         }
     }
     
@@ -80,15 +85,19 @@ class ExcelHeaderDetectorTest {
             workbook.write(fos);
         }
 
-        try (Workbook workbook = new XSSFWorkbook(Files.newInputStream(excelFile))) {
-            Sheet sheet = workbook.getSheetAt(0);
-            Iterator<Row> rowIterator = sheet.iterator();
+        try (InputStream inputStream = Files.newInputStream(excelFile);
+             ReadableWorkbook workbook = new ReadableWorkbook(inputStream)) {
+            org.dhatim.fastexcel.reader.Sheet sheet = workbook.getFirstSheet();
+            Stream<org.dhatim.fastexcel.reader.Row> rowStream = sheet.openStream();
+            Iterator<org.dhatim.fastexcel.reader.Row> rowIterator = rowStream.iterator();
 
             // キー列 "  名前  " で検出（Excel側は "名前"）
-            ExcelHeaderDetector detector = new ExcelHeaderDetector("  名前  ", 10);
+            FastExcelHeaderDetector detector = new FastExcelHeaderDetector("  名前  ", 10);
             boolean found = detector.detectHeader(rowIterator);
 
             assertTrue(found, "ヘッダーが見つかること");
+            
+            rowStream.close();
         }
     }
 
@@ -109,17 +118,20 @@ class ExcelHeaderDetectorTest {
             workbook.write(fos);
         }
 
-        try (Workbook workbook = new XSSFWorkbook(Files.newInputStream(excelFile))) {
-            Sheet sheet = workbook.getSheetAt(0);
-            Iterator<Row> rowIterator = sheet.iterator();
+        try (InputStream inputStream = Files.newInputStream(excelFile);
+             ReadableWorkbook workbook = new ReadableWorkbook(inputStream)) {
+            org.dhatim.fastexcel.reader.Sheet sheet = workbook.getFirstSheet();
+            Stream<org.dhatim.fastexcel.reader.Row> rowStream = sheet.openStream();
+            Iterator<org.dhatim.fastexcel.reader.Row> rowIterator = rowStream.iterator();
 
-            ExcelHeaderDetector detector = new ExcelHeaderDetector("ID", 5);
+            FastExcelHeaderDetector detector = new FastExcelHeaderDetector("ID", 5);
             boolean found = detector.detectHeader(rowIterator);
 
             assertTrue(found);
-            assertEquals(2, detector.getHeaderRow().getRowNum());
+            // fastexcelのRow.getRowNum()は1始まりなので、0始まりに変換すると2になる
+            assertEquals(2, detector.getHeaderRowIndex());
+            
+            rowStream.close();
         }
     }
 }
-
-
