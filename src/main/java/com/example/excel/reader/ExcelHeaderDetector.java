@@ -1,13 +1,18 @@
 package com.example.excel.reader;
 
+import java.text.Normalizer;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
 
 import com.example.common.converter.CellValueConverter;
@@ -27,6 +32,7 @@ public class ExcelHeaderDetector {
 
     /** デフォルトのヘッダー探索行数 */
     private static final int DEFAULT_HEADER_SEARCH_ROWS = 10;
+    private static final DataFormatter HEADER_FORMATTER = new DataFormatter();
 
     private final String headerKeyColumn;
     private final int headerSearchRows;
@@ -94,6 +100,7 @@ public class ExcelHeaderDetector {
      * @return ヘッダー行のインデックス（見つからない場合-1）
      */
     private int findHeaderRowInStream(Iterator<Row> rowIterator) {
+        String normalizedHeaderKey = normalizeHeaderValue(headerKeyColumn);
         if (headerKeyColumn == null) {
             // キー列が指定されていない場合は最初の行をヘッダーとする
             if (rowIterator.hasNext()) {
@@ -117,11 +124,8 @@ public class ExcelHeaderDetector {
             for (int cellIndex = 0; cellIndex < row.getLastCellNum(); cellIndex++) {
                 Cell cell = row.getCell(cellIndex);
                 if (cell != null) {
-                    String cellValue = CellValueConverter.getCellValueAsString(cell);
-                    // nullチェックと空文字チェック（念のため）
-                    if (cellValue != null && !cellValue.isEmpty()) {
-                        // 空白を除去して比較
-                        if (headerKeyColumn.trim().equals(cellValue.trim())) {
+                    for (String candidate : getHeaderCandidates(cell)) {
+                        if (normalizedHeaderKey != null && normalizedHeaderKey.equals(candidate)) {
                             log.debug("ヘッダー行を検出: 行={}, キー列={}", row.getRowNum(), headerKeyColumn);
                             headerRow = row;
                             return row.getRowNum();
@@ -138,8 +142,9 @@ public class ExcelHeaderDetector {
      * ヘッダーマップを構築
      * 
      * @throws KeyColumnNotFoundException キー列がヘッダー行に見つからない場合
+     * @throws HeaderNotFoundException 正規化後のヘッダー名が衝突した場合
      */
-    private void buildHeaderMaps() throws KeyColumnNotFoundException {
+    private void buildHeaderMaps() throws KeyColumnNotFoundException, HeaderNotFoundException {
         headerMap = new HashMap<>();
         columnMap = new HashMap<>();
 
@@ -147,13 +152,20 @@ public class ExcelHeaderDetector {
         for (int i = 0; i < headerRow.getLastCellNum(); i++) {
             Cell cell = headerRow.getCell(i);
             if (cell != null) {
-                String headerValue = CellValueConverter.getCellValueAsString(cell);
-                if (headerValue != null) {
-                    // カラム名の空白を除去してマップに格納
-                    String trimmedHeader = headerValue.trim();
-                    if (!trimmedHeader.isEmpty()) {
-                        headerMap.put(i, trimmedHeader);
-                        columnMap.put(trimmedHeader, i);
+                List<String> candidates = getHeaderCandidates(cell);
+                if (!candidates.isEmpty()) {
+                    String originalHeader = HEADER_FORMATTER.formatCellValue(cell);
+                    headerMap.put(i, candidates.get(0));
+                    for (String candidate : candidates) {
+                        Integer existingIndex = columnMap.putIfAbsent(candidate, i);
+                        if (existingIndex != null && !existingIndex.equals(i)) {
+                            String existingOriginal = headerMap.get(existingIndex);
+                            log.error("正規化後のヘッダー名が衝突しました: 正規化後='{}', 列{}='{}', 列{}='{}'",
+                                    candidate, existingIndex, existingOriginal, i, originalHeader);
+                            throw new HeaderNotFoundException(
+                                    String.format("正規化後のヘッダー名が衝突しました: 正規化後='%s', 列%d='%s', 列%d='%s'",
+                                            candidate, existingIndex, existingOriginal, i, originalHeader));
+                        }
                     }
                 }
             }
@@ -161,13 +173,54 @@ public class ExcelHeaderDetector {
 
         // キー列のインデックスを取得（終了判定用）
         if (headerKeyColumn != null) {
-            // 比較時もトリムされた値を使用
-            keyColumnIndex = columnMap.get(headerKeyColumn.trim());
+            // 比較時も正規化済みの値を使用
+            keyColumnIndex = columnMap.get(normalizeHeaderValue(headerKeyColumn));
             if (keyColumnIndex == null) {
                 log.error("キー列 '{}' がヘッダー行に見つかりませんでした", headerKeyColumn);
                 throw new KeyColumnNotFoundException(headerKeyColumn);
             }
         }
+    }
+
+    static String normalizeHeaderValue(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = Normalizer.normalize(value, Normalizer.Form.NFKC);
+        normalized = normalized.replace("\uFEFF", "").replace("\u200B", "");
+        normalized = normalized.replace("\u00A0", " ").replace("\u3000", " ");
+        normalized = normalized.replaceAll("\\p{C}", "");
+        normalized = normalized.replaceAll("\\s+[\\p{IsHiragana}\\p{IsKatakana}\\u30FC]+$", "");
+        return normalized.trim();
+    }
+
+    private static List<String> getHeaderCandidates(Cell cell) {
+        List<String> candidates = new ArrayList<>();
+        String formatted = HEADER_FORMATTER.formatCellValue(cell);
+        if (formatted != null && !formatted.trim().isEmpty()) {
+            addCandidate(candidates, formatted.trim());
+        }
+        return candidates;
+    }
+
+    private static void addCandidate(List<String> candidates, String value) {
+        String normalized = normalizeHeaderValue(value);
+        if (normalized != null && !normalized.isEmpty() && !candidates.contains(normalized)) {
+            candidates.add(normalized);
+        }
+        String compacted = compactHeaderValue(normalized);
+        if (compacted != null && !compacted.isEmpty() && !candidates.contains(compacted)) {
+            candidates.add(compacted);
+        }
+    }
+
+    private static String compactHeaderValue(String value) {
+        if (value == null) {
+            return null;
+        }
+        String compacted = value.replaceAll("[\\p{Z}\\p{P}]", "");
+        compacted = compacted.replaceAll("[\\p{IsHiragana}\\p{IsKatakana}\\u30FC]", "");
+        return compacted.trim();
     }
 
     /**

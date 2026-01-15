@@ -224,9 +224,12 @@ public class ExcelRowIterator<T> implements Iterator<T> {
         if (!usePositionMapping) {
             Map<String, Integer> columnMap = headerDetector.getColumnMap();
             for (FieldMappingCache.FieldMappingInfo mappingInfo : fieldMappingCache.getCache().values()) {
-                if (mappingInfo.getColumnName() != null && !columnMap.containsKey(mappingInfo.getColumnName())) {
-                    log.error("必須ヘッダーカラム '{}' が見つかりません", mappingInfo.getColumnName());
-                    throw new HeaderNotFoundException("必須ヘッダーカラムが見つかりません: " + mappingInfo.getColumnName());
+                if (mappingInfo.getColumnName() != null) {
+                    String normalizedColumnName = ExcelHeaderDetector.normalizeHeaderValue(mappingInfo.getColumnName());
+                    if (!columnMap.containsKey(normalizedColumnName)) {
+                        log.error("必須ヘッダーカラム '{}' が見つかりません", mappingInfo.getColumnName());
+                        throw new HeaderNotFoundException("必須ヘッダーカラムが見つかりません: " + mappingInfo.getColumnName());
+                    }
                 }
             }
         }
@@ -266,7 +269,8 @@ public class ExcelRowIterator<T> implements Iterator<T> {
                 if (usePositionMapping) {
                     columnIndex = mappingInfo.getPosition();
                 } else {
-                    columnIndex = columnMap.get(mappingInfo.getColumnName());
+                    String normalizedColumnName = ExcelHeaderDetector.normalizeHeaderValue(mappingInfo.getColumnName());
+                    columnIndex = columnMap.get(normalizedColumnName);
             }
 
             if (columnIndex != null && columnIndex < row.getLastCellNum()) {

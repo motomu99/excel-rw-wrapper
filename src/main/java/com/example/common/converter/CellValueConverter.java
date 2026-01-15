@@ -8,6 +8,7 @@ import java.util.Set;
 
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.DateUtil;
 
 import com.example.exception.CellValueConversionException;
@@ -31,6 +32,7 @@ public class CellValueConverter {
         Long.class, long.class,
         Double.class, double.class
     );
+    private static final DataFormatter FORMATTER = new DataFormatter();
 
     @SuppressFBWarnings("CT_CONSTRUCTOR_THROW")
     private CellValueConverter() {
@@ -48,29 +50,48 @@ public class CellValueConverter {
         if (cell == null) {
             return "";
         }
-
-        return switch (cell.getCellType()) {
-            case STRING -> {
-                var rich = cell.getRichStringCellValue();
-                yield rich != null ? rich.getString() : "";
-            }
-            case NUMERIC -> {
-                if (DateUtil.isCellDateFormatted(cell)) {
-                    yield formatDateCell(cell);
+        if (cell.getCellType() == CellType.BOOLEAN) {
+            return String.valueOf(cell.getBooleanCellValue());
+        }
+        if (cell.getCellType() == CellType.FORMULA) {
+            return cell.getCellFormula();
+        }
+        if (cell.getCellType() == CellType.NUMERIC) {
+            if (DateUtil.isCellDateFormatted(cell)) {
+                return formatDateCell(cell);
+            } else {
+                double value = cell.getNumericCellValue();
+                // 整数値かどうかをチェック（小数点以下が0の場合）
+                if (value == (long) value) {
+                    return String.valueOf((long) value);
                 } else {
-                    double value = cell.getNumericCellValue();
-                    // 整数値かどうかをチェック（小数点以下が0の場合）
-                    if (value == (long) value) {
-                        yield String.valueOf((long) value);
-                    } else {
-                        yield String.valueOf(value);
-                    }
+                    return String.valueOf(value);
                 }
             }
-            case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
-            case FORMULA -> cell.getCellFormula();
-            default -> "";
-        };
+        }
+        if (cell.getCellType() == CellType.STRING) {
+            // STRINGセルはFORMATTERで見た目の値を取得し、フリガナ除去のみ適用
+            String formattedValue = FORMATTER.formatCellValue(cell);
+            return removeTrailingFurigana(formattedValue);
+        }
+        // その他のセルタイプ（BLANK等）はFORMATTERで処理
+        String formattedValue = FORMATTER.formatCellValue(cell);
+        return formattedValue == null ? "" : formattedValue.trim();
+    }
+
+    /**
+     * 末尾のフリガナを除去（データ完全性を保つための最小限の処理）
+     * 
+     * @param value 文字列値
+     * @return フリガナ除去後の文字列
+     */
+    private static String removeTrailingFurigana(String value) {
+        if (value == null) {
+            return "";
+        }
+        // 末尾の空白+かな文字（フリガナ）のみ除去
+        String cleaned = value.replaceAll("\\s+[\\p{IsHiragana}\\p{IsKatakana}\\u30FC]+$", "");
+        return cleaned.trim();
     }
 
     /**
