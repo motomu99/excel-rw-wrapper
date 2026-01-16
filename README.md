@@ -738,7 +738,7 @@ CsvExternalSorter.builder(inputPath, outputPath)
 
 ## Excel読み込み機能 📊
 
-Apache POIとFastExcel ReaderをラップしたシンプルなExcel読み込みライブラリです。フリガナ付きセルの末尾フリガナも正しく処理できます。ヘッダー名は厳密一致です。
+Apache POIとFastExcel ReaderをラップしたシンプルなExcel読み込みライブラリです。フリガナ付きセルの末尾フリガナも正しく処理できます。ヘッダー名は前後空白をトリムした上で厳密一致です。
 
 ### ExcelStreamReader（Stream APIでの読み込み）
 

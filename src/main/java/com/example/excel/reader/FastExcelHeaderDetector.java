@@ -96,7 +96,8 @@ public class FastExcelHeaderDetector {
      * @return ヘッダー行のインデックス（見つからない場合-1）
      */
     private int findHeaderRowInStream(Iterator<Row> rowIterator) {
-        if (headerKeyColumn == null) {
+        String trimmedHeaderKey = trimToNull(headerKeyColumn);
+        if (trimmedHeaderKey == null) {
             // キー列が指定されていない場合は最初の行をヘッダーとする
             if (rowIterator.hasNext()) {
                 headerRow = rowIterator.next();
@@ -126,7 +127,7 @@ public class FastExcelHeaderDetector {
                 }
                 List<String> candidates = getHeaderCandidates(cellText);
                 for (String candidate : candidates) {
-                    if (headerKeyColumn != null && headerKeyColumn.equals(candidate)) {
+                    if (trimmedHeaderKey != null && trimmedHeaderKey.equals(candidate)) {
                         log.debug("ヘッダー行を検出: 行={}, キー列={}", row.getRowNum(), headerKeyColumn);
                         headerRow = row;
                         headerRowIndex = row.getRowNum() - 1;
@@ -181,7 +182,7 @@ public class FastExcelHeaderDetector {
             
             List<String> candidates = getHeaderCandidates(cellText);
             if (!candidates.isEmpty()) {
-                String originalHeader = cellText;
+            String originalHeader = candidates.get(0);
                 headerMap.put(i, candidates.get(0));
                 for (String candidate : candidates) {
                     Integer existingIndex = columnMap.putIfAbsent(candidate, i);
@@ -198,8 +199,9 @@ public class FastExcelHeaderDetector {
         }
 
         // キー列のインデックスを取得（終了判定用）
-        if (headerKeyColumn != null) {
-            keyColumnIndex = columnMap.get(headerKeyColumn);
+        String trimmedHeaderKey = trimToNull(headerKeyColumn);
+        if (trimmedHeaderKey != null) {
+            keyColumnIndex = columnMap.get(trimmedHeaderKey);
             if (keyColumnIndex == null) {
                 log.error("キー列 '{}' がヘッダー行に見つかりませんでした", headerKeyColumn);
                 throw new KeyColumnNotFoundException(headerKeyColumn);
@@ -215,10 +217,19 @@ public class FastExcelHeaderDetector {
      */
     private static List<String> getHeaderCandidates(String cellText) {
         List<String> candidates = new ArrayList<>();
-        if (cellText != null && !cellText.isEmpty()) {
-            candidates.add(cellText);
+        String trimmed = trimToNull(cellText);
+        if (trimmed != null) {
+            candidates.add(trimmed);
         }
         return candidates;
+    }
+
+    private static String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     /**
