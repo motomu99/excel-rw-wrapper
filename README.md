@@ -11,14 +11,14 @@ OpenCSVをラップしたシンプルなCSV読み込みライブラリです。
 - 🎯 **Bean対応**: アノテーションで項目名を指定してBeanにマッピング
 - ✅ **列数検証**: CSV/TSVファイルの列数不整合を自動検出し、エラーを早期に検知
 - 🔢 **行番号トラッキング**: データの元ファイル行番号を自動取得してエラー特定を容易に
-- 📝 **フリガナ対応**: Excelセルのフリガナを自動的に削除して読み込み（FastExcel Reader使用）
+- 📝 **フリガナ対応**: Excelセルの末尾フリガナを自動的に削除して読み込み（FastExcel Reader使用）
 
 ## 依存関係
 
 - Java 21以上
 - OpenCSV 5.9 (CSV読み書き用)
 - Apache POI 5.2.5 (Excel読み書き用)
-- FastExcel Reader 0.19.0 (大容量Excel読み込み用、フリガナ対応)
+- FastExcel Reader 0.19.0 (大容量Excel読み込み用)
 - Lombok 1.18.30 (Beanクラスの自動生成用)
 
 ## 📚 ドキュメント
@@ -738,7 +738,7 @@ CsvExternalSorter.builder(inputPath, outputPath)
 
 ## Excel読み込み機能 📊
 
-Apache POIとFastExcel ReaderをラップしたシンプルなExcel読み込みライブラリです。フリガナ付きセルも正しく処理できます。
+Apache POIとFastExcel ReaderをラップしたシンプルなExcel読み込みライブラリです。フリガナ付きセルの末尾フリガナも正しく処理できます。ヘッダー名は厳密一致です。
 
 ### ExcelStreamReader（Stream APIでの読み込み）
 

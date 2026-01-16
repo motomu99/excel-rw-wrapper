@@ -164,7 +164,7 @@ public class FastExcelHeaderDetector {
      * ヘッダーマップを構築
      * 
      * @throws KeyColumnNotFoundException キー列がヘッダー行に見つからない場合
-     * @throws HeaderNotFoundException 正規化後のヘッダー名が衝突した場合
+     * @throws HeaderNotFoundException ヘッダー名が重複した場合
      */
     private void buildHeaderMaps() throws KeyColumnNotFoundException, HeaderNotFoundException {
         headerMap = new HashMap<>();
@@ -181,16 +181,16 @@ public class FastExcelHeaderDetector {
             
             List<String> candidates = getHeaderCandidates(cellText);
             if (!candidates.isEmpty()) {
-                String originalHeader = cellText.trim();
+                String originalHeader = cellText;
                 headerMap.put(i, candidates.get(0));
                 for (String candidate : candidates) {
                     Integer existingIndex = columnMap.putIfAbsent(candidate, i);
                     if (existingIndex != null && !existingIndex.equals(i)) {
                         String existingOriginal = headerMap.get(existingIndex);
-                        log.error("正規化後のヘッダー名が衝突しました: 正規化後='{}', 列{}='{}', 列{}='{}'",
+                        log.error("ヘッダー名が重複しました: ヘッダー='{}', 列{}='{}', 列{}='{}'",
                                 candidate, existingIndex, existingOriginal, i, originalHeader);
                         throw new HeaderNotFoundException(
-                                String.format("正規化後のヘッダー名が衝突しました: 正規化後='%s', 列%d='%s', 列%d='%s'",
+                                String.format("ヘッダー名が重複しました: ヘッダー='%s', 列%d='%s', 列%d='%s'",
                                         candidate, existingIndex, existingOriginal, i, originalHeader));
                     }
                 }
