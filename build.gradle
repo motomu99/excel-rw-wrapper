@@ -2,9 +2,10 @@ plugins {
     id 'java'
     id 'java-library'
     id 'jacoco'
-    id 'com.github.spotbugs' version '6.0.7'
+    id 'com.github.spotbugs' version '6.4.8'
     id 'checkstyle'
     id 'pmd'
+    id 'com.github.ben-manes.versions' version '0.53.0'
 }
 
 group = 'com.example'
@@ -26,27 +27,27 @@ repositories {
 
 dependencies {
     // OpenCSV
-    api 'com.opencsv:opencsv:5.9'
+    api 'com.opencsv:opencsv:5.12.0'
 
     // 文字コード自動判別
-    api 'com.github.albfernandez:juniversalchardet:2.4.0'
+    api 'com.github.albfernandez:juniversalchardet:2.5.0'
 
     // Apache POI for Excel
-    api 'org.apache.poi:poi:5.2.5'
-    api 'org.apache.poi:poi-ooxml:5.2.5'
+    api 'org.apache.poi:poi:5.5.1'
+    api 'org.apache.poi:poi-ooxml:5.5.1'
     
     // FastExcel Reader (メモリ効率の良い大量データ読み込み用)
     api 'org.dhatim:fastexcel-reader:0.19.0'
 
     // Lombok
-    compileOnly 'org.projectlombok:lombok:1.18.30'
-    annotationProcessor 'org.projectlombok:lombok:1.18.30'
-    testCompileOnly 'org.projectlombok:lombok:1.18.30'
-    testAnnotationProcessor 'org.projectlombok:lombok:1.18.30'
+    compileOnly 'org.projectlombok:lombok:1.18.42'
+    annotationProcessor 'org.projectlombok:lombok:1.18.42'
+    testCompileOnly 'org.projectlombok:lombok:1.18.42'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.42'
 
     // SLF4J (ログ出力用)
     api 'org.slf4j:slf4j-api:2.0.9'
-    runtimeOnly 'ch.qos.logback:logback-classic:1.4.11'
+    runtimeOnly 'ch.qos.logback:logback-classic:1.5.24'
 
     // Test Dependencies
     testImplementation 'junit:junit:4.13.2'
@@ -54,8 +55,8 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.0'
 
     // SpotBugs Annotations (for @SuppressFBWarnings)
-    compileOnly 'com.github.spotbugs:spotbugs-annotations:4.8.3'
-    testCompileOnly 'com.github.spotbugs:spotbugs-annotations:4.8.3'
+    compileOnly 'com.github.spotbugs:spotbugs-annotations:4.9.8'
+    testCompileOnly 'com.github.spotbugs:spotbugs-annotations:4.9.8'
 }
 
 tasks.named('test') {
@@ -157,7 +158,7 @@ test {
 
 // SpotBugs設定
 spotbugs {
-    toolVersion = '4.8.3'
+    toolVersion = '4.9.8'
     ignoreFailures = false
 }
 
