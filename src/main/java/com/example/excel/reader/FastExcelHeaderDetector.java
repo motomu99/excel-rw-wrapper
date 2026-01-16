@@ -28,6 +28,7 @@ public class FastExcelHeaderDetector {
 
     /** デフォルトのヘッダー探索行数 */
     private static final int DEFAULT_HEADER_SEARCH_ROWS = 10;
+    private static final int MAX_EXCEL_COLUMNS = 16384;
 
     private final String headerKeyColumn;
     private final int headerSearchRows;
@@ -118,20 +119,13 @@ public class FastExcelHeaderDetector {
             }
 
             // 行内のすべてのセルをチェックして、キー列名があるか確認
-            // fastexcelのRowは最大列数を直接取得できないため、適切な範囲でチェック
-            int cellCount = row.getCellCount();
+            int cellCount = getScanLimit(row);
             for (int cellIndex = 0; cellIndex < cellCount; cellIndex++) {
                 String cellText = getCellTextSafely(row, cellIndex);
                 if (cellText == null) {
-                    // この列以降にセルがない可能性があるので、次の行へ
-                    if (cellIndex == 0) {
-                        // 最初のセルがnullなら空行として扱う
-                        break;
-                    }
-                    // セルがなくなったら次の行へ
-                    break;
+                    // 空セルはスキップ（スパースな行でも後続を確認）
+                    continue;
                 }
-                
                 List<String> candidates = getHeaderCandidates(cellText);
                 for (String candidate : candidates) {
                     if (normalizedHeaderKey != null && normalizedHeaderKey.equals(candidate)) {
@@ -179,18 +173,12 @@ public class FastExcelHeaderDetector {
         columnMap = new HashMap<>();
 
         // ヘッダー情報を構築
-        // fastexcelのRowは最大列数を直接取得できないため、適切な範囲でチェック
-        int cellCount = headerRow.getCellCount();
+        int cellCount = getScanLimit(headerRow);
         for (int i = 0; i < cellCount; i++) {
             String cellText = getCellTextSafely(headerRow, i);
             if (cellText == null) {
-                // セルがなくなったら終了
-                if (i == 0) {
-                    // 最初のセルがnullなら空行として扱う
-                    break;
-                }
-                // セルがなくなったら終了
-                break;
+                // 空セルはスキップ（スパースな行でも後続を確認）
+                continue;
             }
             
             List<String> candidates = getHeaderCandidates(cellText);
@@ -252,6 +240,28 @@ public class FastExcelHeaderDetector {
             addCandidate(candidates, cellText.trim());
         }
         return candidates;
+    }
+
+    /**
+     * 行内のセルをスキャンする上限を取得（スパースな行に対応）
+     */
+    private static int getScanLimit(Row row) {
+        if (row == null) {
+            return 0;
+        }
+        int cellCount = row.getCellCount();
+        if (cellCount <= 0) {
+            return 0;
+        }
+        int foundCells = 0;
+        int maxIndex = -1;
+        for (int index = 0; index < MAX_EXCEL_COLUMNS && foundCells < cellCount; index++) {
+            if (row.hasCell(index)) {
+                foundCells++;
+                maxIndex = index;
+            }
+        }
+        return maxIndex >= 0 ? maxIndex + 1 : 0;
     }
 
     /**

@@ -33,6 +33,8 @@ public class ExcelReaderTest {
     private static final Path SAMPLE_EXCEL_WITH_TITLE = TEST_RESOURCES_DIR.resolve("sample_with_title.xlsx");
     private static final Path SAMPLE_EXCEL_WITH_EMPTY_KEY = TEST_RESOURCES_DIR.resolve("sample_with_empty_key.xlsx");
     private static final Path SAMPLE_EXCEL_HEADER_AT_A1 = TEST_RESOURCES_DIR.resolve("sample_header_at_a1.xlsx");
+    private static final Path SAMPLE_EXCEL_HEADER_START_B = TEST_RESOURCES_DIR.resolve("sample_header_start_b.xlsx");
+    private static final Path SAMPLE_EXCEL_SPARSE_ROW = TEST_RESOURCES_DIR.resolve("sample_sparse_row.xlsx");
     private static final Path SAMPLE_EXCEL_CUSTOM_CONVERTER = TEST_RESOURCES_DIR.resolve("sample_custom_converter.xlsx");
 
     @BeforeAll
@@ -57,6 +59,12 @@ public class ExcelReaderTest {
 
         // A1にヘッダー行があるサンプルExcelファイルを作成
         createSampleExcelHeaderAtA1();
+
+        // A列が空でB列からヘッダーが始まるサンプルExcelファイルを作成
+        createSampleExcelHeaderStartAtB();
+
+        // 行内に空セルが混在するサンプルExcelファイルを作成
+        createSampleExcelWithSparseRow();
 
         // カスタムコンバーター検証用のサンプルExcelファイルを作成（ヘッダーベース）
         createSampleExcelWithCustomConverter();
@@ -209,6 +217,57 @@ public class ExcelReaderTest {
             createDataRow(sheet, 1, "田中太郎", 25, "エンジニア", "東京");
             createDataRow(sheet, 2, "佐藤花子", 30, "デザイナー", "大阪");
             createDataRow(sheet, 3, "山田次郎", 28, "営業", "福岡");
+
+            workbook.write(fos);
+        }
+    }
+
+    private static void createSampleExcelHeaderStartAtB() throws IOException {
+        try (Workbook workbook = new XSSFWorkbook();
+             FileOutputStream fos = new FileOutputStream(SAMPLE_EXCEL_HEADER_START_B.toFile())) {
+
+            Sheet sheet = workbook.createSheet("Sheet1");
+
+            // A列は空、B列からヘッダー
+            Row headerRow = sheet.createRow(0);
+            headerRow.createCell(1).setCellValue("名前");
+            headerRow.createCell(2).setCellValue("年齢");
+            headerRow.createCell(3).setCellValue("職業");
+            headerRow.createCell(4).setCellValue("出身地");
+
+            // データ行（B列から）
+            Row dataRow1 = sheet.createRow(1);
+            dataRow1.createCell(1).setCellValue("田中太郎");
+            dataRow1.createCell(2).setCellValue(25);
+            dataRow1.createCell(3).setCellValue("エンジニア");
+            dataRow1.createCell(4).setCellValue("東京");
+
+            Row dataRow2 = sheet.createRow(2);
+            dataRow2.createCell(1).setCellValue("佐藤花子");
+            dataRow2.createCell(2).setCellValue(30);
+            dataRow2.createCell(3).setCellValue("デザイナー");
+            dataRow2.createCell(4).setCellValue("大阪");
+
+            workbook.write(fos);
+        }
+    }
+
+    private static void createSampleExcelWithSparseRow() throws IOException {
+        try (Workbook workbook = new XSSFWorkbook();
+             FileOutputStream fos = new FileOutputStream(SAMPLE_EXCEL_SPARSE_ROW.toFile())) {
+
+            Sheet sheet = workbook.createSheet("Sheet1");
+
+            Row headerRow = sheet.createRow(0);
+            headerRow.createCell(0).setCellValue("名前");
+            headerRow.createCell(1).setCellValue("年齢");
+            headerRow.createCell(2).setCellValue("職業");
+            headerRow.createCell(3).setCellValue("出身地");
+
+            // [null, whitespace, null, data] のパターン
+            Row dataRow = sheet.createRow(1);
+            dataRow.createCell(1).setCellValue("   ");
+            dataRow.createCell(3).setCellValue("東京");
 
             workbook.write(fos);
         }
@@ -379,6 +438,35 @@ public class ExcelReaderTest {
         assertEquals(30, secondPerson.getAge());
         assertEquals("デザイナー", secondPerson.getOccupation());
         assertEquals("大阪", secondPerson.getBirthplace());
+    }
+
+    @Test
+    @DisplayName("ヘッダー自動検出 - A列が空でB列から始まるヘッダーでも読み込めること")
+    void testReadWithHeaderKeyStartAtB() throws IOException {
+        List<Person> result = ExcelReader.builder(Person.class, SAMPLE_EXCEL_HEADER_START_B)
+            .headerKey("名前")
+            .headerSearchRows(5)
+            .read();
+
+        assertNotNull(result);
+        assertEquals(2, result.size());
+
+        Person firstPerson = result.get(0);
+        assertEquals("田中太郎", firstPerson.getName());
+        assertEquals(25, firstPerson.getAge());
+        assertEquals("エンジニア", firstPerson.getOccupation());
+        assertEquals("東京", firstPerson.getBirthplace());
+    }
+
+    @Test
+    @DisplayName("空セルが混在する行でも空行扱いされず読み込めること")
+    void testReadWithSparseRow() throws IOException {
+        List<Person> result = ExcelReader.builder(Person.class, SAMPLE_EXCEL_SPARSE_ROW)
+            .read();
+
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals("東京", result.get(0).getBirthplace());
     }
 
     @Test

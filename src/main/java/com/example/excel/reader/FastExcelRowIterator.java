@@ -30,6 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class FastExcelRowIterator<T> implements Iterator<T> {
 
+    private static final int MAX_EXCEL_COLUMNS = 16384;
     private final Iterator<Row> rowIterator;
     private final Class<T> beanClass;
     private final String headerKeyColumn;
@@ -394,17 +395,12 @@ public class FastExcelRowIterator<T> implements Iterator<T> {
      */
     private boolean isEmptyRow(Row row) {
         // 適切な範囲でセルをチェック（最大1000列まで）
-        int cellCount = row.getCellCount();
+        int cellCount = getScanLimit(row);
         for (int i = 0; i < cellCount; i++) {
             String value = CellValueConverter.getCellValueAsString(row, i);
             if (value == null) {
-                // セルがなくなったら終了
-                if (i == 0) {
-                    // 最初のセルがnullなら空行として扱う
-                    return true;
-                }
-                // セルがなくなったら終了
-                break;
+                // nullセルはスキップ（間欠的な空セルがあっても後続を確認）
+                continue;
             }
             if (value != null && !value.trim().isEmpty()) {
                 return false;
@@ -420,6 +416,28 @@ public class FastExcelRowIterator<T> implements Iterator<T> {
      * @return 列数（最後のセルインデックス + 1）
      */
     private int getColumnCount(Row row) {
-        return row.getCellCount();
+        return getScanLimit(row);
+    }
+
+    /**
+     * 行内のセルをスキャンする上限を取得（スパースな行に対応）
+     */
+    private static int getScanLimit(Row row) {
+        if (row == null) {
+            return 0;
+        }
+        int cellCount = row.getCellCount();
+        if (cellCount <= 0) {
+            return 0;
+        }
+        int foundCells = 0;
+        int maxIndex = -1;
+        for (int index = 0; index < MAX_EXCEL_COLUMNS && foundCells < cellCount; index++) {
+            if (row.hasCell(index)) {
+                foundCells++;
+                maxIndex = index;
+            }
+        }
+        return maxIndex >= 0 ? maxIndex + 1 : 0;
     }
 }

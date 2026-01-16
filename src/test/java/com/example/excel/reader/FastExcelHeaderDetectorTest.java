@@ -134,4 +134,86 @@ class FastExcelHeaderDetectorTest {
             rowStream.close();
         }
     }
+
+    @Test
+    @DisplayName("ヘッダー検出 - A列が空でB列から始まるヘッダーを検出できること")
+    void testDetectHeader_StartFromColumnB() throws IOException, HeaderNotFoundException, KeyColumnNotFoundException {
+        Path excelFile = tempDir.resolve("header_start_b.xlsx");
+        try (Workbook workbook = new XSSFWorkbook();
+             FileOutputStream fos = new FileOutputStream(excelFile.toFile())) {
+
+            Sheet sheet = workbook.createSheet("Sheet1");
+            Row headerRow = sheet.createRow(0);
+            headerRow.createCell(1).setCellValue("ID");
+            headerRow.createCell(2).setCellValue("Name");
+
+            Row dataRow = sheet.createRow(1);
+            dataRow.createCell(1).setCellValue(1);
+            dataRow.createCell(2).setCellValue("Alice");
+
+            workbook.write(fos);
+        }
+
+        try (InputStream inputStream = Files.newInputStream(excelFile);
+             ReadableWorkbook workbook = new ReadableWorkbook(inputStream)) {
+            org.dhatim.fastexcel.reader.Sheet sheet = workbook.getFirstSheet();
+            Stream<org.dhatim.fastexcel.reader.Row> rowStream = sheet.openStream();
+            Iterator<org.dhatim.fastexcel.reader.Row> rowIterator = rowStream.iterator();
+
+            FastExcelHeaderDetector detector = new FastExcelHeaderDetector("ID", 5);
+            boolean found = detector.detectHeader(rowIterator);
+
+            assertTrue(found, "ヘッダーが見つかること");
+            Map<String, Integer> columnMap = detector.getColumnMap();
+            assertEquals(1, columnMap.get("ID"));
+            assertEquals(2, columnMap.get("Name"));
+
+            Map<Integer, String> headerMap = detector.getHeaderMap();
+            assertEquals("ID", headerMap.get(1));
+            assertEquals("Name", headerMap.get(2));
+
+            rowStream.close();
+        }
+    }
+
+    @Test
+    @DisplayName("ヘッダー検出 - スパースなヘッダー行でも検出できること")
+    void testDetectHeader_SparseHeaderRow() throws IOException, HeaderNotFoundException, KeyColumnNotFoundException {
+        Path excelFile = tempDir.resolve("sparse_header.xlsx");
+        try (Workbook workbook = new XSSFWorkbook();
+             FileOutputStream fos = new FileOutputStream(excelFile.toFile())) {
+
+            Sheet sheet = workbook.createSheet("Sheet1");
+            Row headerRow = sheet.createRow(0);
+            headerRow.createCell(1).setCellValue("ID");
+            headerRow.createCell(3).setCellValue("Name");
+
+            Row dataRow = sheet.createRow(1);
+            dataRow.createCell(1).setCellValue(1);
+            dataRow.createCell(3).setCellValue("Alice");
+
+            workbook.write(fos);
+        }
+
+        try (InputStream inputStream = Files.newInputStream(excelFile);
+             ReadableWorkbook workbook = new ReadableWorkbook(inputStream)) {
+            org.dhatim.fastexcel.reader.Sheet sheet = workbook.getFirstSheet();
+            Stream<org.dhatim.fastexcel.reader.Row> rowStream = sheet.openStream();
+            Iterator<org.dhatim.fastexcel.reader.Row> rowIterator = rowStream.iterator();
+
+            FastExcelHeaderDetector detector = new FastExcelHeaderDetector("Name", 5);
+            boolean found = detector.detectHeader(rowIterator);
+
+            assertTrue(found, "ヘッダーが見つかること");
+            Map<String, Integer> columnMap = detector.getColumnMap();
+            assertEquals(1, columnMap.get("ID"));
+            assertEquals(3, columnMap.get("Name"));
+
+            Map<Integer, String> headerMap = detector.getHeaderMap();
+            assertEquals("ID", headerMap.get(1));
+            assertEquals("Name", headerMap.get(3));
+
+            rowStream.close();
+        }
+    }
 }
