@@ -1,6 +1,5 @@
 package com.example.excel.reader;
 
-import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -97,7 +96,6 @@ public class FastExcelHeaderDetector {
      * @return ヘッダー行のインデックス（見つからない場合-1）
      */
     private int findHeaderRowInStream(Iterator<Row> rowIterator) {
-        String normalizedHeaderKey = normalizeHeaderValue(headerKeyColumn);
         if (headerKeyColumn == null) {
             // キー列が指定されていない場合は最初の行をヘッダーとする
             if (rowIterator.hasNext()) {
@@ -128,7 +126,7 @@ public class FastExcelHeaderDetector {
                 }
                 List<String> candidates = getHeaderCandidates(cellText);
                 for (String candidate : candidates) {
-                    if (normalizedHeaderKey != null && normalizedHeaderKey.equals(candidate)) {
+                    if (headerKeyColumn != null && headerKeyColumn.equals(candidate)) {
                         log.debug("ヘッダー行を検出: 行={}, キー列={}", row.getRowNum(), headerKeyColumn);
                         headerRow = row;
                         headerRowIndex = row.getRowNum() - 1;
@@ -201,8 +199,7 @@ public class FastExcelHeaderDetector {
 
         // キー列のインデックスを取得（終了判定用）
         if (headerKeyColumn != null) {
-            // 比較時も正規化済みの値を使用
-            keyColumnIndex = columnMap.get(normalizeHeaderValue(headerKeyColumn));
+            keyColumnIndex = columnMap.get(headerKeyColumn);
             if (keyColumnIndex == null) {
                 log.error("キー列 '{}' がヘッダー行に見つかりませんでした", headerKeyColumn);
                 throw new KeyColumnNotFoundException(headerKeyColumn);
@@ -211,33 +208,15 @@ public class FastExcelHeaderDetector {
     }
 
     /**
-     * ヘッダー値を正規化（フリガナ削除など）
-     * 
-     * @param value 元の値
-     * @return 正規化後の値
-     */
-    static String normalizeHeaderValue(String value) {
-        if (value == null) {
-            return null;
-        }
-        String normalized = Normalizer.normalize(value, Normalizer.Form.NFKC);
-        normalized = normalized.replace("\uFEFF", "").replace("\u200B", "");
-        normalized = normalized.replace("\u00A0", " ").replace("\u3000", " ");
-        normalized = normalized.replaceAll("\\p{C}", "");
-        normalized = normalized.replaceAll("\\s+[\\p{IsHiragana}\\p{IsKatakana}\\u30FC]+$", "");
-        return normalized.trim();
-    }
-
-    /**
-     * ヘッダー候補を取得
+     * ヘッダー候補を取得（厳密一致）
      * 
      * @param cellText セルのテキスト
      * @return ヘッダー候補のリスト
      */
     private static List<String> getHeaderCandidates(String cellText) {
         List<String> candidates = new ArrayList<>();
-        if (cellText != null && !cellText.trim().isEmpty()) {
-            addCandidate(candidates, cellText.trim());
+        if (cellText != null && !cellText.isEmpty()) {
+            candidates.add(cellText);
         }
         return candidates;
     }
@@ -264,37 +243,6 @@ public class FastExcelHeaderDetector {
         return maxIndex >= 0 ? maxIndex + 1 : 0;
     }
 
-    /**
-     * ヘッダー候補を追加
-     * 
-     * @param candidates 候補リスト
-     * @param value 値
-     */
-    private static void addCandidate(List<String> candidates, String value) {
-        String normalized = normalizeHeaderValue(value);
-        if (normalized != null && !normalized.isEmpty() && !candidates.contains(normalized)) {
-            candidates.add(normalized);
-        }
-        String compacted = compactHeaderValue(normalized);
-        if (compacted != null && !compacted.isEmpty() && !candidates.contains(compacted)) {
-            candidates.add(compacted);
-        }
-    }
-
-    /**
-     * ヘッダー値を圧縮（空白・記号・フリガナを削除）
-     * 
-     * @param value 値
-     * @return 圧縮後の値
-     */
-    private static String compactHeaderValue(String value) {
-        if (value == null) {
-            return null;
-        }
-        String compacted = value.replaceAll("[\\p{Z}\\p{P}]", "");
-        compacted = compacted.replaceAll("[\\p{IsHiragana}\\p{IsKatakana}\\u30FC]", "");
-        return compacted.trim();
-    }
 
     /**
      * ヘッダー行を取得

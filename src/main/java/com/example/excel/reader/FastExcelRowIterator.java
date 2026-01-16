@@ -230,8 +230,8 @@ public class FastExcelRowIterator<T> implements Iterator<T> {
             Map<String, Integer> columnMap = headerDetector.getColumnMap();
             for (FieldMappingCache.FieldMappingInfo mappingInfo : fieldMappingCache.getCache().values()) {
                 if (mappingInfo.getColumnName() != null) {
-                    String normalizedColumnName = FastExcelHeaderDetector.normalizeHeaderValue(mappingInfo.getColumnName());
-                    if (!columnMap.containsKey(normalizedColumnName)) {
+                    String columnName = mappingInfo.getColumnName();
+                    if (!columnMap.containsKey(columnName)) {
                         log.error("必須ヘッダーカラム '{}' が見つかりません", mappingInfo.getColumnName());
                         throw new HeaderNotFoundException("必須ヘッダーカラムが見つかりません: " + mappingInfo.getColumnName());
                     }
@@ -271,8 +271,8 @@ public class FastExcelRowIterator<T> implements Iterator<T> {
                 if (usePositionMapping) {
                     columnIndex = mappingInfo.getPosition();
                 } else {
-                    String normalizedColumnName = FastExcelHeaderDetector.normalizeHeaderValue(mappingInfo.getColumnName());
-                    columnIndex = columnMap.get(normalizedColumnName);
+                    String columnName = mappingInfo.getColumnName();
+                    columnIndex = columnMap.get(columnName);
             }
 
             if (columnIndex != null) {
