@@ -16,10 +16,10 @@ OpenCSVをラップしたシンプルなCSV読み込みライブラリです。
 ## 依存関係
 
 - Java 21以上
-- OpenCSV 5.9 (CSV読み書き用)
-- Apache POI 5.2.5 (Excel読み書き用)
+- OpenCSV 5.12.0 (CSV読み書き用)
+- Apache POI 5.5.1 (Excel読み書き用)
 - FastExcel Reader 0.19.0 (大容量Excel読み込み用)
-- Lombok 1.18.30 (Beanクラスの自動生成用)
+- Lombok 1.18.42 (Beanクラスの自動生成用)
 
 ## 📚 ドキュメント
 
