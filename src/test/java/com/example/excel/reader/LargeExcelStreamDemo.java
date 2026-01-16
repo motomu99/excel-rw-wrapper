@@ -118,6 +118,9 @@ public class LargeExcelStreamDemo {
      * テスト用の大きなExcelファイルを作成
      */
     private static void createLargeExcel(Path filePath, int rowCount) throws IOException {
+        // 親ディレクトリが存在しない場合は作成
+        Files.createDirectories(filePath.getParent());
+        
         try (Workbook workbook = new XSSFWorkbook();
              FileOutputStream fos = new FileOutputStream(filePath.toFile())) {
 

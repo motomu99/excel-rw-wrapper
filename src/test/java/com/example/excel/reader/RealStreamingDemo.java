@@ -227,6 +227,9 @@ public class RealStreamingDemo {
      * テスト用の大量Excelファイルを作成
      */
     private void createHugeExcel(Path filePath, int rowCount) throws IOException {
+        // 親ディレクトリが存在しない場合は作成
+        Files.createDirectories(filePath.getParent());
+        
         try (Workbook workbook = new XSSFWorkbook();
              FileOutputStream fos = new FileOutputStream(filePath.toFile())) {
 

@@ -285,6 +285,9 @@ public class LargeDataGroupingSorterDemo {
      * テスト用CSV作成
      */
     private void createTestCsv(Path csvPath, int rowCount) throws IOException {
+        // 親ディレクトリが存在しない場合は作成
+        Files.createDirectories(csvPath.getParent());
+        
         String[] occupations = {"エンジニア", "デザイナー", "営業", "マネージャー", "企画"};
         String[] cities = {"東京", "大阪", "福岡", "名古屋", "札幌"};
         

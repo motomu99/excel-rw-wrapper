@@ -241,6 +241,9 @@ public class GroupingStreamingDemo {
      * テスト用Excel作成（グルーピング用）
      */
     private void createGroupingTestExcel(Path filePath, int rowCount) throws IOException {
+        // 親ディレクトリが存在しない場合は作成
+        Files.createDirectories(filePath.getParent());
+        
         try (Workbook workbook = new XSSFWorkbook();
              FileOutputStream fos = new FileOutputStream(filePath.toFile())) {
 
