@@ -168,15 +168,23 @@ public class CsvReaderWrapper {
 
         try (FileInputStream fis = new FileInputStream(filePath.toFile());
              InputStream is = withBom ? BomHandler.skipBom(fis) : fis;
-             InputStreamReader isr = new InputStreamReader(is, charset);
-             com.opencsv.CSVReader csvReader = new com.opencsv.CSVReaderBuilder(isr)
-                 .withCSVParser(new com.opencsv.CSVParserBuilder()
-                     .withSeparator(fileType.getDelimiter().charAt(0))
-                     .withQuoteChar('"')
-                     .withIgnoreQuotations(ignoreQuotations)
-                     .withIgnoreLeadingWhiteSpace(true)
-                     .build())
-                 .build()) {
+             InputStreamReader isr = new InputStreamReader(is, charset)) {
+            com.opencsv.CSVReaderBuilder csvReaderBuilder = new com.opencsv.CSVReaderBuilder(isr)
+                .withCSVParser(new com.opencsv.CSVParserBuilder()
+                    .withSeparator(fileType.getDelimiter().charAt(0))
+                    .withQuoteChar('"')
+                    .withIgnoreQuotations(ignoreQuotations)
+                    .withIgnoreLeadingWhiteSpace(true)
+                    .build());
+
+            boolean isPositionMapping = Boolean.TRUE.equals(usePositionMapping);
+            if (isPositionMapping && skipLines > 0) {
+                // ポジションベースではヘッダー行が自動でスキップされないため、
+                // skipLinesはCSVReader側で処理してパース前に除外する
+                csvReaderBuilder.withSkipLines(skipLines);
+            }
+
+            try (com.opencsv.CSVReader csvReader = csvReaderBuilder.build()) {
             
             MappingStrategy<T> strategy = createMappingStrategy();
             
@@ -192,6 +200,7 @@ public class CsvReaderWrapper {
             setLineNumbers(result, usePositionMapping);
 
             return applySkipLines(result);
+            }
         } catch (IOException e) {
             log.error("CSVファイル読み込み中にエラーが発生: ファイルパス={}, エラー={}", filePath, e.getMessage(), e);
             throw new CsvReadException("CSVファイルの読み込みに失敗しました: " + filePath, e);
@@ -267,7 +276,13 @@ public class CsvReaderWrapper {
 
         // 位置ベースマッピング（ヘッダーなし）の場合は1行目から、
         // ヘッダーベースマッピングの場合は2行目からデータが始まる
-        int lineNumber = (usePositionMapping != null && usePositionMapping) ? 1 : 2;
+        int lineNumber;
+        if (usePositionMapping != null && usePositionMapping) {
+            // 位置ベースは読み込み前スキップを考慮
+            lineNumber = 1 + skipLines;
+        } else {
+            lineNumber = 2;
+        }
 
         for (T bean : result) {
             try {
@@ -312,7 +327,13 @@ public class CsvReaderWrapper {
 
         // 位置ベースマッピング（ヘッダーなし）の場合は1行目から、
         // ヘッダーベースマッピングの場合は2行目からデータが始まる
-        int tempFileLineNumber = (usePositionMapping != null && usePositionMapping) ? 1 : 2;
+        int tempFileLineNumber;
+        if (usePositionMapping != null && usePositionMapping) {
+            // 位置ベースは読み込み前スキップを考慮
+            tempFileLineNumber = 1 + skipLines;
+        } else {
+            tempFileLineNumber = 2;
+        }
 
         for (T bean : result) {
             try {
@@ -460,15 +481,23 @@ public class CsvReaderWrapper {
             
             try (FileInputStream fis = new FileInputStream(fileToRead.toFile());
                  InputStream is = withBom ? BomHandler.skipBom(fis) : fis;
-                 InputStreamReader isr = new InputStreamReader(is, charset);
-                 com.opencsv.CSVReader csvReader = new com.opencsv.CSVReaderBuilder(isr)
-                     .withCSVParser(new com.opencsv.CSVParserBuilder()
-                         .withSeparator(fileType.getDelimiter().charAt(0))
-                         .withQuoteChar('"')
-                         .withIgnoreQuotations(ignoreQuotations)
-                         .withIgnoreLeadingWhiteSpace(true)
-                         .build())
-                     .build()) {
+                 InputStreamReader isr = new InputStreamReader(is, charset)) {
+                
+                com.opencsv.CSVReaderBuilder csvReaderBuilder = new com.opencsv.CSVReaderBuilder(isr)
+                    .withCSVParser(new com.opencsv.CSVParserBuilder()
+                        .withSeparator(fileType.getDelimiter().charAt(0))
+                        .withQuoteChar('"')
+                        .withIgnoreQuotations(ignoreQuotations)
+                        .withIgnoreLeadingWhiteSpace(true)
+                        .build());
+                
+                boolean isPositionMapping = Boolean.TRUE.equals(usePositionMapping);
+                if (isPositionMapping && skipLines > 0) {
+                    // ポジションベースはCSVReader側でスキップ
+                    csvReaderBuilder.withSkipLines(skipLines);
+                }
+
+                try (com.opencsv.CSVReader csvReader = csvReaderBuilder.build()) {
                 
                 MappingStrategy<T> strategy = createMappingStrategy();
                 
@@ -491,6 +520,7 @@ public class CsvReaderWrapper {
                 List<T> finalData = applySkipLines(result);
                 
                 return new CsvReadResult<>(finalData, columnErrors);
+                }
             }
         } catch (IOException e) {
             log.error("CSVファイル読み込み中にエラーが発生: ファイルパス={}, エラー={}", filePath, e.getMessage(), e);
@@ -525,6 +555,10 @@ public class CsvReaderWrapper {
      * @return スキップ処理後のリスト
      */
     private <T> List<T> applySkipLines(List<T> result) {
+        if (Boolean.TRUE.equals(usePositionMapping)) {
+            // 位置ベースはCSVReader側でスキップ済み
+            return result;
+        }
         if (skipLines <= 0) {
             return result;
         }

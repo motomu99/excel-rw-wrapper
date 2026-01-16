@@ -5,11 +5,17 @@ import com.example.common.config.FileType;
 import com.example.exception.CsvReadException;
 import com.example.model.Person;
 import com.example.model.PersonWithoutHeader;
+import com.example.model.PersonWithCustomConverter;
+import com.example.model.PersonWithCustomType;
+import com.example.model.linenumber.PersonWithoutHeaderAndLineNumber;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 
@@ -233,6 +239,94 @@ public class CsvReaderWrapperTest {
         Person firstPerson = persons.get(0);
         assertEquals("田中太郎", firstPerson.getName());
         assertEquals(25, firstPerson.getAge());
+    }
+
+    @Test
+    @DisplayName("カスタムコンバーター - ヘッダーマッピングで@CsvCustomBindByNameが適用されること")
+    void testBuilderWithHeaderMappingAndCustomConverter() throws Exception {
+        String csvContent = String.join(System.lineSeparator(),
+            "名前,年齢,職業",
+            "田中太郎, 40 ,エンジニア",
+            "佐藤花子,30,デザイナー"
+        );
+
+        Path tempCsv = Files.createTempFile("csv-header-custom-converter-", ".csv");
+        Files.writeString(tempCsv, csvContent, StandardCharsets.UTF_8);
+
+        List<PersonWithCustomConverter> result = CsvReaderWrapper
+            .builder(PersonWithCustomConverter.class, tempCsv)
+            .useHeaderMapping()
+            .read();
+
+        assertNotNull(result);
+        assertEquals(2, result.size());
+
+        PersonWithCustomConverter first = result.get(0);
+        assertEquals("田中太郎", first.getName());
+        assertEquals(40, first.getAge());
+        // occupation は @CsvCustomBindByPosition 用なので、このテストでは null のまま
+        assertNull(first.getOccupation());
+
+        PersonWithCustomConverter second = result.get(1);
+        assertEquals("佐藤花子", second.getName());
+        assertEquals(30, second.getAge());
+        assertNull(second.getOccupation());
+    }
+
+    @Test
+    @DisplayName("独自型とコンバーター - ポジションベースでヘッダーありCSVを読み込み、独自型に変換できること")
+    void testBuilderWithCustomTypeAndConverter() {
+        List<PersonWithCustomType> result = CsvReaderWrapper
+            .builder(PersonWithCustomType.class, Paths.get("src/test/resources/sample.csv"))
+            .usePositionMapping()
+            .skipLines(1)
+            .read();
+
+        assertNotNull(result);
+        assertEquals(5, result.size());
+
+        PersonWithCustomType firstPerson = result.get(0);
+        assertEquals("田中太郎", firstPerson.getName());
+        assertEquals(25, firstPerson.getAge());
+        assertNotNull(firstPerson.getEmail());
+        assertEquals("エンジニア@example.com", firstPerson.getEmail().getValue());
+        assertEquals("東京", firstPerson.getBirthplace());
+
+        PersonWithCustomType secondPerson = result.get(1);
+        assertEquals("佐藤花子", secondPerson.getName());
+        assertEquals(30, secondPerson.getAge());
+        assertNotNull(secondPerson.getEmail());
+        assertEquals("デザイナー@example.com", secondPerson.getEmail().getValue());
+        assertEquals("大阪", secondPerson.getBirthplace());
+
+        assertTrue(result.stream().allMatch(person -> person.getEmail() != null),
+            "すべてのレコードでEmailが設定されていること");
+    }
+
+    @Test
+    @DisplayName("位置ベースのスキップ - スキップ後も行番号が正しく設定されること")
+    void testBuilderWithPositionMappingAndSkipLinesLineNumber() throws Exception {
+        String csvContent = String.join(System.lineSeparator(),
+            "田中太郎,20,営業",
+            "佐藤花子,30,開発",
+            "山田次郎,40,営業"
+        );
+
+        Path tempCsv = Files.createTempFile("csv-position-skip-lines-", ".csv");
+        Files.writeString(tempCsv, csvContent, StandardCharsets.UTF_8);
+
+        List<PersonWithoutHeaderAndLineNumber> result = CsvReaderWrapper
+            .builder(PersonWithoutHeaderAndLineNumber.class, tempCsv)
+            .usePositionMapping()
+            .skipLines(1)
+            .read();
+
+        assertNotNull(result);
+        assertEquals(2, result.size());
+        assertEquals("佐藤花子", result.get(0).getName());
+        assertEquals(2, result.get(0).getLineNumber());
+        assertEquals("山田次郎", result.get(1).getName());
+        assertEquals(3, result.get(1).getLineNumber());
     }
 
     @Test

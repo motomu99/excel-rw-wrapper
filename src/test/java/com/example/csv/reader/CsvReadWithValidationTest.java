@@ -7,6 +7,7 @@ import org.junit.jupiter.api.DisplayName;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -247,6 +248,35 @@ public class CsvReadWithValidationTest {
         // 3つ目のBeanは元のファイルの8行目（6行目がエラー行なのでスキップ、空行をスキップした論理的行番号6）
         assertEquals(6, data.get(2).getLineNumber());
         assertEquals("伊藤美咲", data.get(2).getName());
+    }
+
+    @Test
+    @DisplayName("位置ベース+スキップ行ありでもエラー行を除外し、行番号が元ファイル基準になること")
+    void testReadWithValidationPositionMappingAndSkipLines() throws IOException, CsvException {
+        Path csvFile = TEST_RESOURCES_DIR.resolve("sample_position_skip_with_errors.csv");
+        String content = String.join(System.lineSeparator(),
+            "田中太郎,20,営業",
+            "佐藤花子,30,開発",
+            "山田次郎,40",
+            "高橋健太,50,総務"
+        );
+        Files.writeString(csvFile, content, StandardCharsets.UTF_8);
+
+        CsvReadResult<com.example.model.linenumber.PersonWithoutHeaderAndLineNumber> result =
+            CsvReaderWrapper.builder(com.example.model.linenumber.PersonWithoutHeaderAndLineNumber.class, csvFile)
+                .usePositionMapping()
+                .skipLines(1)
+                .readWithValidation();
+
+        assertNotNull(result);
+        assertEquals(2, result.getSuccessCount());
+        assertEquals(1, result.getErrorCount());
+
+        List<com.example.model.linenumber.PersonWithoutHeaderAndLineNumber> data = result.getData();
+        assertEquals("佐藤花子", data.get(0).getName());
+        assertEquals(2, data.get(0).getLineNumber());
+        assertEquals("高橋健太", data.get(1).getName());
+        assertEquals(4, data.get(1).getLineNumber());
     }
 
     @Test
