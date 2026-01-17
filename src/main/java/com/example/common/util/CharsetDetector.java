@@ -70,10 +70,15 @@ public class CharsetDetector {
         int totalBytesRead = 0;
         
         // 最大4096バイトまで読み込んで判別を試みる
-        while ((bytesRead = inputStream.read(buffer, 0, 
-                Math.min(buffer.length, MAX_BYTES_TO_DETECT - totalBytesRead))) > 0 
-                && !detector.isDone() 
-                && totalBytesRead < MAX_BYTES_TO_DETECT) {
+        while (true) {
+            if (detector.isDone() || totalBytesRead >= MAX_BYTES_TO_DETECT) {
+                break;
+            }
+            bytesRead = inputStream.read(buffer, 0, 
+                    Math.min(buffer.length, MAX_BYTES_TO_DETECT - totalBytesRead));
+            if (bytesRead <= 0) {
+                break;
+            }
             detector.handleData(buffer, 0, bytesRead);
             totalBytesRead += bytesRead;
         }

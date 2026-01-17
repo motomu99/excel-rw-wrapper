@@ -394,15 +394,17 @@ public class ExcelStreamReader<T> {
             if (rowStream != null) {
                 try {
                     rowStream.close();
-                } catch (Exception e) {
+                } catch (Exception ignored) {
                     // クローズ時のエラーは無視
+                    log.trace("RowStreamのクローズ中にエラーが発生しましたが、無視します。");
                 }
             }
             if (workbook != null) {
                 try {
                     workbook.close();
-                } catch (Exception e) {
+                } catch (Exception ignored) {
                     // クローズ時のエラーは無視
+                    log.trace("Workbookのクローズ中にエラーが発生しましたが、無視します。");
                 }
             }
             if (fis != null) fis.close();
@@ -427,15 +429,17 @@ public class ExcelStreamReader<T> {
             if (rowStream != null) {
                 try {
                     rowStream.close();
-                } catch (Exception e) {
+                } catch (Exception ignored) {
                     // クローズ時のエラーは無視
+                    log.trace("RowStreamのクローズ中にエラーが発生しましたが、無視します。");
                 }
             }
             if (workbook != null) {
                 try {
                     workbook.close();
-                } catch (Exception e) {
+                } catch (Exception ignored) {
                     // クローズ時のエラーは無視
+                    log.trace("Workbookのクローズ中にエラーが発生しましたが、無視します。");
                 }
             }
             if (fis != null) fis.close();

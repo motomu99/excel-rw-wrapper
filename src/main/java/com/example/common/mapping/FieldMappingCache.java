@@ -21,6 +21,8 @@ import com.example.common.annotation.LineNumber;
  * マッピング情報を抽出します。</p>
  */
 public final class FieldMappingCache {
+    private static final String EI_EXPOSE_REP = "EI_EXPOSE_REP";
+    private static final String EI_EXPOSE_REP2 = "EI_EXPOSE_REP2";
 
     private final Map<Field, FieldMappingInfo> cache;
     private final Field lineNumberField;
@@ -49,7 +51,7 @@ public final class FieldMappingCache {
      *
      * @return 行番号フィールド、存在しない場合は {@code null}
      */
-    @SuppressFBWarnings("EI_EXPOSE_REP")
+    @SuppressFBWarnings(EI_EXPOSE_REP)
     public Field getLineNumberField() {
         return lineNumberField;
     }
@@ -204,7 +206,7 @@ public final class FieldMappingCache {
          * @param validatorClass Pre-assignment バリデータクラス
          * @param converterClass カスタムコンバータークラス
          */
-        @SuppressFBWarnings("EI_EXPOSE_REP2")
+        @SuppressFBWarnings(EI_EXPOSE_REP2)
         @SuppressWarnings("PMD.AvoidAccessibilityAlteration")
         public FieldMappingInfo(Field field, String columnName, Integer position,
                                Class<?> validatorClass,
@@ -285,7 +287,7 @@ public final class FieldMappingCache {
          * 
          * <p>Field, Constructor, Methodは実質的にimmutableなため、コピーを返す必要はない。</p>
          */
-        @SuppressFBWarnings("EI_EXPOSE_REP")
+        @SuppressFBWarnings(EI_EXPOSE_REP)
         public Field getField() {
             return field;
         }
@@ -307,7 +309,7 @@ public final class FieldMappingCache {
          * 
          * <p>Constructorは実質的にimmutableなため、コピーを返す必要はない。</p>
          */
-        @SuppressFBWarnings("EI_EXPOSE_REP")
+        @SuppressFBWarnings(EI_EXPOSE_REP)
         public java.lang.reflect.Constructor<?> getValidatorConstructor() {
             return validatorConstructor;
         }
@@ -317,7 +319,7 @@ public final class FieldMappingCache {
          * 
          * <p>Methodは実質的にimmutableなため、コピーを返す必要はない。</p>
          */
-        @SuppressFBWarnings("EI_EXPOSE_REP")
+        @SuppressFBWarnings(EI_EXPOSE_REP)
         public java.lang.reflect.Method getValidatorMethod() {
             return validatorMethod;
         }
@@ -331,7 +333,7 @@ public final class FieldMappingCache {
          * 
          * <p>Constructorは実質的にimmutableなため、コピーを返す必要はない。</p>
          */
-        @SuppressFBWarnings("EI_EXPOSE_REP")
+        @SuppressFBWarnings(EI_EXPOSE_REP)
         public java.lang.reflect.Constructor<? extends AbstractBeanField<?, ?>> getConverterConstructor() {
             return converterConstructor;
         }
@@ -341,7 +343,7 @@ public final class FieldMappingCache {
          * 
          * <p>Methodは実質的にimmutableなため、コピーを返す必要はない。</p>
          */
-        @SuppressFBWarnings("EI_EXPOSE_REP")
+        @SuppressFBWarnings(EI_EXPOSE_REP)
         public java.lang.reflect.Method getConverterMethod() {
             return converterMethod;
         }

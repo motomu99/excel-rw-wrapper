@@ -7,8 +7,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-
 import org.dhatim.fastexcel.reader.Row;
 
 import com.example.exception.HeaderNotFoundException;
@@ -127,7 +125,7 @@ public class FastExcelHeaderDetector {
                 }
                 List<String> candidates = getHeaderCandidates(cellText);
                 for (String candidate : candidates) {
-                    if (trimmedHeaderKey != null && trimmedHeaderKey.equals(candidate)) {
+                    if (trimmedHeaderKey.equals(candidate)) {
                         log.debug("ヘッダー行を検出: 行={}, キー列={}", row.getRowNum(), headerKeyColumn);
                         headerRow = row;
                         headerRowIndex = row.getRowNum() - 1;
@@ -260,7 +258,6 @@ public class FastExcelHeaderDetector {
      * 
      * @return ヘッダー行
      */
-    @SuppressFBWarnings("EI_EXPOSE_REP")
     public Row getHeaderRow() {
         return headerRow;
     }

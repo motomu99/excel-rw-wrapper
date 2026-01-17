@@ -1,7 +1,6 @@
 package com.example.common.converter;
 
 import java.math.BigDecimal;
-import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -281,32 +280,26 @@ public class CellValueConverter {
      * 
      * @param row 行
      * @param index セルインデックス
-     * @return セルの値（文字列形式、フリガナ正規化済み）
+     * @return セルの値（文字列形式）
      */
     public static String getCellValueAsString(Row row, int index) {
-        if (row == null) {
+        if (row == null || !row.hasCell(index)) {
             return null;
         }
+
         try {
-            if (!row.hasCell(index)) {
-                return null;
-            }
             org.dhatim.fastexcel.reader.Cell cell = row.getCell(index);
-            if (cell == null) {
+            if (cell == null || cell.getType() == org.dhatim.fastexcel.reader.CellType.EMPTY) {
                 return null;
             }
+
             if (cell.getType() == org.dhatim.fastexcel.reader.CellType.FORMULA) {
-                String formula = cell.getFormula();
-                return formula == null ? null : normalizeStringValue(formula);
+                return cell.getFormula();
             }
-            if (cell.getType() == org.dhatim.fastexcel.reader.CellType.STRING) {
-                String text = cell.asString();
-                return text == null ? null : normalizeStringValue(text);
-            }
-            String text = cell.getText();
-            return text == null ? null : normalizeStringValue(text);
+
+            return cell.getText();
         } catch (Exception e) {
-            // セルが存在しない場合はnullを返す
+            log.debug("セルの取得またはテキスト変換に失敗しました: index={}", index, e);
             return null;
         }
     }
@@ -336,15 +329,21 @@ public class CellValueConverter {
             }
 
             if (targetType == String.class) {
+                // 文字列型はそのまま返す（空白も保持）
                 return cellText;
             } else if (isNumericType(targetType)) {
-                return convertToNumericType(row, index, targetType, cellText);
+                // 数値型の場合は、空白文字列をnullとして扱う
+                String trimmed = cellText.trim();
+                if (trimmed.isEmpty()) {
+                    return null;
+                }
+                return convertToNumericType(row, index, targetType, trimmed);
             } else if (targetType == Boolean.class || targetType == boolean.class) {
-                return convertToBooleanType(row, index, cellText);
+                return convertToBooleanType(row, index, cellText.trim());
             } else if (targetType == LocalDate.class) {
-                return convertToLocalDate(row, index, cellText);
+                return convertToLocalDate(row, index, cellText.trim());
             } else if (targetType == LocalDateTime.class) {
-                return convertToLocalDateTime(row, index, cellText);
+                return convertToLocalDateTime(row, index, cellText.trim());
             }
         } catch (IllegalArgumentException e) {
             String cellValue = getCellValueAsString(row, index);
@@ -379,8 +378,9 @@ public class CellValueConverter {
                     return num.doubleValue();
                 }
             }
-        } catch (org.dhatim.fastexcel.reader.ExcelReaderException e) {
-            // 数値取得に失敗した場合はフォールバック
+        } catch (org.dhatim.fastexcel.reader.ExcelReaderException ignored) {
+            // 数値取得に失敗した場合は文字列からのパースにフォールバック
+            log.trace("fastexcelからの数値取得に失敗しました。文字列パースを試みます。");
         }
         // 数値として取得できない場合は文字列からパース
         return parseNumericString(cellText, targetType);
@@ -400,8 +400,9 @@ public class CellValueConverter {
             if (optBoolean.isPresent()) {
                 return optBoolean.get();
             }
-        } catch (org.dhatim.fastexcel.reader.ExcelReaderException e) {
+        } catch (org.dhatim.fastexcel.reader.ExcelReaderException ignored) {
             // Boolean取得に失敗した場合はフォールバック
+            log.trace("fastexcelからのBoolean取得に失敗しました。文字列パースを試みます。");
         }
         return Boolean.parseBoolean(cellText);
     }
@@ -420,8 +421,9 @@ public class CellValueConverter {
             if (optDateTime.isPresent()) {
                 return optDateTime.get().toLocalDate();
             }
-        } catch (org.dhatim.fastexcel.reader.ExcelReaderException e) {
+        } catch (org.dhatim.fastexcel.reader.ExcelReaderException ignored) {
             // 日付取得に失敗した場合はフォールバック
+            log.trace("fastexcelからの日付取得に失敗しました。文字列パースを試みます。");
         }
         return LocalDate.parse(cellText);
     }
@@ -440,28 +442,11 @@ public class CellValueConverter {
             if (optDateTime.isPresent()) {
                 return optDateTime.get();
             }
-        } catch (org.dhatim.fastexcel.reader.ExcelReaderException e) {
+        } catch (org.dhatim.fastexcel.reader.ExcelReaderException ignored) {
             // 日時取得に失敗した場合はフォールバック
+            log.trace("fastexcelからの日時取得に失敗しました。文字列パースを試みます。");
         }
         return LocalDateTime.parse(cellText);
-    }
-
-    /**
-     * 文字列値を正規化（フリガナ削除、制御文字削除など）
-     * 
-     * @param value 元の値
-     * @return 正規化後の値
-     */
-    public static String normalizeStringValue(String value) {
-        if (value == null) {
-            return "";
-        }
-        String normalizedValue = Normalizer.normalize(value, Normalizer.Form.NFKC);
-        String cleanedValue = normalizedValue.replace("\uFEFF", "").replace("\u200B", "");
-        cleanedValue = cleanedValue.replace("\u00A0", " ").replace("\u3000", " ");
-        cleanedValue = cleanedValue.replaceAll("\\p{C}", "");
-        cleanedValue = cleanedValue.replaceAll("\\s+[\\p{IsHiragana}\\p{IsKatakana}\\u30FC]+$", "");
-        return cleanedValue.trim();
     }
 }
 

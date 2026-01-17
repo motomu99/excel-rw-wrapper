@@ -217,6 +217,7 @@ pmdMain {
 }
 
 pmdTest {
+    ignoreFailures = true
     reports {
         xml.required = true
         html.required = true

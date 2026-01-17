@@ -36,6 +36,7 @@ public class ExcelReaderTest {
     private static final Path SAMPLE_EXCEL_HEADER_START_B = TEST_RESOURCES_DIR.resolve("sample_header_start_b.xlsx");
     private static final Path SAMPLE_EXCEL_SPARSE_ROW = TEST_RESOURCES_DIR.resolve("sample_sparse_row.xlsx");
     private static final Path SAMPLE_EXCEL_CUSTOM_CONVERTER = TEST_RESOURCES_DIR.resolve("sample_custom_converter.xlsx");
+    private static final Path SAMPLE_EXCEL_FULLWIDTH = TEST_RESOURCES_DIR.resolve("sample_fullwidth.xlsx");
 
     @BeforeAll
     static void setUp() throws IOException {
@@ -68,6 +69,9 @@ public class ExcelReaderTest {
 
         // カスタムコンバーター検証用のサンプルExcelファイルを作成（ヘッダーベース）
         createSampleExcelWithCustomConverter();
+
+        // 全角英数字を含むサンプルExcelファイルを作成
+        createSampleExcelWithFullwidth();
     }
 
     private static void createSampleExcel() throws IOException {
@@ -672,6 +676,77 @@ public class ExcelReaderTest {
         assertEquals("佐藤花子", p2.getName());
         assertEquals(30, p2.getAge());
         assertNull(p2.getOccupation());
+    }
+
+    private static void createSampleExcelWithFullwidth() throws IOException {
+        try (Workbook workbook = new XSSFWorkbook();
+             FileOutputStream fos = new FileOutputStream(SAMPLE_EXCEL_FULLWIDTH.toFile())) {
+
+            Sheet sheet = workbook.createSheet("Sheet1");
+
+            // ヘッダー行
+            Row headerRow = sheet.createRow(0);
+            headerRow.createCell(0).setCellValue("名前");
+            headerRow.createCell(1).setCellValue("年齢");
+            headerRow.createCell(2).setCellValue("職業");
+            headerRow.createCell(3).setCellValue("出身地");
+
+            // データ行1（全角数字を含む）
+            Row dataRow1 = sheet.createRow(1);
+            dataRow1.createCell(0).setCellValue("田中太郎");
+            dataRow1.createCell(1).setCellValue(25);
+            dataRow1.createCell(2).setCellValue("エンジニア");
+            dataRow1.createCell(3).setCellValue("東京０１２３"); // 全角数字
+
+            // データ行2（全角英字を含む）
+            Row dataRow2 = sheet.createRow(2);
+            dataRow2.createCell(0).setCellValue("佐藤花子");
+            dataRow2.createCell(1).setCellValue(30);
+            dataRow2.createCell(2).setCellValue("デザイナー");
+            dataRow2.createCell(3).setCellValue("大阪ＡＢＣ"); // 全角英字大文字
+
+            // データ行3（全角英数字が混在）
+            Row dataRow3 = sheet.createRow(3);
+            dataRow3.createCell(0).setCellValue("山田次郎");
+            dataRow3.createCell(1).setCellValue(28);
+            dataRow3.createCell(2).setCellValue("営業");
+            dataRow3.createCell(3).setCellValue("福岡ａｂｃ１２３"); // 全角英字小文字と数字
+
+            // データ行4（全角英数字のみ）
+            Row dataRow4 = sheet.createRow(4);
+            dataRow4.createCell(0).setCellValue("高橋健太");
+            dataRow4.createCell(1).setCellValue(35);
+            dataRow4.createCell(2).setCellValue("マネージャー");
+            dataRow4.createCell(3).setCellValue("ＴＥＳＴ１２３"); // 全角英数字のみ
+
+            workbook.write(fos);
+        }
+    }
+
+    @Test
+    @DisplayName("全角英数字の保持 - 全角英数字が半角に変換されずに保持されること")
+    void testFullwidthCharactersPreserved() throws IOException {
+        List<Person> result = ExcelReader.builder(Person.class, SAMPLE_EXCEL_FULLWIDTH)
+            .read();
+
+        assertNotNull(result);
+        assertEquals(4, result.size());
+
+        // 全角数字が保持されていること
+        Person person1 = result.get(0);
+        assertEquals("東京０１２３", person1.getBirthplace(), "全角数字が半角に変換されていないこと");
+
+        // 全角英字大文字が保持されていること
+        Person person2 = result.get(1);
+        assertEquals("大阪ＡＢＣ", person2.getBirthplace(), "全角英字大文字が半角に変換されていないこと");
+
+        // 全角英字小文字と数字が保持されていること
+        Person person3 = result.get(2);
+        assertEquals("福岡ａｂｃ１２３", person3.getBirthplace(), "全角英字小文字と数字が半角に変換されていないこと");
+
+        // 全角英数字のみが保持されていること
+        Person person4 = result.get(3);
+        assertEquals("ＴＥＳＴ１２３", person4.getBirthplace(), "全角英数字のみが半角に変換されていないこと");
     }
 }
 

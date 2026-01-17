@@ -45,6 +45,7 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 public class CsvStreamReader<T> {
+    private static final String CSV_READ_ERROR_MSG = "CSVファイルの読み込みに失敗しました: ";
     
     private final Class<T> beanClass;
     private final Path filePath;
@@ -162,7 +163,7 @@ public class CsvStreamReader<T> {
             }
         } catch (IOException e) {
             log.error("CSVファイル読み込み中にエラーが発生: ファイルパス={}, エラー={}", filePath, e.getMessage(), e);
-            throw new CsvReadException("CSVファイルの読み込みに失敗しました: " + filePath, e);
+            throw new CsvReadException(CSV_READ_ERROR_MSG + filePath, e);
         }
     }
 
@@ -192,7 +193,7 @@ public class CsvStreamReader<T> {
             } catch (FileNotFoundException e) {
                 // ファイルが存在しない場合は即座にエラーにする
                 log.error("ファイルが存在しません: ファイルパス={}", filePath, e);
-                throw new CsvReadException("CSVファイルの読み込みに失敗しました: " + filePath, e);
+                throw new CsvReadException(CSV_READ_ERROR_MSG + filePath, e);
             } catch (IOException e) {
                 // 文字コードの自動判別に失敗した場合はUTF-8をデフォルトとして使用
                 log.warn("文字コードの自動判別に失敗しました。UTF-8を使用します: {}", e.getMessage());
@@ -403,7 +404,7 @@ public class CsvStreamReader<T> {
             } catch (IOException e) {
                 log.error("CSVファイル読み込み中にエラーが発生: ファイルパス={}, エラー={}", 
                          reader.filePath, e.getMessage(), e);
-                throw new CsvReadException("CSVファイルの読み込みに失敗しました: " + reader.filePath, e);
+                throw new CsvReadException(CSV_READ_ERROR_MSG + reader.filePath, e);
             } finally {
                 // 一時ファイルを削除
                 if (tempFile != null) {
@@ -473,7 +474,7 @@ public class CsvStreamReader<T> {
                         row = csvReader.readNext();
                     }
                 } catch (CsvValidationException e) {
-                    throw new CsvReadException("CSVファイルの読み込みに失敗しました: " + reader.filePath, e);
+                    throw new CsvReadException(CSV_READ_ERROR_MSG + reader.filePath, e);
                 }
             }
             

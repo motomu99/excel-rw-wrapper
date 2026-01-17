@@ -30,6 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class FastExcelRowIterator<T> implements Iterator<T> {
 
+    private static final String EI_EXPOSE_REP2 = "EI_EXPOSE_REP2";
     private static final int MAX_EXCEL_COLUMNS = 16384;
     private final Iterator<Row> rowIterator;
     private final Class<T> beanClass;
@@ -71,7 +72,7 @@ public class FastExcelRowIterator<T> implements Iterator<T> {
      * @param treatFirstRowAsData 最初の行をデータとして扱うかどうか
      * @param validateColumnCount 列数チェックを有効にするかどうか
      */
-    @SuppressFBWarnings("EI_EXPOSE_REP2")
+    @SuppressFBWarnings(EI_EXPOSE_REP2)
     public FastExcelRowIterator(Iterator<Row> rowIterator, Class<T> beanClass, 
                            String headerKeyColumn, int headerSearchRows, 
                            boolean usePositionMapping, boolean treatFirstRowAsData,
@@ -84,7 +85,11 @@ public class FastExcelRowIterator<T> implements Iterator<T> {
         this.usePositionMapping = usePositionMapping;
         this.treatFirstRowAsData = treatFirstRowAsData;
         this.validateColumnCount = validateColumnCount;
-        this.errors = validateColumnCount ? new ArrayList<>() : null;
+        if (validateColumnCount) {
+            this.errors = new ArrayList<>();
+        } else {
+            this.errors = null;
+        }
     }
     
     /**
@@ -97,7 +102,6 @@ public class FastExcelRowIterator<T> implements Iterator<T> {
      * @param usePositionMapping 位置ベースマッピングを使用するかどうか
      * @param treatFirstRowAsData 最初の行をデータとして扱うかどうか
      */
-    @SuppressFBWarnings("EI_EXPOSE_REP2")
     public FastExcelRowIterator(Iterator<Row> rowIterator, Class<T> beanClass, 
                            String headerKeyColumn, int headerSearchRows, 
                            boolean usePositionMapping, boolean treatFirstRowAsData) {
@@ -274,8 +278,10 @@ public class FastExcelRowIterator<T> implements Iterator<T> {
                 } else {
                     String columnName = mappingInfo.getColumnName();
                     String trimmedColumnName = columnName != null ? columnName.trim() : null;
-                    columnIndex = trimmedColumnName == null ? null : columnMap.get(trimmedColumnName);
-            }
+                    if (trimmedColumnName != null) {
+                        columnIndex = columnMap.get(trimmedColumnName);
+                    }
+                }
 
             if (columnIndex != null) {
                 String columnName = headerMap.get(columnIndex);
@@ -292,7 +298,7 @@ public class FastExcelRowIterator<T> implements Iterator<T> {
                 }
                 
                 // Pre-assignment バリデータが指定されている場合、バリデーションを実行
-                if (mappingInfo.getValidatorClass() != null && stringValue != null && !stringValue.isEmpty()) {
+                if (mappingInfo.getValidatorClass() != null && !stringValue.isEmpty()) {
                     try {
                         // キャッシュされたコンストラクタとメソッドを使用
                         Object validator = mappingInfo.getValidatorConstructor().newInstance();
@@ -404,7 +410,7 @@ public class FastExcelRowIterator<T> implements Iterator<T> {
                 // nullセルはスキップ（間欠的な空セルがあっても後続を確認）
                 continue;
             }
-            if (value != null && !value.trim().isEmpty()) {
+            if (!value.trim().isEmpty()) {
                 return false;
             }
         }

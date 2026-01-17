@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -402,5 +403,49 @@ public class CsvReaderWrapperTest {
         assertEquals("田中太郎", persons.get(0).getName());
         assertEquals("高橋健太", persons.get(4).getName());
         assertEquals("鈴木一郎", persons.get(7).getName());
+    }
+
+    @Test
+    @DisplayName("全角英数字の保持 - 全角英数字が半角に変換されずに保持されること")
+    void testFullwidthCharactersPreserved() throws IOException {
+        // 全角英数字を含むCSVファイルを一時的に作成
+        Path tempCsv = Files.createTempFile("test_fullwidth", ".csv");
+        tempCsv.toFile().deleteOnExit();
+        
+        try {
+            // CSVファイルに全角英数字を含むデータを書き込む
+            List<String> lines = java.util.Arrays.asList(
+                "名前,年齢,職業,出身地",
+                "田中太郎,25,エンジニア,東京０１２３",
+                "佐藤花子,30,デザイナー,大阪ＡＢＣ",
+                "山田次郎,28,営業,福岡ａｂｃ１２３",
+                "高橋健太,35,マネージャー,ＴＥＳＴ１２３"
+            );
+            Files.write(tempCsv, lines, StandardCharsets.UTF_8);
+
+            List<Person> result = CsvReaderWrapper.builder(Person.class, tempCsv)
+                .read();
+
+            assertNotNull(result);
+            assertEquals(4, result.size());
+
+            // 全角数字が保持されていること
+            Person person1 = result.get(0);
+            assertEquals("東京０１２３", person1.getBirthplace(), "全角数字が半角に変換されていないこと");
+
+            // 全角英字大文字が保持されていること
+            Person person2 = result.get(1);
+            assertEquals("大阪ＡＢＣ", person2.getBirthplace(), "全角英字大文字が半角に変換されていないこと");
+
+            // 全角英字小文字と数字が保持されていること
+            Person person3 = result.get(2);
+            assertEquals("福岡ａｂｃ１２３", person3.getBirthplace(), "全角英字小文字と数字が半角に変換されていないこと");
+
+            // 全角英数字のみが保持されていること
+            Person person4 = result.get(3);
+            assertEquals("ＴＥＳＴ１２３", person4.getBirthplace(), "全角英数字のみが半角に変換されていないこと");
+        } finally {
+            Files.deleteIfExists(tempCsv);
+        }
     }
 }
